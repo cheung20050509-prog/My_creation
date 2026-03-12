@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.pt
+checkpoints/
+logs/
+*.log
+deberta-v3-base/
+datasets/
+datasets
+.env
+.venv/
+venv/
