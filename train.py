@@ -41,6 +41,7 @@ parser.add_argument("--n_epochs", type=int, default=50)
 parser.add_argument("--stage1_epochs", type=int, default=10)
 parser.add_argument("--dropout_prob", type=float, default=0.1)
 parser.add_argument("--learning_rate", type=float, default=2e-5)
+parser.add_argument("--ig_learning_rate", type=float, default=5e-4)
 parser.add_argument("--gradient_accumulation_step", type=int, default=1)
 parser.add_argument("--warmup_proportion", type=float, default=0.1)
 parser.add_argument("--weight_decay", type=float, default=1e-3)
@@ -56,6 +57,7 @@ parser.add_argument("--beta_ib", type=float, default=32)
 parser.add_argument("--gamma_cyc", type=float, default=1.0)
 parser.add_argument("--alpha_ib", type=float, default=0.01)
 parser.add_argument("--alpha_nce", type=float, default=0.05)
+parser.add_argument("--mse_weight", type=float, default=0.5)
 parser.add_argument("--cra_layers", type=int, default=8)
 parser.add_argument("--cra_dims", default="64,32,16", type=str)
 
@@ -192,13 +194,27 @@ def build_model(n_opt):
         args.model, multimodal_config=args, num_labels=1)
     model.to(DEVICE)
 
-    params = list(model.named_parameters())
     no_decay = {"bias", "LayerNorm.bias", "LayerNorm.weight"}
+
+    backbone_prefix = "dberta.model."
+    ig_lr = getattr(args, 'ig_learning_rate', 5e-4)
+
+    backbone_decay, backbone_no_decay = [], []
+    ig_decay, ig_no_decay = [], []
+    for n, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+        is_nd = any(nd in n for nd in no_decay)
+        if n.startswith(backbone_prefix):
+            (backbone_no_decay if is_nd else backbone_decay).append(p)
+        else:
+            (ig_no_decay if is_nd else ig_decay).append(p)
+
     groups = [
-        {"params": [p for n, p in params if not any(nd in n for nd in no_decay)],
-         "weight_decay": args.weight_decay},
-        {"params": [p for n, p in params if any(nd in n for nd in no_decay)],
-         "weight_decay": 0.0},
+        {"params": backbone_decay,    "lr": args.learning_rate, "weight_decay": args.weight_decay},
+        {"params": backbone_no_decay, "lr": args.learning_rate, "weight_decay": 0.0},
+        {"params": ig_decay,          "lr": ig_lr,              "weight_decay": args.weight_decay},
+        {"params": ig_no_decay,       "lr": ig_lr,              "weight_decay": 0.0},
     ]
     optimizer = AdamW(groups, lr=args.learning_rate)
     scheduler = get_linear_schedule_with_warmup(
@@ -247,7 +263,9 @@ def train_epoch(model, loader, optimizer, scheduler, stage):
         logits, ib_loss, loss_dict, nce_extras = model(
             input_ids, v_norm, a_norm, labels=label_ids, stage=stage)
 
-        l_task = F.l1_loss(logits.view(-1), label_ids.view(-1))
+        pred_flat = logits.view(-1)
+        label_flat = label_ids.view(-1)
+        l_task = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
         l_nce = compute_infonce(nce_extras) if nce_extras is not None else 0.0
 
         loss = l_task + ib_loss + args.alpha_nce * l_nce
@@ -288,17 +306,19 @@ def eval_epoch(model, loader, stage=2):
             a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
 
             logits, _, _, _ = model(input_ids, v_norm, a_norm, stage=stage)
-            loss = F.l1_loss(logits.view(-1), label_ids.view(-1))
+            pred_flat = logits.view(-1)
+            label_flat = label_ids.view(-1)
+            loss = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
             total_loss += loss.item()
             steps += 1
     return total_loss / max(steps, 1)
 
 
-def test_epoch(model, loader, stage=2):
+def test_epoch(model, loader, stage=2, desc="Test"):
     model.eval()
     preds, labels, all_w = [], [], []
     with torch.no_grad():
-        for batch in tqdm(loader, desc="Test"):
+        for batch in tqdm(loader, desc=desc):
             batch = tuple(t.to(DEVICE) for t in batch)
             input_ids, visual, acoustic, label_ids = batch
             visual = visual.squeeze(1)
@@ -341,7 +361,8 @@ def main():
     print(f"  Dataset        : {args.dataset}")
     print(f"  Epochs         : {args.n_epochs} (stage1: {args.stage1_epochs})")
     print(f"  Batch size     : {args.train_batch_size}")
-    print(f"  Learning rate  : {args.learning_rate}")
+    print(f"  LR (backbone)  : {args.learning_rate}")
+    print(f"  LR (InfoGate)  : {args.ig_learning_rate}")
     print(f"  InfoGate layers: {args.num_infogate_layers}")
     print(f"  Bottleneck dim : {args.bottleneck_dim}")
     print(f"  beta_ib        : {args.beta_ib}")
@@ -360,39 +381,42 @@ def main():
 
     os.makedirs(args.checkpoint_dir, exist_ok=True)
     ckpt_path = os.path.join(args.checkpoint_dir, f"infogate_{args.dataset}_best.pt")
-    best_val = float('inf')
+    best_dev_mae = float('inf')
     best_results = None
 
     for epoch in range(args.n_epochs):
         stage = 1 if epoch < args.stage1_epochs else 2
         tr_loss, tr_task, tr_ib, tr_nce, tr_detail = train_epoch(
             model, train_dl, optimizer, scheduler, stage)
-        val_loss = eval_epoch(model, dev_dl, stage=stage)
 
         print(f"\nEpoch {epoch + 1}/{args.n_epochs}  [stage {stage}]")
         print(f"  Loss  total={tr_loss:.4f}  task={tr_task:.4f}  "
               f"ib={tr_ib:.4f}  nce={tr_nce:.4f}")
         detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items())
         print(f"  Detail  {detail_str}")
-        print(f"  Val loss: {val_loss:.4f}")
+
+        dev_preds, dev_labels = test_epoch(model, dev_dl, stage=stage, desc="Dev")
+        dev_acc2, dev_acc7, dev_mae, dev_corr, dev_f1 = score(dev_preds, dev_labels)
+        print(f"  Dev   Acc2={dev_acc2*100:.2f}%  Acc7={dev_acc7*100:.2f}%  "
+              f"MAE={dev_mae:.4f}  Corr={dev_corr:.4f}  F1={dev_f1:.4f}")
 
         preds, labels = test_epoch(model, test_dl, stage=stage)
         acc2, acc7, mae, corr, f1 = score(preds, labels)
         print(f"  Test  Acc2={acc2*100:.2f}%  Acc7={acc7*100:.2f}%  "
               f"MAE={mae:.4f}  Corr={corr:.4f}  F1={f1:.4f}")
 
-        if val_loss < best_val:
-            best_val = val_loss
+        if dev_mae < best_dev_mae:
+            best_dev_mae = dev_mae
             best_results = (acc2, acc7, mae, corr, f1)
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-                'valid_loss': val_loss,
+                'dev_mae': dev_mae,
                 'test_results': best_results,
                 'args': args,
             }, ckpt_path)
-            print(f"  >> Best model saved to {ckpt_path}")
+            print(f"  >> Best model saved (dev MAE={dev_mae:.4f}) to {ckpt_path}")
 
     print("\n" + "=" * 60)
     print("Best Results:")
