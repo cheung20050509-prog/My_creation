@@ -61,6 +61,9 @@ parser.add_argument("--mse_weight", type=float, default=0.5)
 parser.add_argument("--cra_layers", type=int, default=8)
 parser.add_argument("--cra_dims", default="64,32,16", type=str)
 
+parser.add_argument("--ema_decay", type=float, default=0.999)
+parser.add_argument("--ema_start_epoch", type=int, default=5)
+
 parser.add_argument("--checkpoint_dir", type=str, default="checkpoints")
 
 args = parser.parse_args()
@@ -226,6 +229,50 @@ def build_model(n_opt):
 
 
 # ============================================================
+# EMA
+# ============================================================
+
+class EMA:
+    def __init__(self, model, decay=0.999):
+        self.decay = decay
+        self.shadow = {n: p.clone().detach()
+                       for n, p in model.named_parameters() if p.requires_grad}
+        self.backup = {}
+
+    @torch.no_grad()
+    def update(self, model):
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self.shadow:
+                self.shadow[n].mul_(self.decay).add_(p.data, alpha=1 - self.decay)
+
+    def apply(self, model):
+        self.backup = {n: p.data.clone() for n, p in model.named_parameters()
+                       if p.requires_grad and n in self.shadow}
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self.shadow:
+                p.data.copy_(self.shadow[n])
+
+    def restore(self, model):
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self.backup:
+                p.data.copy_(self.backup[n])
+        self.backup = {}
+
+    def state_dict(self):
+        return {n: v.clone() for n, v in self.shadow.items()}
+
+    def load_state_dict(self, state_dict):
+        for n, v in state_dict.items():
+            if n in self.shadow:
+                self.shadow[n].copy_(v)
+
+    def reset(self, model):
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self.shadow:
+                self.shadow[n].copy_(p.data)
+
+
+# ============================================================
 # InfoNCE (from MODS)
 # ============================================================
 
@@ -245,7 +292,7 @@ def compute_infonce(nce_extras, temperature=0.07):
 # Train / Eval / Test
 # ============================================================
 
-def train_epoch(model, loader, optimizer, scheduler, stage):
+def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
     model.train()
     total_loss, steps = 0.0, 0
     sum_task, sum_ib, sum_nce = 0.0, 0.0, 0.0
@@ -286,6 +333,8 @@ def train_epoch(model, loader, optimizer, scheduler, stage):
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
+            if ema is not None:
+                ema.update(model)
 
     n = max(steps, 1)
     detail = {k: v / n for k, v in sum_detail.items()}
@@ -373,10 +422,12 @@ def main():
     set_seed(args.seed)
     train_dl, dev_dl, test_dl, n_opt = setup_data()
     model, optimizer, scheduler = build_model(n_opt)
+    ema = EMA(model, decay=args.ema_decay)
 
     total_p = sum(p.numel() for p in model.parameters())
     train_p = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Parameters: {total_p:,} total, {train_p:,} trainable")
+    print(f"EMA: decay={args.ema_decay}, start_epoch={args.ema_start_epoch}")
     print("=" * 60)
 
     os.makedirs(args.checkpoint_dir, exist_ok=True)
@@ -386,14 +437,22 @@ def main():
 
     for epoch in range(args.n_epochs):
         stage = 1 if epoch < args.stage1_epochs else 2
+        eval_with_ema = epoch >= args.ema_start_epoch
+        if epoch == args.ema_start_epoch:
+            ema.reset(model)
         tr_loss, tr_task, tr_ib, tr_nce, tr_detail = train_epoch(
-            model, train_dl, optimizer, scheduler, stage)
+            model, train_dl, optimizer, scheduler, stage,
+            ema=ema if eval_with_ema else None)
 
-        print(f"\nEpoch {epoch + 1}/{args.n_epochs}  [stage {stage}]")
+        print(f"\nEpoch {epoch + 1}/{args.n_epochs}  [stage {stage}]"
+              f"{'  (EMA eval)' if eval_with_ema else ''}")
         print(f"  Loss  total={tr_loss:.4f}  task={tr_task:.4f}  "
               f"ib={tr_ib:.4f}  nce={tr_nce:.4f}")
         detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items())
         print(f"  Detail  {detail_str}")
+
+        if eval_with_ema:
+            ema.apply(model)
 
         dev_preds, dev_labels = test_epoch(model, dev_dl, stage=stage, desc="Dev")
         dev_acc2, dev_acc7, dev_mae, dev_corr, dev_f1 = score(dev_preds, dev_labels)
@@ -408,15 +467,21 @@ def main():
         if dev_mae < best_dev_mae:
             best_dev_mae = dev_mae
             best_results = (acc2, acc7, mae, corr, f1)
-            torch.save({
+            save_dict = {
                 'epoch': epoch + 1,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'dev_mae': dev_mae,
                 'test_results': best_results,
                 'args': args,
-            }, ckpt_path)
+            }
+            if eval_with_ema:
+                save_dict['ema_state_dict'] = ema.state_dict()
+            torch.save(save_dict, ckpt_path)
             print(f"  >> Best model saved (dev MAE={dev_mae:.4f}) to {ckpt_path}")
+
+        if eval_with_ema:
+            ema.restore(model)
 
     print("\n" + "=" * 60)
     print("Best Results:")

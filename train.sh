@@ -8,10 +8,13 @@ DATASET=${1:-mosi}
 EPOCHS=${2:-80}
 STAGE1=${3:-8}
 BATCH_SIZE=${4:-16}
+LOG_SUFFIX=${5:-}
 
 mkdir -p checkpoints logs
 
+LOGFILE="logs/train_${DATASET}${LOG_SUFFIX}.log"
 echo "Training InfoGate on ${DATASET} for ${EPOCHS} epochs (stage1: ${STAGE1})"
+echo "Log: ${LOGFILE}"
 
 nohup "$PYTHON" -u train.py \
     --dataset "$DATASET" \
@@ -30,12 +33,14 @@ nohup "$PYTHON" -u train.py \
     --gamma_cyc 1.0 \
     --alpha_ib 0.005 \
     --alpha_nce 0.05 \
+    --mse_weight 0.5 \
     --cra_layers 8 \
     --dropout_prob 0.25 \
     --weight_decay 0.01 \
+    --ema_decay 0.999 \
+    --ema_start_epoch 5 \
     --checkpoint_dir checkpoints \
-    --seed 128 \
-    > "logs/train_${DATASET}.log" 2>&1 &
+    --seed 42 \
+    > "${LOGFILE}" 2>&1 &
 
 echo "PID: $!"
-echo "Log: logs/train_${DATASET}.log"
