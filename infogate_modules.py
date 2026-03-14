@@ -699,18 +699,4 @@ class InfoGate(nn.Module):
             'L_cyc': L_cyc.item() if torch.is_tensor(L_cyc) else L_cyc,
         }
 
-        # 13. NCE extras (training only) ------------------------------
-        nce_extras = None
-        if self.training:
-            h_a = self.mselector.adaptive_aggregate(B['a'], self.mselector.W_a)
-            h_l = self.mselector.adaptive_aggregate(B['t'], self.mselector.W_l)
-            h_v = self.mselector.adaptive_aggregate(B['v'], self.mselector.W_v)
-            nce_extras = {
-                'h_p': h_p,
-                'h_a': h_a, 'h_l': h_l, 'h_v': h_v,
-                'F_a': self.reverse_proj_a,
-                'F_l': self.reverse_proj_l,
-                'F_v': self.reverse_proj_v,
-            }
-
-        return logits, ib_loss, loss_dict, nce_extras
+        return logits, ib_loss, loss_dict, h_p

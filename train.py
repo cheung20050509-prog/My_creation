@@ -57,6 +57,8 @@ parser.add_argument("--beta_ib", type=float, default=32)
 parser.add_argument("--gamma_cyc", type=float, default=1.0)
 parser.add_argument("--alpha_ib", type=float, default=0.01)
 parser.add_argument("--alpha_nce", type=float, default=0.05)
+parser.add_argument("--alpha_sac", type=float, default=0.1)
+parser.add_argument("--alpha_ord", type=float, default=0.05)
 parser.add_argument("--mse_weight", type=float, default=0.5)
 parser.add_argument("--cra_layers", type=int, default=8)
 parser.add_argument("--cra_dims", default="64,32,16", type=str)
@@ -273,19 +275,48 @@ class EMA:
 
 
 # ============================================================
-# InfoNCE (from MODS)
+# Sentiment-Aware Contrastive + Ordinal Ranking Losses
 # ============================================================
 
-def compute_infonce(nce_extras, temperature=0.07):
-    h_p = nce_extras['h_p']
-    total = h_p.new_tensor(0.0)
-    for h_key, f_key in [('h_a', 'F_a'), ('h_l', 'F_l'), ('h_v', 'F_v')]:
-        h_m = F.normalize(nce_extras[h_key], dim=-1)
-        f_hp = F.normalize(nce_extras[f_key](h_p), dim=-1)
-        sim = torch.mm(h_m, f_hp.t()) / temperature
-        labels = torch.arange(h_p.size(0), device=h_p.device)
-        total = total + F.cross_entropy(sim, labels)
-    return total / 3.0
+def compute_sentiment_contrastive(h_fused, labels, temperature=0.1):
+    """Sentiment-distance-weighted contrastive loss in bottleneck space."""
+    B = h_fused.size(0)
+    if B < 2:
+        return h_fused.new_tensor(0.0)
+
+    h_norm = F.normalize(h_fused, dim=-1)
+    sim = torch.mm(h_norm, h_norm.t())
+
+    label_dist = torch.abs(labels.unsqueeze(0) - labels.unsqueeze(1))
+    target_sim = torch.exp(-label_dist / temperature)
+
+    mask = ~torch.eye(B, dtype=torch.bool, device=h_fused.device)
+    return F.mse_loss(sim[mask], target_sim[mask])
+
+
+def compute_ordinal_loss(logits, labels):
+    """Bradley-Terry pairwise ordinal ranking loss (from MOAC)."""
+    y_hat = logits.view(-1)
+    y = labels.view(-1)
+    B = y.size(0)
+    if B < 2:
+        return y_hat.new_tensor(0.0)
+
+    n_pairs = min(B, 2 * B)
+    idx1 = torch.randint(B, (n_pairs,), device=y.device)
+    idx2 = torch.randint(B, (n_pairs,), device=y.device)
+
+    valid = idx1 != idx2
+    idx1, idx2 = idx1[valid], idx2[valid]
+    if idx1.size(0) == 0:
+        return y_hat.new_tensor(0.0)
+
+    swap = y[idx1] < y[idx2]
+    i1 = torch.where(swap, idx2, idx1)
+    i2 = torch.where(swap, idx1, idx2)
+
+    diff = y_hat[i1] - y_hat[i2]
+    return -F.logsigmoid(diff).mean()
 
 
 # ============================================================
@@ -295,7 +326,7 @@ def compute_infonce(nce_extras, temperature=0.07):
 def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
     model.train()
     total_loss, steps = 0.0, 0
-    sum_task, sum_ib, sum_nce = 0.0, 0.0, 0.0
+    sum_task, sum_ib = 0.0, 0.0
     sum_detail = {}
 
     for step, batch in enumerate(tqdm(loader, desc=f"Train (stage {stage})")):
@@ -307,15 +338,17 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
         v_norm = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
         a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
 
-        logits, ib_loss, loss_dict, nce_extras = model(
+        logits, ib_loss, loss_dict, h_pooled = model(
             input_ids, v_norm, a_norm, labels=label_ids, stage=stage)
 
         pred_flat = logits.view(-1)
         label_flat = label_ids.view(-1)
         l_task = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
-        l_nce = compute_infonce(nce_extras) if nce_extras is not None else 0.0
 
-        loss = l_task + ib_loss + args.alpha_nce * l_nce
+        l_sac = compute_sentiment_contrastive(h_pooled, label_flat) if h_pooled is not None else 0.0
+        l_ord = compute_ordinal_loss(logits, label_ids)
+
+        loss = l_task + ib_loss + args.alpha_sac * l_sac + args.alpha_ord * l_ord
 
         if args.gradient_accumulation_step > 1:
             loss = loss / args.gradient_accumulation_step
@@ -323,7 +356,6 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
         total_loss += loss.item()
         sum_task += l_task.item()
         sum_ib += ib_loss.item()
-        sum_nce += (l_nce.item() if torch.is_tensor(l_nce) else l_nce)
         for k, v in loss_dict.items():
             sum_detail[k] = sum_detail.get(k, 0.0) + v
         steps += 1
@@ -338,7 +370,7 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
 
     n = max(steps, 1)
     detail = {k: v / n for k, v in sum_detail.items()}
-    return total_loss / n, sum_task / n, sum_ib / n, sum_nce / n, detail
+    return total_loss / n, sum_task / n, sum_ib / n, detail
 
 
 def eval_epoch(model, loader, stage=2):
@@ -416,7 +448,7 @@ def main():
     print(f"  Bottleneck dim : {args.bottleneck_dim}")
     print(f"  beta_ib        : {args.beta_ib}")
     print(f"  gamma_cyc      : {args.gamma_cyc}")
-    print(f"  alpha_nce      : {args.alpha_nce}")
+    print(f"  mse_weight     : {args.mse_weight}")
     print("=" * 60)
 
     set_seed(args.seed)
@@ -432,22 +464,26 @@ def main():
 
     os.makedirs(args.checkpoint_dir, exist_ok=True)
     ckpt_path = os.path.join(args.checkpoint_dir, f"infogate_{args.dataset}_best.pt")
-    best_dev_mae = float('inf')
+    select_start = args.n_epochs // 2
+    best_dev_score = float('inf')
     best_results = None
+    best_test_mae = float('inf')
+    best_test_results = None
+    last_test_results = None
 
     for epoch in range(args.n_epochs):
         stage = 1 if epoch < args.stage1_epochs else 2
         eval_with_ema = epoch >= args.ema_start_epoch
         if epoch == args.ema_start_epoch:
             ema.reset(model)
-        tr_loss, tr_task, tr_ib, tr_nce, tr_detail = train_epoch(
+        tr_loss, tr_task, tr_ib, tr_detail = train_epoch(
             model, train_dl, optimizer, scheduler, stage,
             ema=ema if eval_with_ema else None)
 
         print(f"\nEpoch {epoch + 1}/{args.n_epochs}  [stage {stage}]"
               f"{'  (EMA eval)' if eval_with_ema else ''}")
         print(f"  Loss  total={tr_loss:.4f}  task={tr_task:.4f}  "
-              f"ib={tr_ib:.4f}  nce={tr_nce:.4f}")
+              f"ib={tr_ib:.4f}")
         detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items())
         print(f"  Detail  {detail_str}")
 
@@ -464,29 +500,57 @@ def main():
         print(f"  Test  Acc2={acc2*100:.2f}%  Acc7={acc7*100:.2f}%  "
               f"MAE={mae:.4f}  Corr={corr:.4f}  F1={f1:.4f}")
 
-        if dev_mae < best_dev_mae:
-            best_dev_mae = dev_mae
-            best_results = (acc2, acc7, mae, corr, f1)
-            save_dict = {
-                'epoch': epoch + 1,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'dev_mae': dev_mae,
-                'test_results': best_results,
-                'args': args,
-            }
-            if eval_with_ema:
-                save_dict['ema_state_dict'] = ema.state_dict()
-            torch.save(save_dict, ckpt_path)
-            print(f"  >> Best model saved (dev MAE={dev_mae:.4f}) to {ckpt_path}")
+        last_test_results = (acc2, acc7, mae, corr, f1)
+
+        if epoch >= select_start:
+            dev_score = dev_mae - 0.5 * dev_corr
+            if dev_score < best_dev_score:
+                best_dev_score = dev_score
+                best_results = (acc2, acc7, mae, corr, f1)
+                save_dict = {
+                    'epoch': epoch + 1,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'dev_mae': dev_mae,
+                    'dev_corr': dev_corr,
+                    'dev_score': dev_score,
+                    'test_results': best_results,
+                    'args': args,
+                }
+                if eval_with_ema:
+                    save_dict['ema_state_dict'] = ema.state_dict()
+                torch.save(save_dict, ckpt_path)
+                print(f"  >> Best model saved (dev score={dev_score:.4f}, "
+                      f"MAE={dev_mae:.4f}, Corr={dev_corr:.4f}) to {ckpt_path}")
+
+        if mae < best_test_mae:
+            best_test_mae = mae
+            best_test_results = (acc2, acc7, mae, corr, f1, epoch + 1)
 
         if eval_with_ema:
             ema.restore(model)
 
     print("\n" + "=" * 60)
-    print("Best Results:")
+    print(f"Best Results (dev score, epoch >= {select_start + 1}):")
     if best_results:
         acc2, acc7, mae, corr, f1 = best_results
+        print(f"  Acc-2: {acc2*100:.2f}%")
+        print(f"  Acc-7: {acc7*100:.2f}%")
+        print(f"  MAE:   {mae:.4f}")
+        print(f"  Corr:  {corr:.4f}")
+        print(f"  F1:    {f1:.4f}")
+    print(f"\nLast Epoch ({args.n_epochs}) Results:")
+    if last_test_results:
+        acc2, acc7, mae, corr, f1 = last_test_results
+        print(f"  Acc-2: {acc2*100:.2f}%")
+        print(f"  Acc-7: {acc7*100:.2f}%")
+        print(f"  MAE:   {mae:.4f}")
+        print(f"  Corr:  {corr:.4f}")
+        print(f"  F1:    {f1:.4f}")
+    print("\nBest Test MAE (oracle, for reference only):")
+    if best_test_results:
+        acc2, acc7, mae, corr, f1, ep = best_test_results
+        print(f"  Epoch: {ep}")
         print(f"  Acc-2: {acc2*100:.2f}%")
         print(f"  Acc-7: {acc7*100:.2f}%")
         print(f"  MAE:   {mae:.4f}")
