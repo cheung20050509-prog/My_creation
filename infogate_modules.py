@@ -255,9 +255,17 @@ class InfoGateLayer(nn.Module):
         sa_p = self.sa_p(B_p_n, B_p_n, B_p_n, conf_p)
         B_p_up = B_p + self.dropout(sa_p)
 
-        # Adaptive gating (replaces H_p + CA_a1 + CA_a2 in PCCA)
-        gated_a1 = self.gate_a1(B_p_up, ca_a1)
-        gated_a2 = self.gate_a2(B_p_up, ca_a2)
+        # Alignment-modulated adaptive gating
+        p_pool = B_p.mean(dim=1)
+        a1_pool = B_a1.mean(dim=1)
+        a2_pool = B_a2.mean(dim=1)
+        align_a1 = (F.cosine_similarity(p_pool, a1_pool, dim=-1).clamp(min=-1, max=1) + 1) / 2
+        align_a2 = (F.cosine_similarity(p_pool, a2_pool, dim=-1).clamp(min=-1, max=1) + 1) / 2
+        align_a1 = align_a1.clamp(min=0.3).view(-1, 1, 1)
+        align_a2 = align_a2.clamp(min=0.3).view(-1, 1, 1)
+
+        gated_a1 = align_a1 * self.gate_a1(B_p_up, ca_a1)
+        gated_a2 = align_a2 * self.gate_a2(B_p_up, ca_a2)
         B_p_fused = B_p_up + self.dropout(gated_a1) + self.dropout(gated_a2)
 
         # Bidirectional: primary -> auxiliaries
