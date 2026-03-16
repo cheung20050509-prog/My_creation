@@ -58,7 +58,6 @@ parser.add_argument("--gamma_cyc", type=float, default=1.0)
 parser.add_argument("--alpha_ib", type=float, default=0.01)
 parser.add_argument("--alpha_nce", type=float, default=0.05)
 parser.add_argument("--alpha_sac", type=float, default=0.1)
-parser.add_argument("--alpha_ord", type=float, default=0.05)
 parser.add_argument("--mse_weight", type=float, default=0.5)
 parser.add_argument("--cra_layers", type=int, default=8)
 parser.add_argument("--cra_dims", default="64,32,16", type=str)
@@ -294,31 +293,6 @@ def compute_sentiment_contrastive(h_fused, labels, temperature=0.1):
     return F.mse_loss(sim[mask], target_sim[mask])
 
 
-def compute_ordinal_loss(logits, labels):
-    """Bradley-Terry pairwise ordinal ranking loss (from MOAC)."""
-    y_hat = logits.view(-1)
-    y = labels.view(-1)
-    B = y.size(0)
-    if B < 2:
-        return y_hat.new_tensor(0.0)
-
-    n_pairs = min(B, 2 * B)
-    idx1 = torch.randint(B, (n_pairs,), device=y.device)
-    idx2 = torch.randint(B, (n_pairs,), device=y.device)
-
-    valid = idx1 != idx2
-    idx1, idx2 = idx1[valid], idx2[valid]
-    if idx1.size(0) == 0:
-        return y_hat.new_tensor(0.0)
-
-    swap = y[idx1] < y[idx2]
-    i1 = torch.where(swap, idx2, idx1)
-    i2 = torch.where(swap, idx1, idx2)
-
-    diff = y_hat[i1] - y_hat[i2]
-    return -F.logsigmoid(diff).mean()
-
-
 # ============================================================
 # Train / Eval / Test
 # ============================================================
@@ -346,9 +320,8 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
         l_task = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
 
         l_sac = compute_sentiment_contrastive(h_pooled, label_flat) if h_pooled is not None else 0.0
-        l_ord = compute_ordinal_loss(logits, label_ids)
 
-        loss = l_task + ib_loss + args.alpha_sac * l_sac + args.alpha_ord * l_ord
+        loss = l_task + ib_loss + args.alpha_sac * l_sac
 
         if args.gradient_accumulation_step > 1:
             loss = loss / args.gradient_accumulation_step
