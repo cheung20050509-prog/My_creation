@@ -177,14 +177,19 @@ class IBGuidedMultiHeadAttention(nn.Module):
         return self.W_o(ctx)
 
 
-class AdaptiveInfoGate(nn.Module):
+class CrossModalDisentangler(nn.Module):
     """
-    Adaptive information gate (novel).
+    Cross-Modal Information Disentangler (CMID).
 
-    Learns per-sample, per-dimension gating weights for an auxiliary
-    cross-attention contribution, replacing PCCA's equal-weight sum.
+    Decomposes each cross-attention output into consonant (task-aligned)
+    and dissonant (task-conflicting) components via a learned gate.
+    Only the consonant component is injected into the primary stream;
+    the dissonant component is detached from the task gradient and only
+    participates in an orthogonality loss that encourages clean separation.
+
         g = sigma(W_2 ReLU(W_1 [primary || ca_output]))
-        output = g * ca_output
+        consonant = g * ca_output          -> injected into primary
+        dissonant = (1 - g) * ca_output    -> detached, orthogonality loss only
     """
     def __init__(self, hidden_dim):
         super().__init__()
@@ -197,7 +202,9 @@ class AdaptiveInfoGate(nn.Module):
 
     def forward(self, primary, ca_output):
         g = self.gate(torch.cat([primary, ca_output], dim=-1))
-        return g * ca_output
+        consonant = g * ca_output
+        dissonant = (1 - g) * ca_output
+        return consonant, dissonant
 
 
 # ============================================================
@@ -223,9 +230,9 @@ class InfoGateLayer(nn.Module):
         self.ca_a2_to_p = IBGuidedMultiHeadAttention(hidden_dim, num_heads, dropout)
         # primary self-attention
         self.sa_p = IBGuidedMultiHeadAttention(hidden_dim, num_heads, dropout)
-        # adaptive gates
-        self.gate_a1 = AdaptiveInfoGate(hidden_dim)
-        self.gate_a2 = AdaptiveInfoGate(hidden_dim)
+        # cross-modal disentanglers
+        self.disent_a1 = CrossModalDisentangler(hidden_dim)
+        self.disent_a2 = CrossModalDisentangler(hidden_dim)
         # primary -> aux cross-attention
         self.ca_p_to_a1 = IBGuidedMultiHeadAttention(hidden_dim, num_heads, dropout)
         self.ca_p_to_a2 = IBGuidedMultiHeadAttention(hidden_dim, num_heads, dropout)
@@ -264,9 +271,12 @@ class InfoGateLayer(nn.Module):
         align_a1 = align_a1.clamp(min=0.3).view(-1, 1, 1)
         align_a2 = align_a2.clamp(min=0.3).view(-1, 1, 1)
 
-        gated_a1 = align_a1 * self.gate_a1(B_p_up, ca_a1)
-        gated_a2 = align_a2 * self.gate_a2(B_p_up, ca_a2)
-        B_p_fused = B_p_up + self.dropout(gated_a1) + self.dropout(gated_a2)
+        # Cross-modal disentanglement: decompose into consonant + dissonant
+        cons_a1, diss_a1 = self.disent_a1(B_p_up, ca_a1)
+        cons_a2, diss_a2 = self.disent_a2(B_p_up, ca_a2)
+
+        # Only consonant is injected (alignment gating still applies)
+        B_p_fused = B_p_up + self.dropout(align_a1 * cons_a1) + self.dropout(align_a2 * cons_a2)
 
         # Bidirectional: primary -> auxiliaries
         B_p_fn = self.ln_p2(B_p_fused)
@@ -282,7 +292,9 @@ class InfoGateLayer(nn.Module):
 
         B_p_out = B_p_fused + self.ffn_p(self.ln_p2(B_p_fused))
 
-        return B_p_out, B_a1_out, B_a2_out
+        # Return dissonant pairs (detached from task path) for orthogonality loss
+        disent_pairs = [(cons_a1, diss_a1), (cons_a2, diss_a2)]
+        return B_p_out, B_a1_out, B_a2_out, disent_pairs
 
 
 class InfoGateModule(nn.Module):
@@ -295,9 +307,21 @@ class InfoGateModule(nn.Module):
         self.final_ln = nn.LayerNorm(hidden_dim)
 
     def forward(self, B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2):
+        all_disent_pairs = []
         for layer in self.layers:
-            B_p, B_a1, B_a2 = layer(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2)
-        return self.final_ln(B_p)
+            B_p, B_a1, B_a2, disent_pairs = layer(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2)
+            all_disent_pairs.extend(disent_pairs)
+
+        # Compute orthogonality loss: mean |cos_sim(consonant, dissonant)|
+        L_orth = B_p.new_tensor(0.0)
+        for cons, diss in all_disent_pairs:
+            # Flatten to (batch, -1) for cosine similarity
+            c_flat = cons.reshape(cons.size(0), -1)
+            d_flat = diss.detach().reshape(diss.size(0), -1)
+            L_orth = L_orth + F.cosine_similarity(c_flat, d_flat, dim=-1).abs().mean()
+        L_orth = L_orth / max(len(all_disent_pairs), 1)
+
+        return self.final_ln(B_p), L_orth
 
 
 # ============================================================
@@ -389,6 +413,7 @@ class InfoGate(nn.Module):
         self.beta_ib = args.get('beta_ib', 32)
         self.gamma_cyc = args.get('gamma_cyc', 1.0)
         self.alpha_ib = args.get('alpha_ib', 0.01)
+        self.alpha_orth = args.get('alpha_orth', 0.01)
         self.bottleneck_dim = bn_dim
 
         # --- 1. Unimodal projectors ---
@@ -679,7 +704,7 @@ class InfoGate(nn.Module):
             B_a_w, B_l_w, B_v_w, conf, weights, primary_idx)
 
         # 9. InfoGate cross-attention ---------------------------------
-        B_p_enhanced = self.infogate(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2)
+        B_p_enhanced, L_orth = self.infogate(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2)
 
         # 10. ITHP-style residual fusion + prediction -------------------
         # expand bottleneck [B, T, bn_dim] -> [B, T, text_dim]
@@ -695,7 +720,7 @@ class InfoGate(nn.Module):
         h_p = self.adaptive_aggregate(B_p_enhanced)
 
         # 12. Combine IB losses ----------------------------------------
-        ib_loss = self.alpha_ib * (L_tib + L_lib)
+        ib_loss = self.alpha_ib * (L_tib + L_lib) + self.alpha_orth * L_orth
         if stage == 2:
             ib_loss = ib_loss + self.gamma_cyc * L_tran
 
@@ -705,6 +730,7 @@ class InfoGate(nn.Module):
             'L_tran': L_tran.item() if torch.is_tensor(L_tran) else L_tran,
             'L_rec': L_rec.item() if torch.is_tensor(L_rec) else L_rec,
             'L_cyc': L_cyc.item() if torch.is_tensor(L_cyc) else L_cyc,
+            'L_orth': L_orth.item() if torch.is_tensor(L_orth) else L_orth,
         }
 
         return logits, ib_loss, loss_dict, h_p

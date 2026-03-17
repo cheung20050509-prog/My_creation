@@ -36,7 +36,7 @@ def parse_best_results(log_path):
         lines = f.readlines()
     in_block = False
     for line in lines:
-        if "Best Results:" in line:
+        if "Best Results" in line and "oracle" not in line.lower():
             in_block = True
             continue
         if in_block:
@@ -110,24 +110,28 @@ def cleanup_checkpoints(study):
 # ------------------------------------------------------------------
 
 def objective(trial, cli_args):
-    # --- Search space (expanded) ---
+    # --- Search space (full) ---
     seed = trial.suggest_categorical("seed", [1, 42, 128, 256, 512, 1024, 2024])
     lr = trial.suggest_float("learning_rate", 1e-5, 5e-5, log=True)
     ig_lr = trial.suggest_float("ig_learning_rate", 1e-4, 1e-3, log=True)
     mse_weight = trial.suggest_float("mse_weight", 0.3, 1.5)
     dropout = trial.suggest_float("dropout_prob", 0.15, 0.35)
-    bottleneck = trial.suggest_categorical("bottleneck_dim", [96, 128, 192])
+    bottleneck = trial.suggest_categorical("bottleneck_dim", [64, 96, 128, 192])
     beta_ib = trial.suggest_float("beta_ib", 8.0, 32.0)
     alpha_ib = trial.suggest_float("alpha_ib", 0.001, 0.02, log=True)
-    alpha_nce = trial.suggest_float("alpha_nce", 0.02, 0.1)
-    ema_decay = trial.suggest_categorical("ema_decay", [0.99, 0.995, 0.999])
+    alpha_sac = trial.suggest_float("alpha_sac", 0.005, 0.05, log=True)
     weight_decay = trial.suggest_float("weight_decay", 0.005, 0.05, log=True)
     stage1_epochs = trial.suggest_int("stage1_epochs", 5, 15)
     num_layers = trial.suggest_categorical("num_infogate_layers", [2, 3, 4])
-    gamma_cyc = trial.suggest_float("gamma_cyc", 0.5, 2.0)
+    gamma_cyc = trial.suggest_float("gamma_cyc", 0.3, 2.0)
     warmup = trial.suggest_float("warmup_proportion", 0.05, 0.2)
+    n_epochs = trial.suggest_categorical("n_epochs", [60, 80, 100, 120])
+    batch_size = trial.suggest_categorical("train_batch_size", [8, 16, 32, 64])
+    grad_accum = trial.suggest_categorical("gradient_accumulation_step", [1, 2, 4])
+    unified_dim = trial.suggest_categorical("unified_dim", [128, 256, 384])
+    ib_hidden_dim = trial.suggest_categorical("ib_hidden_dim", [128, 256])
+    cra_layers = trial.suggest_categorical("cra_layers", [4, 6, 8])
 
-    n_epochs = cli_args.n_epochs
     log_path = os.path.join(LOG_DIR, f"optuna_trial_{trial.number}.log")
     trial_ckpt_dir = os.path.join(CKPT_DIR, f"trial_{trial.number}")
     os.makedirs(trial_ckpt_dir, exist_ok=True)
@@ -137,25 +141,24 @@ def objective(trial, cli_args):
         "--dataset", "mosi",
         "--n_epochs", str(n_epochs),
         "--stage1_epochs", str(stage1_epochs),
-        "--train_batch_size", "16",
-        "--gradient_accumulation_step", "2",
+        "--train_batch_size", str(batch_size),
+        "--gradient_accumulation_step", str(grad_accum),
         "--learning_rate", f"{lr:.6e}",
         "--ig_learning_rate", f"{ig_lr:.6e}",
-        "--unified_dim", "256",
-        "--ib_hidden_dim", "256",
+        "--unified_dim", str(unified_dim),
+        "--ib_hidden_dim", str(ib_hidden_dim),
         "--bottleneck_dim", str(bottleneck),
         "--num_heads", "4",
         "--num_infogate_layers", str(num_layers),
         "--beta_ib", f"{beta_ib:.4f}",
         "--gamma_cyc", f"{gamma_cyc:.4f}",
         "--alpha_ib", f"{alpha_ib:.6f}",
-        "--alpha_nce", f"{alpha_nce:.4f}",
+        "--alpha_sac", f"{alpha_sac:.6f}",
         "--mse_weight", f"{mse_weight:.4f}",
-        "--cra_layers", "8",
+        "--cra_layers", str(cra_layers),
         "--dropout_prob", f"{dropout:.4f}",
         "--weight_decay", f"{weight_decay:.6f}",
-        "--ema_decay", str(ema_decay),
-        "--ema_start_epoch", "5",
+        "--ema_start_epoch", "999",
         "--warmup_proportion", f"{warmup:.4f}",
         "--checkpoint_dir", trial_ckpt_dir,
         "--seed", str(seed),
@@ -165,9 +168,11 @@ def objective(trial, cli_args):
     print(f"Trial {trial.number} starting")
     print(f"  seed={seed} lr={lr:.2e} ig_lr={ig_lr:.2e} mse_w={mse_weight:.2f}")
     print(f"  dropout={dropout:.3f} bn={bottleneck} beta_ib={beta_ib:.1f}")
-    print(f"  alpha_ib={alpha_ib:.4f} alpha_nce={alpha_nce:.3f} ema={ema_decay}")
+    print(f"  alpha_ib={alpha_ib:.4f} alpha_sac={alpha_sac:.4f}")
     print(f"  wd={weight_decay:.4f} stage1={stage1_epochs} layers={num_layers}")
     print(f"  gamma_cyc={gamma_cyc:.2f} warmup={warmup:.3f}")
+    print(f"  epochs={n_epochs} bs={batch_size} accum={grad_accum}")
+    print(f"  udim={unified_dim} ibhid={ib_hidden_dim} cra={cra_layers}")
     print(f"  log: {log_path}")
     print(f"{'='*60}")
 
@@ -247,11 +252,14 @@ def main():
         db_path = os.path.join(LOG_DIR, f"{cli_args.study_name}.db")
         cli_args.db = f"sqlite:///{db_path}"
 
+    sampler = optuna.samplers.TPESampler(
+        multivariate=True, n_startup_trials=20)
     study = optuna.create_study(
         study_name=cli_args.study_name,
         storage=cli_args.db,
         direction="minimize",
         load_if_exists=True,
+        sampler=sampler,
     )
 
     print(f"Optuna study: {cli_args.study_name}")
