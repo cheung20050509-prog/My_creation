@@ -705,6 +705,17 @@ class InfoGate(nn.Module):
             'L_tran': L_tran.item() if torch.is_tensor(L_tran) else L_tran,
             'L_rec': L_rec.item() if torch.is_tensor(L_rec) else L_rec,
             'L_cyc': L_cyc.item() if torch.is_tensor(L_cyc) else L_cyc,
+            # diagnostics
+            'w_acoustic': weights[:, 0].mean().item(),
+            'w_language': weights[:, 1].mean().item(),
+            'w_visual': weights[:, 2].mean().item(),
+            'primary_a': (primary_idx == 0).float().mean().item(),
+            'primary_l': (primary_idx == 1).float().mean().item(),
+            'primary_v': (primary_idx == 2).float().mean().item(),
+            'conf_t': conf_t.mean().item(),
+            'conf_a': conf_a.mean().item(),
+            'conf_v': conf_v.mean().item(),
+            'fusion_conf': conf_p.mean().item(),
         }
 
         return logits, ib_loss, loss_dict, h_p

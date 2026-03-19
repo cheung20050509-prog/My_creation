@@ -457,8 +457,26 @@ def main():
               f"{'  (EMA eval)' if eval_with_ema else ''}")
         print(f"  Loss  total={tr_loss:.4f}  task={tr_task:.4f}  "
               f"ib={tr_ib:.4f}")
-        detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items())
+        detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items()
+                                if k.startswith('L_'))
         print(f"  Detail  {detail_str}")
+        # Diagnostics: MSelector weights, primary selection, confidence
+        diag_keys = ['w_acoustic', 'w_language', 'w_visual',
+                     'primary_a', 'primary_l', 'primary_v',
+                     'conf_t', 'conf_a', 'conf_v', 'fusion_conf']
+        diag_vals = {k: tr_detail[k] for k in diag_keys if k in tr_detail}
+        if diag_vals:
+            w_str = (f"w=[a:{diag_vals.get('w_acoustic',0):.3f} "
+                     f"l:{diag_vals.get('w_language',0):.3f} "
+                     f"v:{diag_vals.get('w_visual',0):.3f}]")
+            p_str = (f"primary=[a:{diag_vals.get('primary_a',0):.2f} "
+                     f"l:{diag_vals.get('primary_l',0):.2f} "
+                     f"v:{diag_vals.get('primary_v',0):.2f}]")
+            c_str = (f"conf=[t:{diag_vals.get('conf_t',0):.3f} "
+                     f"a:{diag_vals.get('conf_a',0):.3f} "
+                     f"v:{diag_vals.get('conf_v',0):.3f} "
+                     f"fused:{diag_vals.get('fusion_conf',0):.3f}]")
+            print(f"  Diag  {w_str}  {p_str}  {c_str}")
 
         if eval_with_ema:
             ema.apply(model)
