@@ -336,7 +336,11 @@ class MSelector(nn.Module):
         h_v = self.adaptive_aggregate(H_v, self.W_v)
 
         logits = self.mlp(torch.cat([h_a, h_l, h_v], dim=-1))
-        weights = F.softmax(logits, dim=-1)
+        
+        # Temperature scaling during training to prevent zero gradients & mode collapse
+        tau = 2.0 if self.training else 1.0
+        weights = F.softmax(logits / tau, dim=-1)
+        
         primary_idx = torch.argmax(weights, dim=-1)
 
         w_a = weights[:, 0:1].unsqueeze(-1)
@@ -686,7 +690,7 @@ class InfoGate(nn.Module):
         h_expand = self.expand(B_p_enhanced)
         # residual: DeBERTa signal + InfoGate multimodal signal
         fused_seq = self.fuse_dropout(
-            self.fuse_ln(self.beta_shift * h_expand + text))
+            self.fuse_ln(h_expand))
         # pool [CLS] token like BertPooler
         pooled = torch.tanh(self.pooler_dense(fused_seq[:, 0, :]))
         logits = self.classifier(self.cls_dropout(pooled))
@@ -699,12 +703,26 @@ class InfoGate(nn.Module):
         if stage == 2:
             ib_loss = ib_loss + self.gamma_cyc * L_tran
 
+        # 13. Routing Information Bottleneck (L_rib / Dynamic Text-Guided Prior)
+        # We use the language modality's internal confidence to dynamically allocate the prior.
+        # This resolves the "Visual Collapse" organically without hardcoded targets.
+        c = conf['t'].mean(dim=(1, 2))  # shape: [B]
+        # Map text confidence [0, 1] to prior probability space [0.33, 0.85]
+        p_l = 0.33 + 0.52 * c
+        p_a = (1.0 - p_l) / 2.0
+        p_v = (1.0 - p_l) / 2.0
+        
+        prior_target = torch.stack([p_a, p_l, p_v], dim=1) # shape: [B, 3]
+        L_rib = F.kl_div(torch.log(weights + 1e-8), prior_target, reduction='batchmean')
+        ib_loss = ib_loss + 0.05 * L_rib
+
         loss_dict = {
             'L_tib': L_tib.item() if torch.is_tensor(L_tib) else L_tib,
             'L_lib': L_lib.item() if torch.is_tensor(L_lib) else L_lib,
             'L_tran': L_tran.item() if torch.is_tensor(L_tran) else L_tran,
             'L_rec': L_rec.item() if torch.is_tensor(L_rec) else L_rec,
             'L_cyc': L_cyc.item() if torch.is_tensor(L_cyc) else L_cyc,
+            'L_ent': L_rib.item() if torch.is_tensor(L_rib) else L_rib,
             # diagnostics
             'w_acoustic': weights[:, 0].mean().item(),
             'w_language': weights[:, 1].mean().item(),

@@ -303,7 +303,8 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
     sum_task, sum_ib = 0.0, 0.0
     sum_detail = {}
 
-    for step, batch in enumerate(tqdm(loader, desc=f"Train (stage {stage})")):
+    train_pbar = tqdm(loader, desc=f"Train (stage {stage})")
+    for step, batch in enumerate(train_pbar):
         batch = tuple(t.to(DEVICE) for t in batch)
         input_ids, visual, acoustic, label_ids = batch
         visual = visual.squeeze(1)
@@ -317,6 +318,11 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
 
         pred_flat = logits.view(-1)
         label_flat = label_ids.view(-1)
+        
+        # Log prediction distribution
+        loss_dict['pred_mean'] = pred_flat.mean().item()
+        loss_dict['pred_std'] = pred_flat.std().item()
+
         l_task = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
 
         l_sac = compute_sentiment_contrastive(h_pooled, label_flat) if h_pooled is not None else 0.0
@@ -332,6 +338,9 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
         for k, v in loss_dict.items():
             sum_detail[k] = sum_detail.get(k, 0.0) + v
         steps += 1
+        
+        # Real-time progress monitoring
+        train_pbar.set_postfix({"task": f"{l_task.item():.3f}", "ib": f"{ib_loss.item():.3f}", "p_std": f"{loss_dict['pred_std']:.2f}"})
 
         if (step + 1) % args.gradient_accumulation_step == 0:
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -460,10 +469,11 @@ def main():
         detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items()
                                 if k.startswith('L_'))
         print(f"  Detail  {detail_str}")
-        # Diagnostics: MSelector weights, primary selection, confidence
+        # Diagnostics: MSelector weights, primary selection, confidence, and prediction bounds
         diag_keys = ['w_acoustic', 'w_language', 'w_visual',
                      'primary_a', 'primary_l', 'primary_v',
-                     'conf_t', 'conf_a', 'conf_v', 'fusion_conf']
+                     'conf_t', 'conf_a', 'conf_v', 'fusion_conf',
+                     'pred_mean', 'pred_std']
         diag_vals = {k: tr_detail[k] for k in diag_keys if k in tr_detail}
         if diag_vals:
             w_str = (f"w=[a:{diag_vals.get('w_acoustic',0):.3f} "
@@ -476,7 +486,9 @@ def main():
                      f"a:{diag_vals.get('conf_a',0):.3f} "
                      f"v:{diag_vals.get('conf_v',0):.3f} "
                      f"fused:{diag_vals.get('fusion_conf',0):.3f}]")
-            print(f"  Diag  {w_str}  {p_str}  {c_str}")
+            pred_str = (f"pred=[mean:{diag_vals.get('pred_mean',0):.3f} "
+                        f"std:{diag_vals.get('pred_std',0):.3f}]")
+            print(f"  Diag  {w_str}  {p_str}  {c_str}\n  Stats {pred_str}")
 
         if eval_with_ema:
             ema.apply(model)
