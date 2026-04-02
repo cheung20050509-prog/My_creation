@@ -1,7 +1,4 @@
-"""
-InfoGate test script.
-Supports complete-modality and missing-modality evaluation protocols.
-"""
+"""InfoGate test script for complete-modality evaluation."""
 
 import argparse
 import os
@@ -45,10 +42,6 @@ parser.add_argument("--cra_dims", default="64,32,16", type=str)
 
 parser.add_argument("--checkpoint", type=str,
                     default="checkpoints/infogate_mosi_best.pt")
-parser.add_argument("--complete_only", action="store_true")
-parser.add_argument("--missing_modality", type=str, default=None,
-                    choices=["text", "acoustic", "visual", "ta", "tv", "av"])
-parser.add_argument("--missing_rate", type=float, default=0.0)
 
 args = parser.parse_args()
 
@@ -178,33 +171,10 @@ def load_model(ckpt_path):
 
 
 # ============================================================
-# Modality mask
-# ============================================================
-
-def build_modality_mask(batch_size, device, missing_modality=None, missing_rate=0.0):
-    mask = torch.ones(batch_size, 3, device=device)
-    idx_map = {'t': 0, 'a': 1, 'v': 2}
-    fixed_map = {
-        'text': ('t',), 'acoustic': ('a',), 'visual': ('v',),
-        'ta': ('t', 'a'), 'tv': ('t', 'v'), 'av': ('a', 'v'),
-    }
-    if missing_modality is not None:
-        for m in fixed_map[missing_modality]:
-            mask[:, idx_map[m]] = 0.0
-    elif missing_rate > 0.0:
-        patterns = [('t',), ('a',), ('v',), ('t', 'a'), ('t', 'v'), ('a', 'v')]
-        for i in range(batch_size):
-            if random.random() < missing_rate:
-                for m in random.choice(patterns):
-                    mask[i, idx_map[m]] = 0.0
-    return mask
-
-
-# ============================================================
 # Evaluation
 # ============================================================
 
-def test_model(model, loader, missing_modality=None, missing_rate=0.0):
+def test_model(model, loader):
     preds, labels = [], []
     with torch.no_grad():
         for batch in tqdm(loader, desc="Testing"):
@@ -213,16 +183,10 @@ def test_model(model, loader, missing_modality=None, missing_rate=0.0):
             visual = visual.squeeze(1)
             acoustic = acoustic.squeeze(1)
 
-            mm = build_modality_mask(
-                input_ids.size(0), input_ids.device,
-                missing_modality=missing_modality,
-                missing_rate=missing_rate)
-
             v_n = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
             a_n = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
 
-            logits, _, _, _ = model(
-                input_ids, v_n, a_n, stage=2, modality_mask=mm)
+            logits, _, _, _ = model(input_ids, v_n, a_n, stage=2)
 
             logits = logits.squeeze(-1).cpu().numpy()
             label_ids = label_ids.cpu().numpy().flatten()
@@ -268,64 +232,10 @@ def main():
     loader = get_test_dataloader()
     print(f"Test samples: {len(loader.dataset)}")
 
-    # --- Complete modality ---
     print("\n[Complete Modality]")
     preds, labels = test_model(model, loader)
     cm = compute_metrics(preds, labels)
     print_metrics(cm, "  ")
-
-    if args.complete_only:
-        return
-
-    # --- Fixed missing ---
-    if args.missing_modality:
-        print(f"\n[Missing: {args.missing_modality}]")
-        p, l = test_model(model, loader, missing_modality=args.missing_modality)
-        print_metrics(compute_metrics(p, l), "  ")
-
-    # --- Random missing ---
-    if args.missing_rate > 0:
-        print(f"\n[Random Missing Rate: {args.missing_rate}]")
-        p, l = test_model(model, loader, missing_rate=args.missing_rate)
-        print_metrics(compute_metrics(p, l), "  ")
-
-    # --- Full protocol (6 fixed + 7 random) ---
-    if not args.missing_modality and args.missing_rate == 0:
-        print("\n" + "=" * 60)
-        print("Fixed Missing Protocol (6 configs)")
-        print("=" * 60)
-        fixed_cfgs = [
-            ('visual', 'u={l,a} (miss v)'),
-            ('acoustic', 'u={l,v} (miss a)'),
-            ('text', 'u={a,v} (miss t)'),
-            ('av', 'u={l}   (miss a,v)'),
-            ('tv', 'u={a}   (miss t,v)'),
-            ('ta', 'u={v}   (miss t,a)'),
-        ]
-        fixed_metrics = []
-        for mm, desc in fixed_cfgs:
-            p, l = test_model(model, loader, missing_modality=mm)
-            m = compute_metrics(p, l)
-            fixed_metrics.append(m)
-            print(f"  {desc}: Acc2={m['Acc2']:.4f}  F1={m['F1']:.4f}  MAE={m['MAE']:.4f}")
-
-        avg = {k: np.mean([m[k] for m in fixed_metrics]) for k in fixed_metrics[0]}
-        print(f"\n  ** Fixed AVG: ", end="")
-        print_metrics(avg)
-
-        print("\n" + "=" * 60)
-        print("Random Missing Protocol (7 rates)")
-        print("=" * 60)
-        rand_metrics = []
-        for mr in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
-            p, l = test_model(model, loader, missing_rate=mr)
-            m = compute_metrics(p, l)
-            rand_metrics.append(m)
-            print(f"  MR={mr}: Acc2={m['Acc2']:.4f}  F1={m['F1']:.4f}  MAE={m['MAE']:.4f}")
-
-        avg = {k: np.mean([m[k] for m in rand_metrics]) for k in rand_metrics[0]}
-        print(f"\n  ** Random AVG: ", end="")
-        print_metrics(avg)
 
 
 if __name__ == "__main__":

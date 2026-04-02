@@ -16,6 +16,13 @@ import torch.nn.functional as F
 import math
 
 
+def masked_sequence_mean(tensor, mask=None):
+    if mask is None:
+        return tensor.mean(dim=1)
+    mask = mask.unsqueeze(-1).type_as(tensor)
+    return (tensor * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1.0)
+
+
 # ============================================================
 # Building Blocks (adapted from CyIN / MODS)
 # ============================================================
@@ -147,7 +154,7 @@ class IBGuidedMultiHeadAttention(nn.Module):
 
         self.conf_scale = nn.Parameter(torch.tensor(1.0))
 
-    def forward(self, query, key, value, key_confidence=None):
+    def forward(self, query, key, value, key_confidence=None, key_mask=None):
         """
         Args:
             query:          [B, T_q, D]
@@ -168,6 +175,10 @@ class IBGuidedMultiHeadAttention(nn.Module):
             conf_bias = torch.log(conf_pos.clamp(min=1e-6))    # [B, T_k]
             scores = scores + self.conf_scale * conf_bias.unsqueeze(1).unsqueeze(2)
             V = V * conf_pos.unsqueeze(1).unsqueeze(-1)
+
+        if key_mask is not None:
+            attn_mask = key_mask.to(dtype=torch.bool).unsqueeze(1).unsqueeze(2)
+            scores = scores.masked_fill(~attn_mask, torch.finfo(scores.dtype).min)
 
         attn = F.softmax(scores, dim=-1)
         attn = self.dropout(attn)
@@ -242,23 +253,23 @@ class InfoGateLayer(nn.Module):
         self.ffn_a2 = PositionwiseFFN(hidden_dim, dropout=dropout)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2):
+    def forward(self, B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask=None):
         B_p_n = self.ln_p1(B_p)
         B_a1_n = self.ln_a1(B_a1)
         B_a2_n = self.ln_a2(B_a2)
 
         # IB-guided cross-attention: auxiliaries -> primary
-        ca_a1 = self.ca_a1_to_p(B_p_n, B_a1_n, B_a1_n, conf_a1)
-        ca_a2 = self.ca_a2_to_p(B_p_n, B_a2_n, B_a2_n, conf_a2)
+        ca_a1 = self.ca_a1_to_p(B_p_n, B_a1_n, B_a1_n, conf_a1, tok_mask)
+        ca_a2 = self.ca_a2_to_p(B_p_n, B_a2_n, B_a2_n, conf_a2, tok_mask)
 
         # IB-guided self-attention on primary
-        sa_p = self.sa_p(B_p_n, B_p_n, B_p_n, conf_p)
+        sa_p = self.sa_p(B_p_n, B_p_n, B_p_n, conf_p, tok_mask)
         B_p_up = B_p + self.dropout(sa_p)
 
         # Alignment-modulated adaptive gating
-        p_pool = B_p.mean(dim=1)
-        a1_pool = B_a1.mean(dim=1)
-        a2_pool = B_a2.mean(dim=1)
+        p_pool = masked_sequence_mean(B_p, tok_mask)
+        a1_pool = masked_sequence_mean(B_a1, tok_mask)
+        a2_pool = masked_sequence_mean(B_a2, tok_mask)
         align_a1 = (F.cosine_similarity(p_pool, a1_pool, dim=-1).clamp(min=-1, max=1) + 1) / 2
         align_a2 = (F.cosine_similarity(p_pool, a2_pool, dim=-1).clamp(min=-1, max=1) + 1) / 2
         align_a1 = align_a1.clamp(min=0.3).view(-1, 1, 1)
@@ -270,8 +281,8 @@ class InfoGateLayer(nn.Module):
 
         # Bidirectional: primary -> auxiliaries
         B_p_fn = self.ln_p2(B_p_fused)
-        ca_p_a1 = self.ca_p_to_a1(B_a1_n, B_p_fn, B_p_fn, conf_p)
-        ca_p_a2 = self.ca_p_to_a2(B_a2_n, B_p_fn, B_p_fn, conf_p)
+        ca_p_a1 = self.ca_p_to_a1(B_a1_n, B_p_fn, B_p_fn, conf_p, tok_mask)
+        ca_p_a2 = self.ca_p_to_a2(B_a2_n, B_p_fn, B_p_fn, conf_p, tok_mask)
 
         # FFN + skip
         B_a1_out = B_a1 + self.dropout(ca_p_a1)
@@ -294,9 +305,9 @@ class InfoGateModule(nn.Module):
         ])
         self.final_ln = nn.LayerNorm(hidden_dim)
 
-    def forward(self, B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2):
+    def forward(self, B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask=None):
         for layer in self.layers:
-            B_p, B_a1, B_a2 = layer(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2)
+            B_p, B_a1, B_a2 = layer(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask)
         return self.final_ln(B_p)
 
 
@@ -319,21 +330,23 @@ class MSelector(nn.Module):
             nn.Linear(hidden_dim, 3),
         )
 
-    def adaptive_aggregate(self, H, W_proj):
+    def adaptive_aggregate(self, H, W_proj, mask=None):
         scores = W_proj(H) / math.sqrt(self.hidden_dim)
+        if mask is not None:
+            scores = scores.masked_fill(~mask.to(dtype=torch.bool).unsqueeze(-1), torch.finfo(scores.dtype).min)
         attn = F.softmax(scores, dim=1)
         return torch.bmm(attn.transpose(1, 2), H).squeeze(1)
 
-    def forward(self, H_a, H_l, H_v):
+    def forward(self, H_a, H_l, H_v, mask=None):
         """
         Args:
             H_a, H_l, H_v: [B, T, D]
         Returns:
-            weighted features, weights [w_a, w_l, w_v], primary_idx (0=a,1=l,2=v)
+            raw features, weights [w_a, w_l, w_v], primary_idx (0=a,1=l,2=v)
         """
-        h_a = self.adaptive_aggregate(H_a, self.W_a)
-        h_l = self.adaptive_aggregate(H_l, self.W_l)
-        h_v = self.adaptive_aggregate(H_v, self.W_v)
+        h_a = self.adaptive_aggregate(H_a, self.W_a, mask)
+        h_l = self.adaptive_aggregate(H_l, self.W_l, mask)
+        h_v = self.adaptive_aggregate(H_v, self.W_v, mask)
 
         logits = self.mlp(torch.cat([h_a, h_l, h_v], dim=-1))
         
@@ -343,11 +356,7 @@ class MSelector(nn.Module):
         
         primary_idx = torch.argmax(weights, dim=-1)
 
-        w_a = weights[:, 0:1].unsqueeze(-1)
-        w_l = weights[:, 1:2].unsqueeze(-1)
-        w_v = weights[:, 2:3].unsqueeze(-1)
-
-        return w_a * H_a, w_l * H_l, w_v * H_v, weights, primary_idx
+        return H_a, H_l, H_v, weights, primary_idx
 
 
 # ============================================================
@@ -376,7 +385,6 @@ class InfoGate(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.modalities = ('t', 'a', 'v')
-        self.modality_to_idx = {'t': 0, 'a': 1, 'v': 2}
 
         text_dim = args.get('text_dim', 768)
         acoustic_dim = args.get('acoustic_dim', 74)
@@ -456,8 +464,10 @@ class InfoGate(nn.Module):
     # Helpers
     # ------------------------------------------------------------------
 
-    def adaptive_aggregate(self, H):
+    def adaptive_aggregate(self, H, mask=None):
         scores = self.agg_proj(H) / math.sqrt(self.bottleneck_dim)
+        if mask is not None:
+            scores = scores.masked_fill(~mask.to(dtype=torch.bool).unsqueeze(-1), torch.finfo(scores.dtype).min)
         attn = F.softmax(scores, dim=1)
         return torch.bmm(attn.transpose(1, 2), H).squeeze(1)
 
@@ -538,45 +548,17 @@ class InfoGate(nn.Module):
         return total, rec_t, cyc_t
 
     # ------------------------------------------------------------------
-    # Missing-modality supplementation
-    # ------------------------------------------------------------------
-
-    def _supplement_missing(self, B_seq, B_pooled, modality_mask):
-        """Replace missing modality sequences with CRA-translated pooled vectors."""
-        supplemented = {}
-        for tgt in self.modalities:
-            t_idx = self.modality_to_idx[tgt]
-            present = modality_mask[:, t_idx].view(-1, 1, 1)  # [B, 1, 1]
-            if present.all():
-                supplemented[tgt] = B_seq[tgt]
-                continue
-
-            rec = torch.zeros_like(B_pooled[tgt])
-            n = modality_mask[:, t_idx:t_idx+1].new_zeros(modality_mask.size(0), 1)
-            for src in self.modalities:
-                if src == tgt:
-                    continue
-                s_idx = self.modality_to_idx[src]
-                s_present = modality_mask[:, s_idx:s_idx+1]
-                rec = rec + self._translate(src, tgt, B_pooled[src]) * s_present
-                n = n + s_present
-            rec = torch.where(n > 0, rec / n.clamp_min(1), B_pooled[tgt])
-            rec_seq = rec.unsqueeze(1).expand_as(B_seq[tgt])
-            supplemented[tgt] = present * B_seq[tgt] + (1 - present) * rec_seq
-        return supplemented
-
-    # ------------------------------------------------------------------
     # Routing
     # ------------------------------------------------------------------
 
-    def _route_by_primary(self, B_a_w, B_l_w, B_v_w, conf, weights, primary_idx):
-        """Route weighted bottlenecks and confidences by primary selection."""
+    def _route_by_primary(self, B_a, B_l, B_v, conf, weights, primary_idx):
+        """Route raw bottlenecks by primary selection and scale auxiliaries by routing weights."""
         Bs = primary_idx.size(0)
         dev = primary_idx.device
         idx = torch.arange(Bs, device=dev)
 
         # order: acoustic=0, language=1, visual=2 (matches MSelector)
-        all_B = torch.stack([B_a_w, B_l_w, B_v_w], dim=1)          # [B,3,T,D]
+        all_B = torch.stack([B_a, B_l, B_v], dim=1)              # [B,3,T,D]
         all_conf = torch.stack([conf['a'], conf['t'], conf['v']], dim=1)
 
         B_p = all_B[idx, primary_idx]
@@ -589,9 +571,10 @@ class InfoGate(nn.Module):
         rem_i = rem_i.masked_select(mask).view(Bs, 2)
         order = rem_w.argsort(dim=1, descending=True)
         sorted_i = rem_i.gather(1, order)
+        sorted_w = rem_w.gather(1, order)
 
-        B_a1 = all_B[idx, sorted_i[:, 0]]
-        B_a2 = all_B[idx, sorted_i[:, 1]]
+        B_a1 = all_B[idx, sorted_i[:, 0]] * sorted_w[:, 0].view(-1, 1, 1)
+        B_a2 = all_B[idx, sorted_i[:, 1]] * sorted_w[:, 1].view(-1, 1, 1)
         conf_a1 = all_conf[idx, sorted_i[:, 0]]
         conf_a2 = all_conf[idx, sorted_i[:, 1]]
         return B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2
@@ -601,7 +584,7 @@ class InfoGate(nn.Module):
     # ------------------------------------------------------------------
 
     def forward(self, text, acoustic, visual, labels=None, stage=1,
-                attention_mask=None, modality_mask=None):
+                attention_mask=None):
         """
         Args:
             text:     [B, T, text_dim]   from DeBERTa
@@ -610,7 +593,6 @@ class InfoGate(nn.Module):
             labels:   [B]  (unused here, reserved for label-level IB extension)
             stage:    1 = IB only; 2 = IB + cyclic translation
             attention_mask: [B, T] valid-token mask
-            modality_mask:  [B, 3] modality presence (t / a / v)
         Returns:
             logits:     [B, 1]
             ib_loss:    scalar
@@ -624,8 +606,6 @@ class InfoGate(nn.Module):
             tok_mask = torch.ones(Bs, T, device=device, dtype=text.dtype)
         else:
             tok_mask = attention_mask.float()
-        if modality_mask is None:
-            modality_mask = torch.ones(Bs, 3, device=device, dtype=text.dtype)
 
         # 1. Project --------------------------------------------------
         F_t = self.proj_t(text)
@@ -657,46 +637,35 @@ class InfoGate(nn.Module):
         else:
             L_lib = torch.tensor(0.0, device=device)
 
-        # 6. Translation loss (stage 2 only, full modalities) ----------
-        all_present = bool(torch.all(modality_mask > 0.5).item())
-        if stage == 2 and all_present:
+        # 6. Translation loss (stage 2 only) ---------------------------
+        if stage == 2:
             L_tran, L_rec, L_cyc = self._translation_loss(B_pooled)
         else:
             zero = torch.tensor(0.0, device=device)
             L_tran, L_rec, L_cyc = zero, zero, zero
 
-        # 6. Supplement missing modalities -----------------------------
-        if not all_present:
-            B_seq = self._supplement_missing(B, B_pooled, modality_mask)
-            for m in self.modalities:
-                m_idx = self.modality_to_idx[m]
-                present = modality_mask[:, m_idx].view(-1, 1, 1)
-                conf[m] = present * conf[m] + (1 - present) * 0.5
-            B = B_seq
-
         # 7. MSelector (order: acoustic, language, visual) -------------
-        B_a_w, B_l_w, B_v_w, weights, primary_idx = self.mselector(
-            B['a'], B['t'], B['v'])
+        B_a_seq, B_l_seq, B_v_seq, weights, primary_idx = self.mselector(
+            B['a'], B['t'], B['v'], tok_mask)
 
         # 8. Route by primary with confidence -------------------------
         B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2 = self._route_by_primary(
-            B_a_w, B_l_w, B_v_w, conf, weights, primary_idx)
+            B_a_seq, B_l_seq, B_v_seq, conf, weights, primary_idx)
 
         # 9. InfoGate cross-attention ---------------------------------
-        B_p_enhanced = self.infogate(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2)
+        B_p_enhanced = self.infogate(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask)
 
         # 10. ITHP-style residual fusion + prediction -------------------
-        # expand bottleneck [B, T, bn_dim] -> [B, T, text_dim]
-        h_expand = self.expand(B_p_enhanced)
-        # residual: DeBERTa signal + InfoGate multimodal signal
+        # expand bottleneck [B, T, bn_dim] -> [B, T, text_dim] and fuse back into text
+        h_expand = self.beta_shift * self.expand(B_p_enhanced)
         fused_seq = self.fuse_dropout(
-            self.fuse_ln(h_expand))
+            self.fuse_ln(text + h_expand))
         # pool [CLS] token like BertPooler
         pooled = torch.tanh(self.pooler_dense(fused_seq[:, 0, :]))
         logits = self.classifier(self.cls_dropout(pooled))
 
         # aggregate bottleneck for NCE (not for prediction)
-        h_p = self.adaptive_aggregate(B_p_enhanced)
+        h_p = self.adaptive_aggregate(B_p_enhanced, tok_mask)
 
         # 12. Combine IB losses ----------------------------------------
         ib_loss = self.alpha_ib * (L_tib + L_lib)

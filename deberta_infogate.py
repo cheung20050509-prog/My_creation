@@ -68,7 +68,7 @@ class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
         self.init_weights()
 
     def forward(self, input_ids, visual, acoustic,
-                labels=None, stage=1, modality_mask=None):
+                labels=None, stage=1):
         pad_id = self.config.pad_token_id if self.config.pad_token_id is not None else 0
         attention_mask = input_ids.ne(pad_id).long()
 
@@ -76,21 +76,10 @@ class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
             input_ids=input_ids, attention_mask=attention_mask
         )[0]  # [B, T, 768]
 
-        if modality_mask is None:
-            modality_mask = text_features.new_ones(text_features.size(0), 3)
-        else:
-            modality_mask = modality_mask.to(
-                device=text_features.device, dtype=text_features.dtype)
-
-        text_features = text_features * modality_mask[:, 0].view(-1, 1, 1)
-        acoustic = acoustic * modality_mask[:, 1].view(-1, 1, 1)
-        visual = visual * modality_mask[:, 2].view(-1, 1, 1)
-
         logits, ib_loss, loss_dict, nce_extras = self.infogate(
             text_features, acoustic, visual,
             labels=labels, stage=stage,
             attention_mask=attention_mask,
-            modality_mask=modality_mask,
         )
         return logits, ib_loss, loss_dict, nce_extras
 
@@ -101,8 +90,8 @@ class InfoGate_DeBertaForSequenceClassification(DebertaV2PreTrainedModel):
         self.dberta = InfoGate_DebertaModel(config, multimodal_config)
 
     def forward(self, input_ids, visual, acoustic,
-                labels=None, stage=1, modality_mask=None):
+                labels=None, stage=1):
         return self.dberta(
             input_ids, visual, acoustic,
-            labels=labels, stage=stage, modality_mask=modality_mask,
+            labels=labels, stage=stage,
         )

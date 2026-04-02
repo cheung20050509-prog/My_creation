@@ -1,132 +1,222 @@
-# InfoGate: Information Bottleneck-Guided Adaptive Cross-Attention for Robust Multimodal Fusion
+# InfoGate on no_highway
 
-## 1. Introduction
+This directory contains the current InfoGate implementation used in the `no_highway` branch.
+It targets multimodal sentiment analysis on CMU-MOSI and CMU-MOSEI with text, acoustic,
+and visual inputs.
 
-Multimodal Sentiment Analysis (MSA) integrates language, acoustic, and visual modalities to predict sentiment intensity from video utterances. While recent methods based on cross-modal attention and information bottleneck (IB) compression have achieved strong results, they face key limitations: (1) cross-modal attention treats all auxiliary tokens equally, regardless of their information quality; (2) fusion strategies apply fixed injection weights without considering cross-modal consistency; (3) contrastive learning objectives (e.g., InfoNCE) focus on modality alignment but ignore inter-sample sentiment relationships.
+Compared with the earlier experimental code, this branch keeps the main InfoGate fusion
+pipeline but simplifies runtime behavior:
 
-We propose **InfoGate**, a framework that leverages IB-derived uncertainty signals to adaptively control every stage of multimodal fusion. Our core insight is that the confidence estimates from Information Bottleneck encoders — computed as `conf = sigmoid(-logvar)` — provide a natural, end-to-end learnable measure of information quality that can guide modality selection, cross-modal attention, and fusion intensity.
+- complete-modality training and evaluation are the supported path
+- the older missing-modality evaluation path is not exposed here
+- the streamlined forward path is easier to retrain, test, and compare
 
-## 2. Methods
+The code still keeps the bottleneck-based regularization pieces, including CRA translators,
+but `test.py` evaluates the standard complete-modality setting.
 
-### 2.1 Architecture Overview
+## Overview
 
+The model combines five pieces:
+
+1. DeBERTa-v3-base text encoder
+2. unimodal projectors for text, audio, and vision
+3. IB encoders that produce bottleneck features plus confidence estimates
+4. MSelector for dynamic primary-modality selection
+5. InfoGate fusion layers with confidence-aware attention and adaptive gating
+
+High-level flow:
+
+```text
+text/audio/vision
+    -> projection to unified hidden size
+    -> IB encoders -> bottleneck features + confidence
+    -> MSelector chooses the primary stream
+    -> InfoGate cross-attention fuses the two auxiliary streams into the primary stream
+    -> bottleneck features are expanded back into the text stream
+    -> DeBERTa-style pooled prediction head outputs sentiment score
 ```
-text → DeBERTa → proj(768→256) → IBEncoder → bottleneck(96d) + confidence
-acoustic → proj(74→256) → IBEncoder → bottleneck(96d) + confidence    
-visual → proj(47→256) → IBEncoder → bottleneck(96d) + confidence
-    ↓
-MSelector (dynamic primary modality selection)
-    ↓
-InfoGateModule (IB-guided cross-attention + adaptive gating, ×4 layers)
-    ↓
-Alignment-modulated injection
-    ↓
-ITHP-style residual fusion with DeBERTa text → prediction
+
+## What the Branch Actually Supports
+
+- `train.py`: two-stage training with EMA evaluation and dev-score checkpoint selection
+- `test.py`: complete-modality evaluation only
+- `train.sh`: default background launcher using the branch's current baseline config
+- `test.sh`: convenience wrapper for evaluation
+- `reproduce.sh`: tuned MOSI-only reproduction command for an older best-MOSI setup
+
+Important scope notes:
+
+- The branch name is `no_highway`, so the active code path is the simplified variant.
+- The README previously described pending MOSEI and missing-modality work; that is now outdated.
+- Current evaluation here is for complete text-audio-vision inputs.
+
+## Current Model Behavior
+
+### Fusion
+
+- IB confidence modulates attention to suppress uncertain auxiliary tokens.
+- MSelector chooses the primary modality dynamically for each sample.
+- Adaptive gates control how much auxiliary information is injected.
+- The fused bottleneck stream is expanded and added back to the DeBERTa text features.
+
+### Training
+
+- Stage 1 trains the task objective and bottleneck losses.
+- Stage 2 adds the translation and cyclic regularization terms.
+- Checkpoints are selected by dev score:
+
+```text
+dev_score = dev_mae - 0.5 * dev_corr
 ```
 
-### 2.2 Key Components
+- The best checkpoint is tracked only after the midpoint of training.
 
-**IB-Guided Cross-Attention.** Standard multi-head attention modified with two confidence-based modulations: (1) score bias `scores += scale * log(conf_K)` suppresses attention to low-confidence key positions; (2) value gating `V_eff = V * conf` reduces contribution of uncertain tokens. This naturally filters noise from auxiliary modalities at the token level.
+## Latest Complete-Modality Results
 
-**Alignment-Modulated Injection.** Before injecting auxiliary cross-attention output into the primary modality, we compute the cosine similarity between primary and auxiliary bottleneck representations. When modalities agree (high alignment), injection proceeds normally; when they contradict (low alignment, e.g., sarcasm), injection is suppressed. Floor at 0.3 prevents complete information cutoff.
+The latest local rerun on this branch was completed on 2026-04-02 using the
+complete-modality setup.
 
-**Adaptive Information Gate.** Per-sample, per-dimension gating that learns which dimensions of the cross-attention output to inject: `g = sigmoid(W2 * ReLU(W1 * [primary || ca_output]))`, `output = g * ca_output`.
+| Dataset | Best Acc2 | Best Acc7 | Best MAE | Best Corr | Best F1 |
+|---|---:|---:|---:|---:|---:|
+| MOSI  | 87.33% | 48.55% | 0.6447 | 0.8470 | 0.8733 |
+| MOSEI | 87.68% | 49.23% | 0.5491 | 0.8204 | 0.8761 |
 
-**Dynamic Primary Modality Selection (MSelector).** Adopted from MODS (AAAI 2026). Adaptive aggregation + MLP assigns soft weights to each modality per sample, determining which modality leads the fusion process.
+These results were produced from local runs whose logs were written to:
 
-### 2.3 Training Objectives
+- `logs/completeonly_20260402/train_mosi_completeonly_20260402.log`
+- `logs/completeonly_20260402/train_mosei_completeonly_20260402.log`
 
-| Loss | Formula | Role |
-|------|---------|------|
-| L_task | L1 + 0.67*MSE | Regression prediction |
-| L_tib | KL + β*reconstruction (cyclic, 9 decoders) | Token-level IB: intra/inter-modal bottleneck regularization |
-| L_lib | KL + β*label_prediction (per modality) | Label-level IB: task-aware bottleneck supervision |
-| L_tran | translation_MSE + cyclic_MSE (CRA) | Cross-modal bottleneck alignment regularization |
-| L_sac | MSE(cosine_sim, exp(-\|y_i-y_j\|)) | Sentiment-aware contrastive learning in bottleneck space |
+and whose best checkpoints were written to:
 
-**Two-stage training:** Stage 1 (epochs 1–12) trains without L_tran to stabilize IB encoders; Stage 2 (epochs 13–80) adds L_tran for cross-modal alignment.
+- `checkpoints_completeonly_20260402/infogate_mosi_best.pt`
+- `checkpoints_completeonly_20260402/infogate_mosei_best.pt`
 
-### 2.4 Theoretical Motivation
+## Repository Layout
 
-The Information Bottleneck principle compresses input X into bottleneck B by minimizing I(X;B) while maximizing I(B;Y). The logvar from the variational approximation naturally indicates per-token uncertainty. We repurpose this uncertainty as a universal control signal:
-
-- **Selection stage:** MSelector uses bottleneck features (already IB-compressed) for modality importance estimation
-- **Attention stage:** IB confidence modulates cross-attention scores and values (token-level filtering)  
-- **Injection stage:** Bottleneck alignment (cosine similarity) gates cross-modal injection (sample-level filtering)
-
-This creates a three-level filtering hierarchy: global (MSelector) → token (IBGuidedAttention) → sample (alignment modulation).
-
-## 3. Results
-
-### CMU-MOSI (dev-score checkpoint selection)
-
-| Method | Acc7↑ | Acc2↑ | F1↑ | MAE↓ | Corr↑ |
-|--------|-------|-------|-----|------|-------|
-| ITHP (ICLR 2024) | 47.7 | 88.5 | 88.5 | 0.663 | 0.856 |
-| CaMIB (ICLR 2026 sub.) | 48.0 | 89.8 | 89.8 | 0.616 | 0.857 |
-| MOAC (WWW 2025) | 48.6 | 89.0 | 89.0 | 0.605 | 0.857 |
-| Multimodal Boosting | 49.1 | 88.5 | 88.4 | 0.634 | 0.855 |
-| **InfoGate (Ours)** | **51.15** | 88.09 | 88.06 | **0.5977** | **0.8629** |
-
-**State-of-the-art on MAE, Acc7, and Corr.** Competitive on Acc2 and F1.
-
-## 4. Discussion
-
-### 4.1 Contributions
-
-1. **IB-Guided Cross-Attention:** Using IB uncertainty to modulate attention scores and values, providing principled token-level noise filtering in cross-modal interaction.
-2. **Alignment-Modulated Injection:** Leveraging bottleneck-space cosine similarity as a sample-level consistency check before cross-modal injection, addressing the "two-sided" nature of auxiliary modalities.
-3. **Sentiment-Aware Contrastive Learning (L_sac):** Structuring the bottleneck space according to inter-sample sentiment distance, complementing the intra-sample cross-modal alignment achieved by cyclic IB.
-
-### 4.2 Ablation Evidence
-
-| Configuration | MAE | Acc7 |
-|--------------|-----|------|
-| Full InfoGate | **0.5977** | **51.15%** |
-| w/o Alignment Modulation | 0.6093 | 48.85% |
-| w/o L_sac | 0.6061 | 48.55% |
-| w/o L_tran (CRA) | 0.6099 | 49.77% |
-
-### 4.3 Limitations
-
-- Acc2/F1 (88.09%/88.06%) still below CaMIB (89.8%) and MOAC (89.0%), primarily due to the model's stronger regression focus over binary classification.
-- Evaluated only on MOSI; MOSEI evaluation pending.
-- The model contains legacy parameters (reverse_proj) from an earlier InfoNCE design that cannot be removed without disrupting the initialization chain.
-
-### 4.4 Future Work
-
-- Evaluation on CMU-MOSEI and missing-modality protocols (CRA infrastructure already in place).
-- Segment-level modality selection for longer sequences.
-- Investigation of the initialization sensitivity issue in HuggingFace-based models.
+```text
+deberta_infogate.py      DeBERTa wrapper that attaches InfoGate
+infogate_modules.py      IB encoders, MSelector, InfoGate layers, losses
+train.py                 main training entry point
+test.py                  complete-modality evaluation entry point
+train.sh                 default nohup launcher
+test.sh                  evaluation wrapper
+reproduce.sh             tuned MOSI reproduction command
+datasets/                expected location for mosi.pkl and mosei.pkl
+deberta-v3-base/         local DeBERTa files used by from_pretrained
+```
 
 ## Setup
 
 ### Requirements
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### Data
-Place `mosi.pkl` / `mosei.pkl` in `datasets/` (or symlink).
 
-### Model
-Place DeBERTa-v3-base files in `deberta-v3-base/`.
+Place the processed dataset files in `datasets/`:
 
-### Train
+- `datasets/mosi.pkl`
+- `datasets/mosei.pkl`
+
+### Backbone
+
+Place the local DeBERTa-v3-base model files in `deberta-v3-base/`.
+
+## Training
+
+### Default branch configuration
+
+This is the simplest way to launch training with the branch's current default setup:
+
 ```bash
-python train.py --dataset mosi --n_epochs 80 --stage1_epochs 12 \
-    --train_batch_size 16 --gradient_accumulation_step 2 \
-    --learning_rate 1.14e-5 --ig_learning_rate 1.93e-4 \
-    --bottleneck_dim 96 --num_infogate_layers 4 \
-    --beta_ib 15.6 --gamma_cyc 0.582 --alpha_ib 0.00227 \
-    --alpha_sac 0.02 --mse_weight 0.67 \
-    --dropout_prob 0.195 --weight_decay 0.005 --seed 42
+./train.sh mosi
+./train.sh mosei
 ```
 
-### Test
+Defaults in `train.sh`:
+
+- `n_epochs=80`
+- `stage1_epochs=8`
+- `train_batch_size=16`
+- `bottleneck_dim=128`
+- `num_infogate_layers=3`
+- `beta_ib=16`
+- `gamma_cyc=1.0`
+- `alpha_ib=0.005`
+- `dropout_prob=0.25`
+- `seed=42`
+
+The script launches `train.py` with `nohup` and writes logs under `logs/`.
+
+### Direct training command
+
+If you want full control over paths or hyperparameters, call `train.py` directly:
+
 ```bash
-python test.py --dataset mosi --checkpoint checkpoints/infogate_mosi_best.pt
+python train.py \
+    --dataset mosei \
+    --n_epochs 80 \
+    --stage1_epochs 8 \
+    --train_batch_size 16 \
+    --gradient_accumulation_step 2 \
+    --learning_rate 2e-5 \
+    --ig_learning_rate 5e-4 \
+    --unified_dim 256 \
+    --ib_hidden_dim 256 \
+    --bottleneck_dim 128 \
+    --num_heads 4 \
+    --num_infogate_layers 3 \
+    --beta_ib 16 \
+    --gamma_cyc 1.0 \
+    --alpha_ib 0.005 \
+    --alpha_nce 0.05 \
+    --mse_weight 0.5 \
+    --cra_layers 8 \
+    --dropout_prob 0.25 \
+    --weight_decay 0.01 \
+    --ema_decay 0.999 \
+    --ema_start_epoch 5 \
+    --checkpoint_dir checkpoints \
+    --seed 42
 ```
+
+### Tuned MOSI reproduction command
+
+`reproduce.sh` keeps an older MOSI-specific configuration with a smaller bottleneck and
+more InfoGate layers:
+
+```bash
+./reproduce.sh
+```
+
+That script is useful when you want to replay the earlier tuned MOSI setup rather than the
+current branch defaults.
+
+## Evaluation
+
+### Default evaluation wrapper
+
+```bash
+./test.sh mosi checkpoints/infogate_mosi_best.pt
+./test.sh mosei checkpoints/infogate_mosei_best.pt
+```
+
+### Evaluate the latest local complete-only rerun
+
+```bash
+python test.py --dataset mosi --checkpoint checkpoints_completeonly_20260402/infogate_mosi_best.pt
+python test.py --dataset mosei --checkpoint checkpoints_completeonly_20260402/infogate_mosei_best.pt
+```
+
+`test.py` prints only the complete-modality result block in this branch.
+
+## Practical Notes
+
+- `*.pt`, `logs/`, and `checkpoints/` are not intended to be versioned.
+- Older logs may contain `pred_std=nan` on a single-sample tail batch; this was a logging-only statistics issue and does not indicate training collapse.
+- If you want to compare branch behavior, use the logs in `logs/completeonly_20260402/` as the latest clean reference for this branch.
 
 ## License
 

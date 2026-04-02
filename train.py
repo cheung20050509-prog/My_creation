@@ -321,7 +321,7 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
         
         # Log prediction distribution
         loss_dict['pred_mean'] = pred_flat.mean().item()
-        loss_dict['pred_std'] = pred_flat.std().item()
+        loss_dict['pred_std'] = pred_flat.std(unbiased=False).item()
 
         l_task = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
 
