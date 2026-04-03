@@ -13,6 +13,14 @@ import time
 
 import optuna
 
+from selection_utils import (
+    DEFAULT_SELECTION_METRIC,
+    SELECTION_METRIC_CHOICES,
+    build_selection_tiebreak,
+    compute_selection_score,
+    selection_higher_is_better,
+)
+
 PYTHON = os.environ.get(
     "PYTHON", "/root/autodl-tmp/anaconda3/envs/ITHP/bin/python")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,6 +31,23 @@ KEEP_TOP_K = 5
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
+DEV_LINE_RE = re.compile(
+    r"\s+Dev\s+Acc2=([\d.]+)%\s+Acc7=([\d.]+)%\s+MAE=([\d.]+)\s+Corr=([\d.]+)\s+F1=([\d.]+)"
+)
+EPOCH_LINE_RE = re.compile(r"Epoch (\d+)/\d+")
+RESULT_LINE_RE = re.compile(r"\s+(Selection score|Acc-2|Acc-7|MAE|Corr|F1):\s+([\d.]+)%?")
+
+
+def append_ablation_flags(cmd, cli_args):
+    for attr, flag in (
+        ("disable_l_lib", "--disable_l_lib"),
+        ("disable_l_tran", "--disable_l_tran"),
+        ("disable_l_rib", "--disable_l_rib"),
+        ("disable_sac", "--disable_sac"),
+    ):
+        if getattr(cli_args, attr, False):
+            cmd.append(flag)
+
 # ------------------------------------------------------------------
 # Log parsing
 # ------------------------------------------------------------------
@@ -32,45 +57,88 @@ def parse_best_results(log_path):
     results = {}
     if not os.path.exists(log_path):
         return results
-    with open(log_path, "r") as f:
-        lines = f.readlines()
     in_block = False
-    for line in lines:
-        if "Best Results:" in line:
-            in_block = True
-            continue
-        if in_block:
-            m = re.match(r"\s+(Acc-2|Acc-7|MAE|Corr|F1):\s+([\d.]+)", line)
-            if m:
-                key = m.group(1)
-                val = float(m.group(2))
+    with open(log_path, "r") as f:
+        for line in f:
+            if line.startswith("Best Results"):
+                in_block = True
+                continue
+            if in_block and line.startswith("Last Epoch"):
+                break
+            if in_block:
+                m = RESULT_LINE_RE.match(line)
+                if not m:
+                    continue
+                key, raw_val = m.groups()
+                val = float(raw_val)
                 if key in ("Acc-2", "Acc-7"):
                     val /= 100.0
+                if key == "Selection score":
+                    key = "SelectionScore"
                 results[key] = val
     return results
 
 
-def parse_dev_mae_at_epoch(log_path, target_epoch):
-    """Parse dev MAE at a specific epoch for pruning."""
+def parse_best_dev_metrics(log_path, selection_metric):
+    """Parse the best dev metrics seen so far using the active selection objective."""
     if not os.path.exists(log_path):
-        return None
-    best_dev_mae = None
-    with open(log_path, "r") as f:
-        for line in f:
-            m = re.match(r"\s+Dev\s+.*MAE=([\d.]+)", line)
-            if m:
-                mae = float(m.group(1))
-                if best_dev_mae is None or mae < best_dev_mae:
-                    best_dev_mae = mae
+        return 0, None
+
     current_epoch = 0
+    best_metrics = None
+    best_score = None
+    best_tiebreak = None
+    higher_is_better = selection_higher_is_better(selection_metric)
+
     with open(log_path, "r") as f:
         for line in f:
-            m = re.match(r"Epoch (\d+)/\d+", line)
-            if m:
-                current_epoch = int(m.group(1))
-    if current_epoch >= target_epoch:
-        return best_dev_mae
-    return None
+            epoch_match = EPOCH_LINE_RE.match(line)
+            if epoch_match:
+                current_epoch = int(epoch_match.group(1))
+                continue
+
+            dev_match = DEV_LINE_RE.match(line)
+            if not dev_match:
+                continue
+
+            acc2, acc7, mae, corr, f1 = map(float, dev_match.groups())
+            metrics = {
+                "Acc2": acc2 / 100.0,
+                "Acc7": acc7 / 100.0,
+                "MAE": mae,
+                "Corr": corr,
+                "F1": f1,
+            }
+            score = compute_selection_score(
+                selection_metric,
+                metrics["Acc2"],
+                metrics["Acc7"],
+                metrics["MAE"],
+                metrics["Corr"],
+                metrics["F1"],
+            )
+            tiebreak = build_selection_tiebreak(
+                metrics["Acc2"],
+                metrics["Acc7"],
+                metrics["MAE"],
+                metrics["Corr"],
+                metrics["F1"],
+            )
+
+            if best_metrics is None:
+                best_metrics = metrics
+                best_score = score
+                best_tiebreak = tiebreak
+                continue
+
+            better_score = score > best_score if higher_is_better else score < best_score
+            same_score = abs(score - best_score) <= 1e-12
+            if better_score or (same_score and tiebreak > best_tiebreak):
+                best_metrics = metrics
+                best_score = score
+                best_tiebreak = tiebreak
+
+    return current_epoch, best_metrics
 
 
 def get_current_epoch(log_path):
@@ -86,17 +154,66 @@ def get_current_epoch(log_path):
     return current
 
 
+def should_prune(selection_metric, epoch, best_metrics):
+    if best_metrics is None:
+        return False, None, None
+
+    if epoch >= 40:
+        if selection_metric in ("acc2_composite", "acc2"):
+            threshold = 0.82
+            value = best_metrics["Acc2"]
+            return value < threshold, "best dev Acc2", threshold
+        if selection_metric == "acc7":
+            threshold = 0.45
+            value = best_metrics["Acc7"]
+            return value < threshold, "best dev Acc7", threshold
+        if selection_metric == "f1":
+            threshold = 0.82
+            value = best_metrics["F1"]
+            return value < threshold, "best dev F1", threshold
+        if selection_metric == "corr":
+            threshold = 0.78
+            value = best_metrics["Corr"]
+            return value < threshold, "best dev Corr", threshold
+        threshold = 0.65
+        value = best_metrics["MAE"]
+        return value > threshold, "best dev MAE", threshold
+
+    if epoch >= 20:
+        if selection_metric in ("acc2_composite", "acc2"):
+            threshold = 0.78
+            value = best_metrics["Acc2"]
+            return value < threshold, "best dev Acc2", threshold
+        if selection_metric == "acc7":
+            threshold = 0.42
+            value = best_metrics["Acc7"]
+            return value < threshold, "best dev Acc7", threshold
+        if selection_metric == "f1":
+            threshold = 0.78
+            value = best_metrics["F1"]
+            return value < threshold, "best dev F1", threshold
+        if selection_metric == "corr":
+            threshold = 0.72
+            value = best_metrics["Corr"]
+            return value < threshold, "best dev Corr", threshold
+        threshold = 0.75
+        value = best_metrics["MAE"]
+        return value > threshold, "best dev MAE", threshold
+
+    return False, None, None
+
+
 # ------------------------------------------------------------------
 # Checkpoint cleanup: keep only top-K trials
 # ------------------------------------------------------------------
 
-def cleanup_checkpoints(study):
+def cleanup_checkpoints(study, higher_is_better):
     """Keep only KEEP_TOP_K best trial checkpoints, delete the rest."""
     completed = [t for t in study.trials
                  if t.state == optuna.trial.TrialState.COMPLETE]
     if len(completed) <= KEEP_TOP_K:
         return
-    ranked = sorted(completed, key=lambda t: t.value)
+    ranked = sorted(completed, key=lambda t: t.value, reverse=higher_is_better)
     keep_nums = {t.number for t in ranked[:KEEP_TOP_K]}
     for t in completed:
         if t.number not in keep_nums:
@@ -119,7 +236,6 @@ def objective(trial, cli_args):
     bottleneck = trial.suggest_categorical("bottleneck_dim", [96, 128, 192])
     beta_ib = trial.suggest_float("beta_ib", 8.0, 32.0)
     alpha_ib = trial.suggest_float("alpha_ib", 0.001, 0.02, log=True)
-    alpha_nce = trial.suggest_float("alpha_nce", 0.02, 0.1)
     ema_decay = trial.suggest_categorical("ema_decay", [0.99, 0.995, 0.999])
     weight_decay = trial.suggest_float("weight_decay", 0.005, 0.05, log=True)
     stage1_epochs = trial.suggest_int("stage1_epochs", 5, 15)
@@ -149,7 +265,6 @@ def objective(trial, cli_args):
         "--beta_ib", f"{beta_ib:.4f}",
         "--gamma_cyc", f"{gamma_cyc:.4f}",
         "--alpha_ib", f"{alpha_ib:.6f}",
-        "--alpha_nce", f"{alpha_nce:.4f}",
         "--mse_weight", f"{mse_weight:.4f}",
         "--cra_layers", "8",
         "--dropout_prob", f"{dropout:.4f}",
@@ -158,16 +273,20 @@ def objective(trial, cli_args):
         "--ema_start_epoch", "5",
         "--warmup_proportion", f"{warmup:.4f}",
         "--checkpoint_dir", trial_ckpt_dir,
+        "--selection_metric", cli_args.selection_metric,
         "--seed", str(seed),
     ]
+    append_ablation_flags(cmd, cli_args)
 
     print(f"\n{'='*60}")
     print(f"Trial {trial.number} starting")
     print(f"  seed={seed} lr={lr:.2e} ig_lr={ig_lr:.2e} mse_w={mse_weight:.2f}")
     print(f"  dropout={dropout:.3f} bn={bottleneck} beta_ib={beta_ib:.1f}")
-    print(f"  alpha_ib={alpha_ib:.4f} alpha_nce={alpha_nce:.3f} ema={ema_decay}")
+    print(f"  alpha_ib={alpha_ib:.4f} select={cli_args.selection_metric} ema={ema_decay}")
     print(f"  wd={weight_decay:.4f} stage1={stage1_epochs} layers={num_layers}")
     print(f"  gamma_cyc={gamma_cyc:.2f} warmup={warmup:.3f}")
+    print(f"  ablate: L_lib={cli_args.disable_l_lib} L_tran={cli_args.disable_l_tran} "
+          f"L_rib={cli_args.disable_l_rib} SAC={cli_args.disable_sac}")
     print(f"  log: {log_path}")
     print(f"{'='*60}")
 
@@ -177,26 +296,30 @@ def objective(trial, cli_args):
     try:
         while proc.poll() is None:
             time.sleep(15)
-            epoch = get_current_epoch(log_path)
+            epoch, best_dev_metrics = parse_best_dev_metrics(
+                log_path, cli_args.selection_metric)
 
-            # Pruning checks
-            if epoch >= 20:
-                dev_mae = parse_dev_mae_at_epoch(log_path, 20)
-                if dev_mae is not None and dev_mae > 0.75:
-                    print(f"  Trial {trial.number} pruned at epoch {epoch}: "
-                          f"dev MAE {dev_mae:.4f} > 0.75")
-                    proc.send_signal(signal.SIGTERM)
-                    proc.wait(timeout=10)
-                    raise optuna.TrialPruned()
-
-            if epoch >= 40:
-                dev_mae = parse_dev_mae_at_epoch(log_path, 40)
-                if dev_mae is not None and dev_mae > 0.65:
-                    print(f"  Trial {trial.number} pruned at epoch {epoch}: "
-                          f"dev MAE {dev_mae:.4f} > 0.65")
-                    proc.send_signal(signal.SIGTERM)
-                    proc.wait(timeout=10)
-                    raise optuna.TrialPruned()
+            prune, metric_name, threshold = should_prune(
+                cli_args.selection_metric, epoch, best_dev_metrics)
+            if prune:
+                current_value = None
+                if best_dev_metrics is not None and metric_name is not None:
+                    if "Acc2" in metric_name:
+                        current_value = best_dev_metrics["Acc2"]
+                    elif "Acc7" in metric_name:
+                        current_value = best_dev_metrics["Acc7"]
+                    elif "F1" in metric_name:
+                        current_value = best_dev_metrics["F1"]
+                    elif "Corr" in metric_name:
+                        current_value = best_dev_metrics["Corr"]
+                    else:
+                        current_value = best_dev_metrics["MAE"]
+                value_str = f"{current_value:.4f}" if current_value is not None else "n/a"
+                print(f"  Trial {trial.number} pruned at epoch {epoch}: "
+                      f"{metric_name}={value_str}, threshold={threshold:.4f}")
+                proc.send_signal(signal.SIGTERM)
+                proc.wait(timeout=10)
+                raise optuna.TrialPruned()
 
         if proc.returncode != 0:
             print(f"  Trial {trial.number} failed with exit code {proc.returncode}")
@@ -223,11 +346,21 @@ def objective(trial, cli_args):
     acc7 = results.get("Acc-7", 0)
     corr = results.get("Corr", 0)
     f1 = results.get("F1", 0)
+    objective_value = results.get("SelectionScore")
+    if objective_value is None:
+        objective_value = compute_selection_score(
+            cli_args.selection_metric,
+            acc2,
+            acc7,
+            mae,
+            corr,
+            f1,
+        )
 
-    print(f"  Trial {trial.number} done: MAE={mae:.4f} Acc2={acc2*100:.2f}% "
-          f"Acc7={acc7*100:.2f}% Corr={corr:.4f} F1={f1:.4f}")
+    print(f"  Trial {trial.number} done: {cli_args.selection_metric}={objective_value:.6f} "
+          f"MAE={mae:.4f} Acc2={acc2*100:.2f}% Acc7={acc7*100:.2f}% Corr={corr:.4f} F1={f1:.4f}")
 
-    return mae
+    return objective_value
 
 
 # ------------------------------------------------------------------
@@ -238,30 +371,45 @@ def main():
     parser = argparse.ArgumentParser(description="Optuna search for InfoGate")
     parser.add_argument("--n_trials", type=int, default=30)
     parser.add_argument("--n_epochs", type=int, default=80)
-    parser.add_argument("--study_name", type=str, default="infogate_mosi")
+    parser.add_argument("--study_name", type=str, default=None)
     parser.add_argument("--db", type=str, default=None,
                         help="Optuna storage URL. Default: sqlite in logs/")
+    parser.add_argument("--selection_metric", type=str,
+                        default=DEFAULT_SELECTION_METRIC,
+                        choices=SELECTION_METRIC_CHOICES)
+    parser.add_argument("--disable_l_lib", action="store_true")
+    parser.add_argument("--disable_l_tran", action="store_true")
+    parser.add_argument("--disable_l_rib", action="store_true")
+    parser.add_argument("--disable_sac", action="store_true")
     cli_args = parser.parse_args()
+
+    if cli_args.study_name is None:
+        cli_args.study_name = f"infogate_mosi_{cli_args.selection_metric}"
 
     if cli_args.db is None:
         db_path = os.path.join(LOG_DIR, f"{cli_args.study_name}.db")
         cli_args.db = f"sqlite:///{db_path}"
 
+    higher_is_better = selection_higher_is_better(cli_args.selection_metric)
+
     study = optuna.create_study(
         study_name=cli_args.study_name,
         storage=cli_args.db,
-        direction="minimize",
+        direction="maximize" if higher_is_better else "minimize",
         load_if_exists=True,
     )
 
     print(f"Optuna study: {cli_args.study_name}")
     print(f"Storage: {cli_args.db}")
+    print(f"Selection metric: {cli_args.selection_metric}")
+    print(f"Ablations: L_lib={cli_args.disable_l_lib} L_tran={cli_args.disable_l_tran} "
+          f"L_rib={cli_args.disable_l_rib} SAC={cli_args.disable_sac}")
     print(f"Trials: {cli_args.n_trials}, Epochs per trial: {cli_args.n_epochs}")
     print(f"Existing trials: {len(study.trials)}")
 
     def after_trial_callback(study, trial):
         if trial.state == optuna.trial.TrialState.COMPLETE:
-            cleanup_checkpoints(study)
+            cleanup_checkpoints(study, higher_is_better)
         elif trial.state == optuna.trial.TrialState.PRUNED:
             d = os.path.join(CKPT_DIR, f"trial_{trial.number}")
             if os.path.isdir(d):
@@ -276,7 +424,7 @@ def main():
     print("\n" + "=" * 60)
     print("Search complete!")
     print(f"Best trial: #{study.best_trial.number}")
-    print(f"Best MAE: {study.best_trial.value:.4f}")
+    print(f"Best objective ({cli_args.selection_metric}): {study.best_trial.value:.6f}")
     print("Best params:")
     for k, v in study.best_trial.params.items():
         print(f"  {k}: {v}")
@@ -284,7 +432,8 @@ def main():
     results_path = os.path.join(LOG_DIR, "optuna_best_params.txt")
     with open(results_path, "w") as f:
         f.write(f"Best trial: #{study.best_trial.number}\n")
-        f.write(f"Best MAE: {study.best_trial.value:.4f}\n")
+        f.write(f"Selection metric: {cli_args.selection_metric}\n")
+        f.write(f"Best objective: {study.best_trial.value:.6f}\n")
         f.write("Best params:\n")
         for k, v in study.best_trial.params.items():
             f.write(f"  {k}: {v}\n")

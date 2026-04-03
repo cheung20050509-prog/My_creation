@@ -60,6 +60,13 @@ class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
             'beta_ib': getattr(multimodal_config, 'beta_ib', 32),
             'gamma_cyc': getattr(multimodal_config, 'gamma_cyc', 1.0),
             'alpha_ib': getattr(multimodal_config, 'alpha_ib', 0.01),
+            'use_l_lib': getattr(multimodal_config, 'use_l_lib', True),
+            'use_l_tran': getattr(multimodal_config, 'use_l_tran', True),
+            'use_l_rib': getattr(multimodal_config, 'use_l_rib', True),
+            'selector_target_temp': getattr(multimodal_config, 'selector_target_temp', 0.35),
+            'selector_balance_weight': getattr(multimodal_config, 'selector_balance_weight', 0.0),
+            'selector_rib_weight': getattr(multimodal_config, 'selector_rib_weight', 0.05),
+            'text_residual_weight': getattr(multimodal_config, 'text_residual_weight', 0.0),
             'cra_layers': getattr(multimodal_config, 'cra_layers', 8),
             'cra_dims': getattr(multimodal_config, 'cra_dims', [64, 32, 16]),
         }

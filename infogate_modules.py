@@ -401,6 +401,13 @@ class InfoGate(nn.Module):
         self.beta_ib = args.get('beta_ib', 32)
         self.gamma_cyc = args.get('gamma_cyc', 1.0)
         self.alpha_ib = args.get('alpha_ib', 0.01)
+        self.use_l_lib = args.get('use_l_lib', True)
+        self.use_l_tran = args.get('use_l_tran', True)
+        self.use_l_rib = args.get('use_l_rib', True)
+        self.selector_target_temp = args.get('selector_target_temp', 0.35)
+        self.selector_balance_weight = args.get('selector_balance_weight', 0.0)
+        self.selector_rib_weight = args.get('selector_rib_weight', 0.05)
+        self.text_residual_weight = args.get('text_residual_weight', 0.0)
         self.bottleneck_dim = bn_dim
 
         # --- 1. Unimodal projectors ---
@@ -451,6 +458,11 @@ class InfoGate(nn.Module):
         })
 
         # --- 10. ITHP-style residual fusion + prediction ---
+        self.primary_ln = nn.LayerNorm(bn_dim)
+        self.primary_dropout = nn.Dropout(dropout)
+        self.primary_classifier = nn.Linear(bn_dim, 1)
+
+        # Optional text residual path kept for ablation / compatibility.
         # expand bottleneck back to text_dim, add as residual to DeBERTa output
         self.expand = nn.Linear(bn_dim, text_dim)
         self.fuse_ln = nn.LayerNorm(text_dim)
@@ -524,6 +536,37 @@ class InfoGate(nn.Module):
             pred_loss = F.l1_loss(y_pred, labels)
             total = total + kl + self.beta_ib * pred_loss
         return total / 3.0
+
+    def _routing_regularizer(self, weights, B_pooled, labels):
+        """Supervise routing with per-sample modality quality instead of a text-only prior."""
+        labels = labels.view(-1)
+        preds = torch.stack([
+            self.label_preds['a'](B_pooled['a']).squeeze(-1),
+            self.label_preds['t'](B_pooled['t']).squeeze(-1),
+            self.label_preds['v'](B_pooled['v']).squeeze(-1),
+        ], dim=1)
+        errors = torch.abs(preds - labels.unsqueeze(1))
+
+        target_logits = -errors.detach() / max(self.selector_target_temp, 1e-6)
+        target = F.softmax(target_logits, dim=-1)
+
+        kl = F.kl_div(
+            torch.log(weights.clamp_min(1e-8)),
+            target,
+            reduction='none',
+        ).sum(dim=-1)
+
+        # High divergence mask: only enforce routing if max_error - min_error > 0.5
+        # Otherwise, the modalities perform similarly, so don't force a sharp target.
+        error_diff = errors.max(dim=-1)[0] - errors.min(dim=-1)[0]
+        mask = (error_diff > 0.5).float()
+        
+        rib_kl = (kl * mask).sum() / mask.sum().clamp_min(1.0)
+
+        batch_usage = weights.mean(dim=0)
+        usage_entropy = -(batch_usage * torch.log(batch_usage.clamp_min(1e-8))).sum()
+        rib_balance = math.log(float(weights.size(1))) - usage_entropy
+        return rib_kl, rib_balance, target, errors.detach(), usage_entropy.detach()
 
     # ------------------------------------------------------------------
     # Translation loss
@@ -606,6 +649,7 @@ class InfoGate(nn.Module):
             tok_mask = torch.ones(Bs, T, device=device, dtype=text.dtype)
         else:
             tok_mask = attention_mask.float()
+        zero = text.new_tensor(0.0)
 
         # 1. Project --------------------------------------------------
         F_t = self.proj_t(text)
@@ -632,16 +676,15 @@ class InfoGate(nn.Module):
         L_tib = self._cyclic_tib(F_dict, B, mu, lv, tok_mask)
 
         # 5. Label-level IB loss (task-aware bottleneck supervision) ----
-        if labels is not None:
+        if self.use_l_lib and labels is not None:
             L_lib = self._label_ib(B_pooled, mu_pooled, lv_pooled, labels)
         else:
-            L_lib = torch.tensor(0.0, device=device)
+            L_lib = zero
 
         # 6. Translation loss (stage 2 only) ---------------------------
-        if stage == 2:
+        if stage == 2 and self.use_l_tran:
             L_tran, L_rec, L_cyc = self._translation_loss(B_pooled)
         else:
-            zero = torch.tensor(0.0, device=device)
             L_tran, L_rec, L_cyc = zero, zero, zero
 
         # 7. MSelector (order: acoustic, language, visual) -------------
@@ -652,38 +695,46 @@ class InfoGate(nn.Module):
         B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2 = self._route_by_primary(
             B_a_seq, B_l_seq, B_v_seq, conf, weights, primary_idx)
 
+        # Delay routing supervision to stage 2 or only selectively
+        if self.use_l_rib and labels is not None and stage == 2:
+            L_rib_kl, L_rib_balance, routing_target, routing_errors, routing_entropy = \
+                self._routing_regularizer(weights, B_pooled, labels)
+            L_rib = L_rib_kl + self.selector_balance_weight * L_rib_balance
+        else:
+            L_rib = zero
+            L_rib_kl = zero
+            L_rib_balance = zero
+            routing_target = None
+            routing_errors = None
+            routing_entropy = zero
+
         # 9. InfoGate cross-attention ---------------------------------
         B_p_enhanced = self.infogate(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask)
 
-        # 10. ITHP-style residual fusion + prediction -------------------
-        # expand bottleneck [B, T, bn_dim] -> [B, T, text_dim] and fuse back into text
-        h_expand = self.beta_shift * self.expand(B_p_enhanced)
-        fused_seq = self.fuse_dropout(
-            self.fuse_ln(text + h_expand))
-        # pool [CLS] token like BertPooler
-        pooled = torch.tanh(self.pooler_dense(fused_seq[:, 0, :]))
-        logits = self.classifier(self.cls_dropout(pooled))
-
-        # aggregate bottleneck for NCE (not for prediction)
+        # 10. Primary-centric prediction --------------------------------
         h_p = self.adaptive_aggregate(B_p_enhanced, tok_mask)
+        
+        # Consistent with MODS: only use the enhanced primary modality
+        logits = self.primary_classifier(self.primary_dropout(self.primary_ln(h_p)))
+
+        # Optional text residual head for controlled ablations.
+        if self.text_residual_weight > 0.0:
+            h_expand = self.beta_shift * self.expand(B_p_enhanced)
+            fused_seq = self.fuse_dropout(self.fuse_ln(text + h_expand))
+            pooled = torch.tanh(self.pooler_dense(fused_seq[:, 0, :]))
+            text_logits = self.classifier(self.cls_dropout(pooled))
+            logits = logits + self.text_residual_weight * text_logits
 
         # 12. Combine IB losses ----------------------------------------
         ib_loss = self.alpha_ib * (L_tib + L_lib)
-        if stage == 2:
+        if stage == 2 and self.use_l_tran:
             ib_loss = ib_loss + self.gamma_cyc * L_tran
 
-        # 13. Routing Information Bottleneck (L_rib / Dynamic Text-Guided Prior)
-        # We use the language modality's internal confidence to dynamically allocate the prior.
-        # This resolves the "Visual Collapse" organically without hardcoded targets.
-        c = conf['t'].mean(dim=(1, 2))  # shape: [B]
-        # Map text confidence [0, 1] to prior probability space [0.33, 0.85]
-        p_l = 0.33 + 0.52 * c
-        p_a = (1.0 - p_l) / 2.0
-        p_v = (1.0 - p_l) / 2.0
-        
-        prior_target = torch.stack([p_a, p_l, p_v], dim=1) # shape: [B, 3]
-        L_rib = F.kl_div(torch.log(weights + 1e-8), prior_target, reduction='batchmean')
-        ib_loss = ib_loss + 0.05 * L_rib
+        # 13. Routing Information Bottleneck (L_rib)
+        # Use per-sample modality quality as the routing target and a mild
+        # batch-level entropy regularizer to prevent selector collapse.
+        if self.use_l_rib and labels is not None:
+            ib_loss = ib_loss + self.selector_rib_weight * L_rib
 
         loss_dict = {
             'L_tib': L_tib.item() if torch.is_tensor(L_tib) else L_tib,
@@ -691,7 +742,9 @@ class InfoGate(nn.Module):
             'L_tran': L_tran.item() if torch.is_tensor(L_tran) else L_tran,
             'L_rec': L_rec.item() if torch.is_tensor(L_rec) else L_rec,
             'L_cyc': L_cyc.item() if torch.is_tensor(L_cyc) else L_cyc,
-            'L_ent': L_rib.item() if torch.is_tensor(L_rib) else L_rib,
+            'L_rib': L_rib.item() if torch.is_tensor(L_rib) else L_rib,
+            'L_rib_kl': L_rib_kl.item() if torch.is_tensor(L_rib_kl) else L_rib_kl,
+            'L_rib_balance': L_rib_balance.item() if torch.is_tensor(L_rib_balance) else L_rib_balance,
             # diagnostics
             'w_acoustic': weights[:, 0].mean().item(),
             'w_language': weights[:, 1].mean().item(),
@@ -703,6 +756,17 @@ class InfoGate(nn.Module):
             'conf_a': conf_a.mean().item(),
             'conf_v': conf_v.mean().item(),
             'fusion_conf': conf_p.mean().item(),
+            'routing_entropy': routing_entropy.item() if torch.is_tensor(routing_entropy) else routing_entropy,
         }
+
+        if routing_target is not None:
+            loss_dict.update({
+                'target_acoustic': routing_target[:, 0].mean().item(),
+                'target_language': routing_target[:, 1].mean().item(),
+                'target_visual': routing_target[:, 2].mean().item(),
+                'err_acoustic': routing_errors[:, 0].mean().item(),
+                'err_language': routing_errors[:, 1].mean().item(),
+                'err_visual': routing_errors[:, 2].mean().item(),
+            })
 
         return logits, ib_loss, loss_dict, h_p
