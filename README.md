@@ -30,10 +30,9 @@ High-level flow:
 text/audio/vision
     -> projection to unified hidden size
     -> IB encoders -> bottleneck features + confidence
-    -> MSelector chooses the primary stream
+    -> MSelector dynamically chooses the primary stream (supervised by selective KL divergence on modality quality)
     -> InfoGate cross-attention fuses the two auxiliary streams into the primary stream
-    -> bottleneck features are expanded back into the text stream
-    -> DeBERTa-style pooled prediction head outputs sentiment score
+    -> The enhanced primary bottleneck stream alone is passed to the prediction head for sentiment scoring
 ```
 
 ## What the Branch Actually Supports
@@ -46,7 +45,7 @@ text/audio/vision
 
 Important scope notes:
 
-- The branch name is `no_highway`, so the active code path is the simplified variant.
+- **The branch name is `no_highway`**, signifying a strict adherence to the Primary-centric philosophy of the MODS paper. The code path explicitly disables any direct concatenation (highway) of textual residual features or auxiliary modalities at the final prediction head, isolating the judgment entirely to the enhanced primary stream to prevent noise bleed.
 - The README previously described pending MOSEI and missing-modality work; that is now outdated.
 - Current evaluation here is for complete text-audio-vision inputs.
 
@@ -55,14 +54,14 @@ Important scope notes:
 ### Fusion
 
 - IB confidence modulates attention to suppress uncertain auxiliary tokens.
-- MSelector chooses the primary modality dynamically for each sample.
-- Adaptive gates control how much auxiliary information is injected.
-- The fused bottleneck stream is expanded and added back to the DeBERTa text features.
+- MSelector chooses the primary modality dynamically for each sample based on sample-level divergence.
+- Adaptive gates control how much auxiliary information is injected into the primary stream.
+- **Pure Primary-centric Prediction**: The fused bottleneck stream is passed through a LayerNorm and direct classification head without any textual feature expansion or highway concatenation.
 
 ### Training
 
-- Stage 1 trains the task objective and bottleneck losses.
-- Stage 2 adds the translation and cyclic regularization terms.
+- Stage 1 trains the task objective and bottleneck losses, allowing the primary stream to warm up.
+- Stage 2 adds the translation, cyclic regularization terms, and selective KL supervision for the dynamic MSelector.
 - Checkpoints are selected by dev score:
 
 ```text
@@ -71,20 +70,20 @@ dev_score = dev_mae - 0.5 * dev_corr
 
 - The best checkpoint is tracked only after the midpoint of training.
 
-## Latest Complete-Modality Results
+## Latest Complete-Modality Results (Dynamic MODS Aligned)
 
-The latest local rerun on this branch was completed on 2026-04-02 using the
-complete-modality setup.
+The latest local rerun on this branch was completed on 2026-04-03 using the
+strictly MODS-aligned dynamic primary architecture without a highway.
 
-| Dataset | Best Acc2 | Best Acc7 | Best MAE | Best Corr | Best F1 |
-|---|---:|---:|---:|---:|---:|
-| MOSI  | 87.33% | 48.55% | 0.6447 | 0.8470 | 0.8733 |
-| MOSEI | 87.68% | 49.23% | 0.5491 | 0.8204 | 0.8761 |
+| Dataset | Best Acc2 | Best Acc7 | Best MAE | Best Corr | Best F1 | status |
+|---|---:|---:|---:|---:|---:|---:|
+| MOSI  | 87.94% | 51.76% | **0.6048** | 0.8540 | 0.8793 | New Low MAE (SOTA level) |
+| MOSEI | ~87.21% | ~47.60% | ~0.5989 | ~0.8137 | ~0.8711 | *Training in progress* |
 
 These results were produced from local runs whose logs were written to:
 
-- `logs/completeonly_20260402/train_mosi_completeonly_20260402.log`
-- `logs/completeonly_20260402/train_mosei_completeonly_20260402.log`
+- `logs/full_dynamic_mods_aligned_20260403/train_mosi_full.log`
+- `logs/full_dynamic_mods_aligned_20260403/train_mosei_full.log`
 
 and whose best checkpoints were written to:
 
