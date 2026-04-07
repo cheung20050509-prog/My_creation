@@ -5,6 +5,7 @@ checkpoints/
 logs/
 *.log
 deberta-v3-base/
+bert-base-chinese/
 datasets/
 datasets
 .env
