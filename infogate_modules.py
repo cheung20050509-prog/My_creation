@@ -316,10 +316,15 @@ class InfoGateModule(nn.Module):
 # ============================================================
 
 class MSelector(nn.Module):
-    """Dynamic primary modality selector (from MODS, AAAI 2026)."""
-    def __init__(self, hidden_dim):
+    """Dynamic primary modality selector with Gumbel-Softmax (Level 2).
+
+    Training: Gumbel-Softmax with straight-through hard samples → differentiable
+    Inference: deterministic argmax
+    """
+    def __init__(self, hidden_dim, gumbel_tau=1.0):
         super().__init__()
         self.hidden_dim = hidden_dim
+        self.gumbel_tau = gumbel_tau          # annealed externally
         self.W_a = nn.Linear(hidden_dim, 1)
         self.W_l = nn.Linear(hidden_dim, 1)
         self.W_v = nn.Linear(hidden_dim, 1)
@@ -342,21 +347,26 @@ class MSelector(nn.Module):
         Args:
             H_a, H_l, H_v: [B, T, D]
         Returns:
-            raw features, weights [w_a, w_l, w_v], primary_idx (0=a,1=l,2=v)
+            raw features, weights (soft), primary_onehot [B, 3], primary_idx [B]
         """
         h_a = self.adaptive_aggregate(H_a, self.W_a, mask)
         h_l = self.adaptive_aggregate(H_l, self.W_l, mask)
         h_v = self.adaptive_aggregate(H_v, self.W_v, mask)
 
-        logits = self.mlp(torch.cat([h_a, h_l, h_v], dim=-1))
-        
-        # Temperature scaling during training to prevent zero gradients & mode collapse
-        tau = 2.0 if self.training else 1.0
-        weights = F.softmax(logits / tau, dim=-1)
-        
-        primary_idx = torch.argmax(weights, dim=-1)
+        logits = self.mlp(torch.cat([h_a, h_l, h_v], dim=-1))  # [B, 3]
 
-        return H_a, H_l, H_v, weights, primary_idx
+        if self.training:
+            # Gumbel-Softmax: hard one-hot in forward, soft gradient in backward
+            primary_onehot = F.gumbel_softmax(logits, tau=self.gumbel_tau, hard=True)
+            # Soft weights use the same logits (no gumbel noise) for stable scaling
+            weights = F.softmax(logits / self.gumbel_tau, dim=-1)
+        else:
+            weights = F.softmax(logits, dim=-1)
+            primary_onehot = F.one_hot(torch.argmax(weights, dim=-1), num_classes=3).float()
+
+        primary_idx = torch.argmax(primary_onehot, dim=-1)  # for diagnostics
+
+        return H_a, H_l, H_v, weights, primary_onehot, primary_idx
 
 
 # ============================================================
@@ -437,7 +447,8 @@ class InfoGate(nn.Module):
         })
 
         # --- 5. MSelector ---
-        self.mselector = MSelector(bn_dim)
+        self.gumbel_tau = args.get('gumbel_tau', 1.0)
+        self.mselector = MSelector(bn_dim, gumbel_tau=self.gumbel_tau)
 
         # --- 6. InfoGate cross-attention ---
         self.infogate = InfoGateModule(bn_dim, num_layers, num_heads, dropout)
@@ -594,20 +605,28 @@ class InfoGate(nn.Module):
     # Routing
     # ------------------------------------------------------------------
 
-    def _route_by_primary(self, B_a, B_l, B_v, conf, weights, primary_idx):
-        """Route raw bottlenecks by primary selection and scale auxiliaries by routing weights."""
+    def _route_by_primary(self, B_a, B_l, B_v, conf, weights, primary_onehot, primary_idx):
+        """Route bottlenecks by primary selection using soft mixing (Level 2).
+
+        primary_onehot: [B, 3] – Gumbel-Softmax one-hot (differentiable).
+        The primary branch is a soft-weighted mix of all modalities via primary_onehot.
+        Auxiliary branches are the remaining two, sorted by descending weight.
+        """
         Bs = primary_idx.size(0)
         dev = primary_idx.device
         idx = torch.arange(Bs, device=dev)
 
         # order: acoustic=0, language=1, visual=2 (matches MSelector)
         all_B = torch.stack([B_a, B_l, B_v], dim=1)              # [B,3,T,D]
-        all_conf = torch.stack([conf['a'], conf['t'], conf['v']], dim=1)
+        all_conf = torch.stack([conf['a'], conf['t'], conf['v']], dim=1)  # [B,3]
 
-        w_primary = weights[idx, primary_idx].view(-1, 1, 1)
-        B_p = all_B[idx, primary_idx] * w_primary
-        conf_p = all_conf[idx, primary_idx]
+        # --- Primary: soft mix via one-hot (straight-through differentiable) ---
+        # primary_onehot: [B, 3] → [B, 3, 1, 1] for broadcasting over [B, 3, T, D]
+        oh = primary_onehot.unsqueeze(-1).unsqueeze(-1)           # [B,3,1,1]
+        B_p = (all_B * oh).sum(dim=1)                             # [B,T,D]
+        conf_p = (all_conf * oh).sum(dim=1)                       # [B,T,D]
 
+        # --- Auxiliaries: use hard index (no gradient needed for ordering) ---
         mask = torch.ones(Bs, 3, device=dev, dtype=torch.bool)
         mask[idx, primary_idx] = False
         rem_w = weights.masked_select(mask).view(Bs, 2)
@@ -689,12 +708,12 @@ class InfoGate(nn.Module):
             L_tran, L_rec, L_cyc = zero, zero, zero
 
         # 7. MSelector (order: acoustic, language, visual) -------------
-        B_a_seq, B_l_seq, B_v_seq, weights, primary_idx = self.mselector(
+        B_a_seq, B_l_seq, B_v_seq, weights, primary_onehot, primary_idx = self.mselector(
             B['a'], B['t'], B['v'], tok_mask)
 
         # 8. Route by primary with confidence -------------------------
         B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2 = self._route_by_primary(
-            B_a_seq, B_l_seq, B_v_seq, conf, weights, primary_idx)
+            B_a_seq, B_l_seq, B_v_seq, conf, weights, primary_onehot, primary_idx)
 
         # Delay routing supervision to stage 2 or only selectively
         if self.use_l_rib and labels is not None and stage == 2:

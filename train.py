@@ -84,6 +84,11 @@ parser.add_argument("--cra_dims", default="64,32,16", type=str)
 parser.add_argument("--ema_decay", type=float, default=0.999)
 parser.add_argument("--ema_start_epoch", type=int, default=5)
 
+parser.add_argument("--gumbel_tau_start", type=float, default=1.0,
+                    help="Gumbel-Softmax temperature at start of training.")
+parser.add_argument("--gumbel_tau_end", type=float, default=0.5,
+                    help="Gumbel-Softmax temperature at end of training (annealed).")
+
 parser.add_argument("--checkpoint_dir", type=str, default="checkpoints")
 parser.add_argument("--selection_metric", type=str,
                     default=DEFAULT_SELECTION_METRIC,
@@ -547,6 +552,15 @@ def main():
 
     for epoch in range(args.n_epochs):
         stage = 1 if epoch < args.stage1_epochs else 2
+        # Gumbel-Softmax tau annealing: linear decay from start to end
+        tau_s = getattr(args, 'gumbel_tau_start', 1.0)
+        tau_e = getattr(args, 'gumbel_tau_end', 0.5)
+        tau = tau_s + (tau_e - tau_s) * epoch / max(args.n_epochs - 1, 1)
+        # Update tau on the model's MSelector
+        m = model.module if hasattr(model, 'module') else model
+        ig = m.dberta.infogate if hasattr(m, 'dberta') else m.bert.infogate
+        ig.mselector.gumbel_tau = tau
+
         eval_with_ema = epoch >= args.ema_start_epoch
         if epoch == args.ema_start_epoch:
             ema.reset(model)
@@ -590,7 +604,7 @@ def main():
             pred_str = (f"pred=[mean:{diag_vals.get('pred_mean',0):.3f} "
                         f"std:{diag_vals.get('pred_std',0):.3f}]")
             print(f"  Diag  {w_str}  {tgt_str}  {p_str}\n"
-                  f"  Qual  {err_str}  {c_str}  {rib_str}\n"
+                  f"  Qual  {err_str}  {c_str}  {rib_str}  gumbel_tau={tau:.3f}\n"
                   f"  Stats {pred_str}")
 
         if eval_with_ema:

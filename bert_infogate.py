@@ -1,20 +1,16 @@
 """
-InfoGate + DeBERTa integration module.
-Uses DeBERTa-v3-base as the text encoder; prediction is handled by InfoGate's
-internal MLP head.
+InfoGate + BERT integration module.
+Uses BERT as the text encoder; prediction is handled by InfoGate's internal MLP head.
 """
 
 import os
 
-from transformers.models.deberta_v2.modeling_deberta_v2 import (
-    DebertaV2PreTrainedModel, DebertaV2Model,
+from transformers import (
+    BertPreTrainedModel, BertModel,
 )
 from infogate_modules import InfoGate
 import global_configs
 from global_configs import DEVICE
-
-_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base")
-
 
 def _resolve_dims(config, mc):
     text_dim = getattr(mc, 'text_dim', None) or global_configs.TEXT_DIM
@@ -37,14 +33,13 @@ def _resolve_dims(config, mc):
         )
     return text_dim, acoustic_dim, visual_dim
 
-
-class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
+class InfoGate_BertModel(BertPreTrainedModel):
     def __init__(self, config, multimodal_config):
         super().__init__(config)
         TEXT_DIM, ACOUSTIC_DIM, VISUAL_DIM = _resolve_dims(config, multimodal_config)
         self.config = config
 
-        model = DebertaV2Model.from_pretrained(_MODEL_DIR)
+        model = BertModel.from_pretrained(getattr(multimodal_config, "model", "bert-base-chinese"))
         self.model = model.to(DEVICE)
 
         ig_args = {
@@ -92,14 +87,14 @@ class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
         return logits, ib_loss, loss_dict, nce_extras
 
 
-class InfoGate_DeBertaForSequenceClassification(DebertaV2PreTrainedModel):
+class InfoGate_BertForSequenceClassification(BertPreTrainedModel):
     def __init__(self, config, multimodal_config):
         super().__init__(config)
-        self.dberta = InfoGate_DebertaModel(config, multimodal_config)
+        self.bert = InfoGate_BertModel(config, multimodal_config)
 
     def forward(self, input_ids, visual, acoustic,
                 labels=None, stage=1):
-        return self.dberta(
+        return self.bert(
             input_ids, visual, acoustic,
             labels=labels, stage=stage,
         )
