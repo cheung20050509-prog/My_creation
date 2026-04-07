@@ -604,7 +604,8 @@ class InfoGate(nn.Module):
         all_B = torch.stack([B_a, B_l, B_v], dim=1)              # [B,3,T,D]
         all_conf = torch.stack([conf['a'], conf['t'], conf['v']], dim=1)
 
-        B_p = all_B[idx, primary_idx]
+        w_primary = weights[idx, primary_idx].view(-1, 1, 1)
+        B_p = all_B[idx, primary_idx] * w_primary
         conf_p = all_conf[idx, primary_idx]
 
         mask = torch.ones(Bs, 3, device=dev, dtype=torch.bool)

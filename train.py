@@ -14,10 +14,11 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from transformers import get_linear_schedule_with_warmup, DebertaV2Tokenizer
+from transformers import get_linear_schedule_with_warmup, DebertaV2Tokenizer, BertTokenizer
 from torch.optim import AdamW
 
 from deberta_infogate import InfoGate_DeBertaForSequenceClassification
+from bert_infogate import InfoGate_BertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
 from selection_utils import (
@@ -34,7 +35,7 @@ from selection_utils import (
 parser = argparse.ArgumentParser(description="InfoGate Training")
 parser.add_argument("--model", type=str,
                     default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base"))
-parser.add_argument("--dataset", type=str, choices=["mosi", "mosei"], default="mosi")
+parser.add_argument("--dataset", type=str, choices=["mosi", "mosei", "simsv2"], default="mosi")
 parser.add_argument("--max_seq_length", type=int, default=50)
 parser.add_argument("--train_batch_size", type=int, default=32)
 parser.add_argument("--dev_batch_size", type=int, default=128)
@@ -89,6 +90,10 @@ parser.add_argument("--selection_metric", type=str,
                     choices=SELECTION_METRIC_CHOICES)
 
 args = parser.parse_args()
+
+if args.dataset == "simsv2":
+    if "deberta-v3-base" in args.model:
+        args.model = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bert-base-chinese")
 
 if isinstance(args.cra_dims, str):
     args.cra_dims = [int(x) for x in args.cra_dims.split(',')]
@@ -148,31 +153,64 @@ def prepare_deberta_input(tokens, visual, acoustic, tokenizer):
 
 def convert_to_features(examples, max_seq_length, tokenizer):
     features = []
-    for example in examples:
-        (words, visual, acoustic), label_id, segment = example
+    if args.dataset == "simsv2":
+        # examples is a dict
+        num_samples = len(examples["raw_text"])
+        for i in range(num_samples):
+            words = examples["raw_text"][i]
+            visual = examples["vision"][i]
+            acoustic = examples["audio"][i]
+            label_id = examples["regression_labels"][i]
+            
+            # Ensure it's a scalar value
+            if isinstance(label_id, (list, tuple, np.ndarray)):
+                label_id = label_id[0]
 
-        tokens, inversions = [], []
-        for idx, word in enumerate(words):
-            toks = tokenizer.tokenize(word)
-            tokens.extend(toks)
-            inversions.extend([idx] * len(toks))
+            tokens = tokenizer.tokenize(words)
+            if len(tokens) > max_seq_length - 2:
+                tokens = tokens[:max_seq_length - 2]
+                visual = visual[:max_seq_length - 2]
+                acoustic = acoustic[:max_seq_length - 2]
+            else:
+                # pad or truncate if needed, SIMSv2 pre-extracts features usually matching text tokens
+                # Let's just truncate visual/acoustic to the length of tokens.
+                min_len = min(len(tokens), len(visual), len(acoustic))
+                tokens = tokens[:min_len]
+                visual = visual[:min_len]
+                acoustic = acoustic[:min_len]
 
-        aligned_v = np.array([visual[i] for i in inversions])
-        aligned_a = np.array([acoustic[i] for i in inversions])
+            ids, vis, aud, mask, seg = prepare_deberta_input(
+                tokens, visual, acoustic, tokenizer)
 
-        if len(tokens) > max_seq_length - 2:
-            tokens = tokens[:max_seq_length - 2]
-            aligned_a = aligned_a[:max_seq_length - 2]
-            aligned_v = aligned_v[:max_seq_length - 2]
+            features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+    else:
+        for example in examples:
+            (words, visual, acoustic), label_id, segment = example
 
-        ids, vis, aud, mask, seg = prepare_deberta_input(
-            tokens, aligned_v, aligned_a, tokenizer)
+            tokens, inversions = [] , []
+            for idx, word in enumerate(words):
+                toks = tokenizer.tokenize(word)
+                tokens.extend(toks)
+                inversions.extend([idx] * len(toks))
 
-        features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+            aligned_v = np.array([visual[i] for i in inversions])
+            aligned_a = np.array([acoustic[i] for i in inversions])
+
+            if len(tokens) > max_seq_length - 2:
+                tokens = tokens[:max_seq_length - 2]
+                aligned_a = aligned_a[:max_seq_length - 2]
+                aligned_v = aligned_v[:max_seq_length - 2]
+
+            ids, vis, aud, mask, seg = prepare_deberta_input(
+                tokens, aligned_v, aligned_a, tokenizer)
+
+            features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
     return features
 
 
 def get_tokenizer(model):
+    if args.dataset == "simsv2":
+        return BertTokenizer.from_pretrained(model)
     return DebertaV2Tokenizer.from_pretrained(model)
 
 
@@ -192,7 +230,12 @@ def setup_data():
         data = pickle.load(fh)
 
     train_ds = get_dataset(data["train"])
-    dev_ds = get_dataset(data["dev"])
+    if "dev" in data:
+        dev_ds = get_dataset(data["dev"])
+    elif "valid" in data:
+        dev_ds = get_dataset(data["valid"])
+    else:
+        raise KeyError("Could not find validation data split ('dev' or 'valid')")
     test_ds = get_dataset(data["test"])
 
     n_opt = int(len(train_ds) / args.train_batch_size
@@ -220,13 +263,17 @@ def set_seed(seed):
 
 
 def build_model(n_opt):
-    model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
-        args.model, multimodal_config=args, num_labels=1)
+    if args.dataset == "simsv2":
+        model = InfoGate_BertForSequenceClassification.from_pretrained(
+            args.model, multimodal_config=args, num_labels=1)
+        backbone_prefix = "bert.model."
+    else:
+        model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
+            args.model, multimodal_config=args, num_labels=1)
+        backbone_prefix = "dberta.model."
     model.to(DEVICE)
 
     no_decay = {"bias", "LayerNorm.bias", "LayerNorm.weight"}
-
-    backbone_prefix = "dberta.model."
     ig_lr = getattr(args, 'ig_learning_rate', 5e-4)
 
     backbone_decay, backbone_no_decay = [], []
