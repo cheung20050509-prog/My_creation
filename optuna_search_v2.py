@@ -57,8 +57,18 @@ DEFAULTS = {
 # Search space (3 tiers)
 # ══════════════════════════════════════════════════════════════
 
-def suggest_tier1(trial):
+def suggest_tier1(trial, dataset="mosi", n_epochs_max=None):
+    candidates = BATCH_CANDIDATES[dataset]
+    batch_idx = trial.suggest_categorical(
+        "batch_config", list(range(len(candidates))))
+    bs, accum = candidates[batch_idx]
+    ep_lo, ep_hi = DATASET_EPOCH_RANGE[dataset]
+    if n_epochs_max is not None:
+        ep_hi = n_epochs_max
     return {
+        "train_batch_size": bs,
+        "gradient_accumulation_step": accum,
+        "n_epochs": trial.suggest_int("n_epochs", ep_lo, ep_hi),
         "seed": trial.suggest_categorical("seed", [1, 42, 128, 256, 512, 1024, 2024]),
         "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
         "ig_learning_rate": trial.suggest_float("ig_learning_rate", 5e-5, 2e-3, log=True),
@@ -96,9 +106,9 @@ def suggest_tier3(trial):
     }
 
 
-def build_search_params(trial, tier):
+def build_search_params(trial, tier, dataset="mosi", n_epochs_max=None):
     params = dict(DEFAULTS)
-    params.update(suggest_tier1(trial))
+    params.update(suggest_tier1(trial, dataset, n_epochs_max))
     if tier >= 2:
         params.update(suggest_tier2(trial))
     if tier >= 3:
@@ -212,16 +222,18 @@ PRUNE_FN = {
     "simsv2": should_prune_simsv2,
 }
 
-# ── per-dataset batch defaults ──
-DATASET_BATCH_DEFAULTS = {
-    "mosi":   {"train_batch_size": 16, "gradient_accumulation_step": 2},
-    "mosei":  {"train_batch_size": 8,  "gradient_accumulation_step": 8},
-    "simsv2": {"train_batch_size": 32, "gradient_accumulation_step": 1},
+# ── per-dataset batch candidates: (batch_size, grad_accum) ──
+# effective batch = batch_size * grad_accum
+BATCH_CANDIDATES = {
+    "mosi":   [(8, 4), (8, 8), (16, 2), (16, 4), (32, 1), (32, 2)],
+    "mosei":  [(4, 8), (4, 16), (8, 4), (8, 8), (16, 2), (16, 4)],
+    "simsv2": [(8, 4), (16, 2), (16, 4), (32, 1), (32, 2), (64, 1)],
 }
-DATASET_EPOCH_DEFAULTS = {
-    "mosi":   80,
-    "mosei":  80,
-    "simsv2": 60,
+
+DATASET_EPOCH_RANGE = {
+    "mosi":   (40, 100),
+    "mosei":  (40, 100),
+    "simsv2": (30, 80),
 }
 
 
@@ -274,7 +286,8 @@ def cleanup_checkpoints_single(study, ckpt_base, higher_is_better):
 # ══════════════════════════════════════════════════════════════
 
 def objective(trial, cli):
-    params = build_search_params(trial, cli.search_tier)
+    params = build_search_params(trial, cli.search_tier, cli.dataset,
+                                  getattr(cli, 'n_epochs', None))
     ds = cli.dataset
 
     log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna")
@@ -290,9 +303,9 @@ def objective(trial, cli):
     cmd = [
         PYTHON, "-u", TRAIN_SCRIPT,
         "--dataset", ds,
-        "--n_epochs", str(cli.n_epochs),
-        "--train_batch_size", str(cli.train_batch_size),
-        "--gradient_accumulation_step", str(cli.gradient_accumulation_step),
+        "--n_epochs", str(params["n_epochs"]),
+        "--train_batch_size", str(params["train_batch_size"]),
+        "--gradient_accumulation_step", str(params["gradient_accumulation_step"]),
         "--checkpoint_dir", trial_ckpt,
         "--selection_metric", cli.selection_metric,
         "--seed", str(params["seed"]),
@@ -360,7 +373,8 @@ def objective(trial, cli):
                     "acc2_composite",
                     best_dev["Acc2"], best_dev["Acc7"],
                     best_dev["MAE"], best_dev["Corr"], best_dev["F1"])
-                trial.report(composite, epoch)
+                if cli.single_objective:
+                    trial.report(composite, epoch)
 
             if PRUNE_FN[ds](epoch, best_dev):
                 a2 = best_dev["Acc2"] if best_dev else 0
@@ -421,11 +435,7 @@ def main():
     pa.add_argument("--gpu", type=int, default=1)
     pa.add_argument("--n_trials", type=int, default=30)
     pa.add_argument("--n_epochs", type=int, default=None,
-                    help="Epochs per trial (default: per-dataset)")
-    pa.add_argument("--train_batch_size", type=int, default=None,
-                    help="Override per-dataset batch default")
-    pa.add_argument("--gradient_accumulation_step", type=int, default=None,
-                    help="Override per-dataset grad accum default")
+                    help="Override epoch range upper bound")
     pa.add_argument("--search_tier", type=int, default=2, choices=[1, 2, 3])
     pa.add_argument("--study_name", type=str, default=None)
     pa.add_argument("--db", type=str, default=None)
@@ -441,13 +451,6 @@ def main():
     cli = pa.parse_args()
 
     ds = cli.dataset
-    bd = DATASET_BATCH_DEFAULTS[ds]
-    if cli.n_epochs is None:
-        cli.n_epochs = DATASET_EPOCH_DEFAULTS[ds]
-    if cli.train_batch_size is None:
-        cli.train_batch_size = bd["train_batch_size"]
-    if cli.gradient_accumulation_step is None:
-        cli.gradient_accumulation_step = bd["gradient_accumulation_step"]
     if cli.study_name is None:
         cli.study_name = f"infogate_{ds}_v2"
 
@@ -486,8 +489,12 @@ def main():
     print(f"  Metric:  {cli.selection_metric}")
     print(f"  Tier:    {cli.search_tier}")
     print(f"  Trials:  {cli.n_trials} (existing: {len(study.trials)})")
-    print(f"  Epochs:  {cli.n_epochs}")
-    print(f"  Batch:   {cli.train_batch_size} x accum {cli.gradient_accumulation_step}")
+    ep_range = DATASET_EPOCH_RANGE[ds]
+    if cli.n_epochs is not None:
+        ep_range = (ep_range[0], cli.n_epochs)
+    print(f"  Epochs:  {ep_range[0]}~{ep_range[1]} (searched)")
+    bc = BATCH_CANDIDATES[ds]
+    print(f"  Batch candidates: {bc}")
     print(f"  Python:  {PYTHON}")
     print()
 
