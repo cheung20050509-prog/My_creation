@@ -196,12 +196,12 @@ def should_prune_mosei(epoch, metrics):
     if metrics is None:
         return False
     acc2, mae = metrics["Acc2"], metrics["MAE"]
-    if epoch >= 50:
-        return acc2 < 0.79 and mae > 0.66
-    if epoch >= 30:
+    if epoch >= 60:
         return acc2 < 0.76 and mae > 0.70
-    if epoch >= 15:
+    if epoch >= 40:
         return acc2 < 0.70 and mae > 0.80
+    if epoch >= 25:
+        return acc2 < 0.55 and mae > 0.95
     return False
 
 
