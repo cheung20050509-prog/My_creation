@@ -57,12 +57,14 @@ DEFAULTS = {
 # Search space (3 tiers)
 # ══════════════════════════════════════════════════════════════
 
-def suggest_tier1(trial, dataset="mosi", n_epochs_max=None):
+def suggest_tier1(trial, dataset="mosi", n_epochs_max=None, n_epochs_min=None):
     candidates = BATCH_CANDIDATES[dataset]
     batch_idx = trial.suggest_categorical(
         "batch_config", list(range(len(candidates))))
     bs, accum = candidates[batch_idx]
     ep_lo, ep_hi = DATASET_EPOCH_RANGE[dataset]
+    if n_epochs_min is not None:
+        ep_lo = n_epochs_min
     if n_epochs_max is not None:
         ep_hi = n_epochs_max
     return {
@@ -106,9 +108,9 @@ def suggest_tier3(trial):
     }
 
 
-def build_search_params(trial, tier, dataset="mosi", n_epochs_max=None):
+def build_search_params(trial, tier, dataset="mosi", n_epochs_max=None, n_epochs_min=None):
     params = dict(DEFAULTS)
-    params.update(suggest_tier1(trial, dataset, n_epochs_max))
+    params.update(suggest_tier1(trial, dataset, n_epochs_max, n_epochs_min))
     if tier >= 2:
         params.update(suggest_tier2(trial))
     if tier >= 3:
@@ -287,7 +289,8 @@ def cleanup_checkpoints_single(study, ckpt_base, higher_is_better):
 
 def objective(trial, cli):
     params = build_search_params(trial, cli.search_tier, cli.dataset,
-                                  getattr(cli, 'n_epochs', None))
+                                  getattr(cli, 'n_epochs', None),
+                                  getattr(cli, 'n_epochs_min', None))
     ds = cli.dataset
 
     log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna")
@@ -436,6 +439,8 @@ def main():
     pa.add_argument("--n_trials", type=int, default=30)
     pa.add_argument("--n_epochs", type=int, default=None,
                     help="Override epoch range upper bound")
+    pa.add_argument("--n_epochs_min", type=int, default=None,
+                    help="Override epoch range lower bound")
     pa.add_argument("--search_tier", type=int, default=2, choices=[1, 2, 3])
     pa.add_argument("--study_name", type=str, default=None)
     pa.add_argument("--db", type=str, default=None)
@@ -490,6 +495,8 @@ def main():
     print(f"  Tier:    {cli.search_tier}")
     print(f"  Trials:  {cli.n_trials} (existing: {len(study.trials)})")
     ep_range = DATASET_EPOCH_RANGE[ds]
+    if cli.n_epochs_min is not None:
+        ep_range = (cli.n_epochs_min, ep_range[1])
     if cli.n_epochs is not None:
         ep_range = (ep_range[0], cli.n_epochs)
     print(f"  Epochs:  {ep_range[0]}~{ep_range[1]} (searched)")
