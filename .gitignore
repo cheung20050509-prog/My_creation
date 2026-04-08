@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 *.pt
+*.db
 checkpoints/
 logs/
 *.log
