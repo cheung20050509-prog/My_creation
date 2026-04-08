@@ -50,6 +50,7 @@ DEFAULTS = {
     "gumbel_tau_start": 1.0, "gumbel_tau_end": 0.5,
     "num_heads": 4, "cra_layers": 8, "unified_dim": 256,
     "ema_start_epoch": 5,
+    "text_residual_weight": 0.0,
 }
 
 
@@ -92,6 +93,7 @@ def suggest_tier2(trial):
         "warmup_proportion": trial.suggest_float("warmup_proportion", 0.02, 0.25),
         "weight_decay": trial.suggest_float("weight_decay", 1e-4, 0.1, log=True),
         "ema_decay": trial.suggest_categorical("ema_decay", [0.99, 0.995, 0.999, 0.9995]),
+        "text_residual_weight": trial.suggest_float("text_res_w", 0.0, 1.0),
     }
 
 
@@ -336,6 +338,7 @@ def objective(trial, cli):
         "--unified_dim", str(params["unified_dim"]),
         "--ib_hidden_dim", str(ib_hidden_dim),
         "--ema_start_epoch", str(params["ema_start_epoch"]),
+        "--text_residual_weight", f"{params['text_residual_weight']:.4f}",
     ]
 
     for attr, flag in (
