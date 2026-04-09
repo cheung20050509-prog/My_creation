@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 
 import optuna
-from optuna.samplers import NSGAIISampler, TPESampler
+from optuna.samplers import NSGAIISampler, RandomSampler, TPESampler
 
 from selection_utils import (
     DEFAULT_SELECTION_METRIC,
@@ -33,9 +33,12 @@ KEEP_TOP_K = 5
 DEV_LINE_RE = re.compile(
     r"\s+Dev\s+Acc2=([\d.]+)%\s+Acc7=([\d.]+)%\s+MAE=([\d.]+)\s+Corr=([\d.]+)\s+F1=([\d.]+)"
 )
+DEV_LINE_SIMSV2_RE = re.compile(
+    r"\s+Dev\s+Acc2=([\d.]+)%\s+Acc5=([\d.]+)%\s+Acc3=([\d.]+)%\s+MAE=([\d.]+)\s+Corr=([\d.]+)\s+F1=([\d.]+)"
+)
 EPOCH_LINE_RE = re.compile(r"Epoch (\d+)/\d+")
 RESULT_LINE_RE = re.compile(
-    r"\s+(Selection score|Acc-2|Acc-7|MAE|Corr|F1):\s+([\d.]+)%?"
+    r"\s+(Selection score|Acc-2|Acc-7|Acc-5|Acc-3|MAE|Corr|F1):\s+([\d.]+)%?"
 )
 
 # ── fixed defaults for params not in active tier ──
@@ -142,7 +145,7 @@ def parse_best_results(log_path):
                     continue
                 key, raw = m.groups()
                 val = float(raw)
-                if key in ("Acc-2", "Acc-7"):
+                if key in ("Acc-2", "Acc-7", "Acc-5", "Acc-3"):
                     val /= 100.0
                 if key == "Selection score":
                     key = "SelectionScore"
@@ -150,7 +153,7 @@ def parse_best_results(log_path):
     return results
 
 
-def parse_best_dev_metrics(log_path):
+def parse_best_dev_metrics(log_path, dataset="mosi"):
     if not os.path.exists(log_path):
         return 0, None
     current_epoch = 0
@@ -162,18 +165,32 @@ def parse_best_dev_metrics(log_path):
             if em:
                 current_epoch = int(em.group(1))
                 continue
-            dm = DEV_LINE_RE.match(line)
-            if not dm:
-                continue
-            acc2, acc7, mae, corr, f1 = (float(x) for x in dm.groups())
-            acc2 /= 100.0
-            acc7 /= 100.0
-            composite = compute_selection_score(
-                "acc2_composite", acc2, acc7, mae, corr, f1)
-            if composite > best_composite:
-                best_composite = composite
-                best = {"Acc2": acc2, "Acc7": acc7, "MAE": mae,
-                        "Corr": corr, "F1": f1}
+            # Try simsv2 format first (more specific), then fallback
+            dm_s = DEV_LINE_SIMSV2_RE.match(line)
+            dm = DEV_LINE_RE.match(line) if dm_s is None else None
+            if dm_s:
+                acc2, acc5, acc3, mae, corr, f1 = (float(x) for x in dm_s.groups())
+                acc2 /= 100.0
+                acc5 /= 100.0
+                acc3 /= 100.0
+                composite = compute_selection_score(
+                    "acc2_composite", acc2=acc2, mae=mae, corr=corr, f1=f1,
+                    acc5=acc5, acc3=acc3)
+                if composite > best_composite:
+                    best_composite = composite
+                    best = {"Acc2": acc2, "Acc5": acc5, "Acc3": acc3,
+                            "MAE": mae, "Corr": corr, "F1": f1}
+            elif dm:
+                acc2, acc7, mae, corr, f1 = (float(x) for x in dm.groups())
+                acc2 /= 100.0
+                acc7 /= 100.0
+                composite = compute_selection_score(
+                    "acc2_composite", acc2=acc2, mae=mae, corr=corr, f1=f1,
+                    acc7=acc7)
+                if composite > best_composite:
+                    best_composite = composite
+                    best = {"Acc2": acc2, "Acc7": acc7, "MAE": mae,
+                            "Corr": corr, "F1": f1}
     return current_epoch, best
 
 
@@ -372,13 +389,18 @@ def objective(trial, cli):
     try:
         while proc.poll() is None:
             time.sleep(15)
-            epoch, best_dev = parse_best_dev_metrics(log_path)
+            epoch, best_dev = parse_best_dev_metrics(log_path, dataset=ds)
 
             if best_dev is not None:
-                composite = compute_selection_score(
-                    "acc2_composite",
-                    best_dev["Acc2"], best_dev["Acc7"],
-                    best_dev["MAE"], best_dev["Corr"], best_dev["F1"])
+                sel_kw = dict(acc2=best_dev["Acc2"], mae=best_dev["MAE"],
+                              corr=best_dev["Corr"], f1=best_dev["F1"])
+                if "Acc7" in best_dev:
+                    sel_kw["acc7"] = best_dev["Acc7"]
+                if "Acc5" in best_dev:
+                    sel_kw["acc5"] = best_dev["Acc5"]
+                if "Acc3" in best_dev:
+                    sel_kw["acc3"] = best_dev["Acc3"]
+                composite = compute_selection_score("acc2_composite", **sel_kw)
                 if cli.single_objective:
                     trial.report(composite, epoch)
 
@@ -415,18 +437,21 @@ def objective(trial, cli):
 
     mae = results["MAE"]
     acc2 = results.get("Acc-2", 0)
-    acc7 = results.get("Acc-7", 0)
     corr = results.get("Corr", 0)
     f1 = results.get("F1", 0)
-    composite = compute_selection_score(
-        "acc2_composite", acc2, acc7, mae, corr, f1)
+    sel_kw = dict(acc2=acc2, mae=mae, corr=corr, f1=f1)
+    if ds == "simsv2":
+        sel_kw["acc5"] = results.get("Acc-5", 0)
+        sel_kw["acc3"] = results.get("Acc-3", 0)
+    else:
+        sel_kw["acc7"] = results.get("Acc-7", 0)
+    composite = compute_selection_score("acc2_composite", **sel_kw)
 
     print(f"  Trial {trial.number} DONE: composite={composite:.4f} "
           f"Acc2={acc2*100:.2f}% MAE={mae:.4f} Corr={corr:.4f}")
 
     if cli.single_objective:
-        return compute_selection_score(
-            cli.selection_metric, acc2, acc7, mae, corr, f1)
+        return compute_selection_score(cli.selection_metric, **sel_kw)
     return composite, mae
 
 
@@ -452,6 +477,8 @@ def main():
                     choices=SELECTION_METRIC_CHOICES)
     pa.add_argument("--single_objective", action="store_true",
                     help="Single-obj TPE instead of multi-obj NSGA-II")
+    pa.add_argument("--n_startup_trials", type=int, default=50,
+                    help="Number of random startup trials before guided search")
     pa.add_argument("--disable_l_lib", action="store_true")
     pa.add_argument("--disable_l_tran", action="store_true")
     pa.add_argument("--disable_l_rib", action="store_true")
@@ -471,13 +498,14 @@ def main():
         db_path = os.path.join(log_dir, f"{cli.study_name}.db")
         cli.db = f"sqlite:///{db_path}"
 
+    n_startup = cli.n_startup_trials
     if cli.single_objective:
         hib = selection_higher_is_better(cli.selection_metric)
         study = optuna.create_study(
             study_name=cli.study_name,
             storage=cli.db,
             direction="maximize" if hib else "minimize",
-            sampler=TPESampler(),
+            sampler=TPESampler(n_startup_trials=n_startup),
             load_if_exists=True,
         )
     else:
@@ -485,7 +513,9 @@ def main():
             study_name=cli.study_name,
             storage=cli.db,
             directions=["maximize", "minimize"],
-            sampler=NSGAIISampler(),
+            sampler=NSGAIISampler(
+                population_size=max(n_startup, 50),
+            ),
             load_if_exists=True,
         )
 

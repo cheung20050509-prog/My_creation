@@ -7,6 +7,10 @@ logs/
 *.log
 deberta-v3-base/
 bert-base-chinese/
+_arxiv_MODS/
+_arxiv_CyIN/
+_arxiv_MODS
+_arxiv_CyIN
 datasets/
 datasets
 .env

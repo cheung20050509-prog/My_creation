@@ -23,7 +23,7 @@ from global_configs import DEVICE
 parser = argparse.ArgumentParser(description="InfoGate Testing")
 parser.add_argument("--model", type=str,
                     default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base"))
-parser.add_argument("--dataset", type=str, choices=["mosi", "mosei"], default="mosi")
+parser.add_argument("--dataset", type=str, choices=["mosi", "mosei", "simsv2"], default="mosi")
 parser.add_argument("--max_seq_length", type=int, default=50)
 parser.add_argument("--test_batch_size", type=int, default=128)
 parser.add_argument("--seed", type=int, default=128)
@@ -197,7 +197,7 @@ def test_model(model, loader):
     return np.array(preds), np.array(labels)
 
 
-def compute_metrics(preds, labels, use_zero=False):
+def compute_metrics(preds, labels, dataset="mosi", use_zero=False):
     nz = np.array([i for i, e in enumerate(labels) if e != 0 or use_zero])
     p, y = preds[nz], labels[nz]
     mae = np.mean(np.abs(p - y))
@@ -205,16 +205,30 @@ def compute_metrics(preds, labels, use_zero=False):
     pb, yb = (p >= 0), (y >= 0)
     acc2 = accuracy_score(yb, pb)
     f1 = f1_score(yb, pb, average="weighted")
-    p7 = np.clip(np.round(p), -3, 3).astype(int)
-    y7 = np.clip(np.round(y), -3, 3).astype(int)
-    acc7 = accuracy_score(y7, p7)
-    return {'MAE': mae, 'Corr': corr, 'Acc2': acc2, 'Acc7': acc7, 'F1': f1}
+    result = {'MAE': mae, 'Corr': corr, 'Acc2': acc2, 'F1': f1}
+    if dataset == "simsv2":
+        p5 = np.clip(np.round(p * 2), -2, 2).astype(int)
+        y5 = np.clip(np.round(y * 2), -2, 2).astype(int)
+        result['Acc5'] = accuracy_score(y5, p5)
+        p3 = np.sign(p).astype(int)
+        y3 = np.sign(y).astype(int)
+        result['Acc3'] = accuracy_score(y3, p3)
+    else:
+        p7 = np.clip(np.round(p), -3, 3).astype(int)
+        y7 = np.clip(np.round(y), -3, 3).astype(int)
+        result['Acc7'] = accuracy_score(y7, p7)
+    return result
 
 
 def print_metrics(metrics, prefix=""):
-    print(f"{prefix}Acc2: {metrics['Acc2']:.4f}  Acc7: {metrics['Acc7']:.4f}  "
-          f"F1: {metrics['F1']:.4f}  MAE: {metrics['MAE']:.4f}  "
+    s = f"{prefix}Acc2: {metrics['Acc2']:.4f}"
+    if 'Acc5' in metrics:
+        s += f"  Acc5: {metrics['Acc5']:.4f}  Acc3: {metrics['Acc3']:.4f}"
+    else:
+        s += f"  Acc7: {metrics['Acc7']:.4f}"
+    s += (f"  F1: {metrics['F1']:.4f}  MAE: {metrics['MAE']:.4f}  "
           f"Corr: {metrics['Corr']:.4f}")
+    print(s)
 
 
 # ============================================================
@@ -234,7 +248,7 @@ def main():
 
     print("\n[Complete Modality]")
     preds, labels = test_model(model, loader)
-    cm = compute_metrics(preds, labels)
+    cm = compute_metrics(preds, labels, dataset=args.dataset)
     print_metrics(cm, "  ")
 
 

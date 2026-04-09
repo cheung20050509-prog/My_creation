@@ -494,10 +494,44 @@ def score(preds, y, use_zero=False):
     yb = y2 >= 0
     acc2 = accuracy_score(yb, pb)
     f1 = f1_score(yb, pb, average="weighted")
-    p7 = np.clip(np.round(p), -3, 3).astype(int) + 3
-    y7 = np.clip(np.round(y2), -3, 3).astype(int) + 3
-    acc7 = accuracy_score(y7, p7)
-    return acc2, acc7, mae, corr, f1
+    result = {"acc2": acc2, "mae": mae, "corr": corr, "f1": f1}
+    if args.dataset == "simsv2":
+        # Acc5: 5-class {-1, -0.5, 0, 0.5, 1} → int {-2, -1, 0, 1, 2}
+        p5 = np.clip(np.round(p * 2), -2, 2).astype(int)
+        y5 = np.clip(np.round(y2 * 2), -2, 2).astype(int)
+        result["acc5"] = accuracy_score(y5, p5)
+        # Acc3: sign-based (negative / neutral / positive)
+        p3 = np.sign(p).astype(int)
+        y3 = np.sign(y2).astype(int)
+        result["acc3"] = accuracy_score(y3, p3)
+    else:
+        p7 = np.clip(np.round(p), -3, 3).astype(int) + 3
+        y7 = np.clip(np.round(y2), -3, 3).astype(int) + 3
+        result["acc7"] = accuracy_score(y7, p7)
+    return result
+
+
+def fmt_metrics(m, prefix=""):
+    """Format metrics dict for printing."""
+    s = f"{prefix}Acc2={m['acc2']*100:.2f}%"
+    if "acc5" in m:
+        s += f"  Acc5={m['acc5']*100:.2f}%  Acc3={m['acc3']*100:.2f}%"
+    else:
+        s += f"  Acc7={m['acc7']*100:.2f}%"
+    s += f"  MAE={m['mae']:.4f}  Corr={m['corr']:.4f}  F1={m['f1']:.4f}"
+    return s
+
+
+def selection_kwargs(m):
+    """Build keyword args for compute_selection_score / build_selection_tiebreak."""
+    kw = dict(acc2=m["acc2"], mae=m["mae"], corr=m["corr"], f1=m["f1"])
+    if "acc7" in m:
+        kw["acc7"] = m["acc7"]
+    if "acc5" in m:
+        kw["acc5"] = m["acc5"]
+    if "acc3" in m:
+        kw["acc3"] = m["acc3"]
+    return kw
 
 
 # ============================================================
@@ -611,32 +645,18 @@ def main():
             ema.apply(model)
 
         dev_preds, dev_labels = test_epoch(model, dev_dl, stage=stage, desc="Dev")
-        dev_acc2, dev_acc7, dev_mae, dev_corr, dev_f1 = score(dev_preds, dev_labels)
-        selection_score = compute_selection_score(
-            args.selection_metric,
-            dev_acc2,
-            dev_acc7,
-            dev_mae,
-            dev_corr,
-            dev_f1,
-        )
-        selection_tiebreak = build_selection_tiebreak(
-            dev_acc2,
-            dev_acc7,
-            dev_mae,
-            dev_corr,
-            dev_f1,
-        )
-        print(f"  Dev   Acc2={dev_acc2*100:.2f}%  Acc7={dev_acc7*100:.2f}%  "
-              f"MAE={dev_mae:.4f}  Corr={dev_corr:.4f}  F1={dev_f1:.4f}")
+        dev_m = score(dev_preds, dev_labels)
+        dev_kw = selection_kwargs(dev_m)
+        selection_score = compute_selection_score(args.selection_metric, **dev_kw)
+        selection_tiebreak = build_selection_tiebreak(**dev_kw)
+        print(f"  Dev   {fmt_metrics(dev_m)}")
         print(f"  Select {args.selection_metric}={selection_score:.6f}")
 
         preds, labels = test_epoch(model, test_dl, stage=stage)
-        acc2, acc7, mae, corr, f1 = score(preds, labels)
-        print(f"  Test  Acc2={acc2*100:.2f}%  Acc7={acc7*100:.2f}%  "
-              f"MAE={mae:.4f}  Corr={corr:.4f}  F1={f1:.4f}")
+        test_m = score(preds, labels)
+        print(f"  Test  {fmt_metrics(test_m)}")
 
-        last_test_results = (acc2, acc7, mae, corr, f1)
+        last_test_results = test_m
 
         if epoch >= select_start:
             if best_selection_tiebreak is None:
@@ -649,13 +669,13 @@ def main():
             if should_save:
                 best_selection_score = selection_score
                 best_selection_tiebreak = selection_tiebreak
-                best_results = (acc2, acc7, mae, corr, f1)
+                best_results = test_m
                 save_dict = {
                     'epoch': epoch + 1,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'dev_mae': dev_mae,
-                    'dev_corr': dev_corr,
+                    'dev_mae': dev_m["mae"],
+                    'dev_corr': dev_m["corr"],
                     'selection_metric': args.selection_metric,
                     'selection_score': selection_score,
                     'ablation': {
@@ -671,42 +691,52 @@ def main():
                     save_dict['ema_state_dict'] = ema.state_dict()
                 torch.save(save_dict, ckpt_path)
                 print(f"  >> Best model saved ({args.selection_metric}={selection_score:.6f}, "
-                      f"MAE={dev_mae:.4f}, Corr={dev_corr:.4f}) to {ckpt_path}")
+                      f"MAE={dev_m['mae']:.4f}, Corr={dev_m['corr']:.4f}) to {ckpt_path}")
 
-        if mae < best_test_mae:
-            best_test_mae = mae
-            best_test_results = (acc2, acc7, mae, corr, f1, epoch + 1)
+        if test_m["mae"] < best_test_mae:
+            best_test_mae = test_m["mae"]
+            best_test_results = {**test_m, "epoch": epoch + 1}
 
         if eval_with_ema:
             ema.restore(model)
 
     print("\n" + "=" * 60)
+    acc_label_hi = "Acc-5" if args.dataset == "simsv2" else "Acc-7"
     print(f"Best Results ({args.selection_metric}, epoch >= {select_start + 1}):")
     if best_results:
-        acc2, acc7, mae, corr, f1 = best_results
         print(f"  Selection score: {best_selection_score:.6f}")
-        print(f"  Acc-2: {acc2*100:.2f}%")
-        print(f"  Acc-7: {acc7*100:.2f}%")
-        print(f"  MAE:   {mae:.4f}")
-        print(f"  Corr:  {corr:.4f}")
-        print(f"  F1:    {f1:.4f}")
+        print(f"  Acc-2: {best_results['acc2']*100:.2f}%")
+        if args.dataset == "simsv2":
+            print(f"  Acc-5: {best_results['acc5']*100:.2f}%")
+            print(f"  Acc-3: {best_results['acc3']*100:.2f}%")
+        else:
+            print(f"  Acc-7: {best_results['acc7']*100:.2f}%")
+        print(f"  MAE:   {best_results['mae']:.4f}")
+        print(f"  Corr:  {best_results['corr']:.4f}")
+        print(f"  F1:    {best_results['f1']:.4f}")
     print(f"\nLast Epoch ({args.n_epochs}) Results:")
     if last_test_results:
-        acc2, acc7, mae, corr, f1 = last_test_results
-        print(f"  Acc-2: {acc2*100:.2f}%")
-        print(f"  Acc-7: {acc7*100:.2f}%")
-        print(f"  MAE:   {mae:.4f}")
-        print(f"  Corr:  {corr:.4f}")
-        print(f"  F1:    {f1:.4f}")
+        print(f"  Acc-2: {last_test_results['acc2']*100:.2f}%")
+        if args.dataset == "simsv2":
+            print(f"  Acc-5: {last_test_results['acc5']*100:.2f}%")
+            print(f"  Acc-3: {last_test_results['acc3']*100:.2f}%")
+        else:
+            print(f"  Acc-7: {last_test_results['acc7']*100:.2f}%")
+        print(f"  MAE:   {last_test_results['mae']:.4f}")
+        print(f"  Corr:  {last_test_results['corr']:.4f}")
+        print(f"  F1:    {last_test_results['f1']:.4f}")
     print("\nBest Test MAE (oracle, for reference only):")
     if best_test_results:
-        acc2, acc7, mae, corr, f1, ep = best_test_results
-        print(f"  Epoch: {ep}")
-        print(f"  Acc-2: {acc2*100:.2f}%")
-        print(f"  Acc-7: {acc7*100:.2f}%")
-        print(f"  MAE:   {mae:.4f}")
-        print(f"  Corr:  {corr:.4f}")
-        print(f"  F1:    {f1:.4f}")
+        print(f"  Epoch: {best_test_results['epoch']}")
+        print(f"  Acc-2: {best_test_results['acc2']*100:.2f}%")
+        if args.dataset == "simsv2":
+            print(f"  Acc-5: {best_test_results['acc5']*100:.2f}%")
+            print(f"  Acc-3: {best_test_results['acc3']*100:.2f}%")
+        else:
+            print(f"  Acc-7: {best_test_results['acc7']*100:.2f}%")
+        print(f"  MAE:   {best_test_results['mae']:.4f}")
+        print(f"  Corr:  {best_test_results['corr']:.4f}")
+        print(f"  F1:    {best_test_results['f1']:.4f}")
 
 
 if __name__ == '__main__':
