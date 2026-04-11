@@ -60,7 +60,6 @@ parser.add_argument("--beta_ib", type=float, default=32)
 parser.add_argument("--gamma_cyc", type=float, default=1.0)
 parser.add_argument("--alpha_ib", type=float, default=0.01)
 parser.add_argument("--alpha_nce", type=float, default=0.05)
-parser.add_argument("--alpha_sac", type=float, default=0.1)
 parser.add_argument("--selector_target_temp", type=float, default=0.35,
                     help="Temperature for modality-quality routing targets.")
 parser.add_argument("--selector_balance_weight", type=float, default=0.0,
@@ -75,8 +74,6 @@ parser.add_argument("--disable_l_tran", action="store_true",
                     help="Ablate the stage-2 translation loss.")
 parser.add_argument("--disable_l_rib", action="store_true",
                     help="Ablate the routing IB prior loss.")
-parser.add_argument("--disable_sac", action="store_true",
-                    help="Ablate the sentiment-aware contrastive loss.")
 parser.add_argument("--mse_weight", type=float, default=0.5)
 parser.add_argument("--cra_layers", type=int, default=8)
 parser.add_argument("--cra_dims", default="64,32,16", type=str)
@@ -106,7 +103,6 @@ if isinstance(args.cra_dims, str):
 args.use_l_lib = not args.disable_l_lib
 args.use_l_tran = not args.disable_l_tran
 args.use_l_rib = not args.disable_l_rib
-args.use_sac = not args.disable_sac
 
 global_configs.set_dataset_config(args.dataset)
 ACOUSTIC_DIM = global_configs.ACOUSTIC_DIM
@@ -351,26 +347,6 @@ class EMA:
                 self.shadow[n].copy_(p.data)
 
 
-# ============================================================
-# Sentiment-Aware Contrastive + Ordinal Ranking Losses
-# ============================================================
-
-def compute_sentiment_contrastive(h_fused, labels, temperature=0.1):
-    """Sentiment-distance-weighted contrastive loss in bottleneck space."""
-    B = h_fused.size(0)
-    if B < 2:
-        return h_fused.new_tensor(0.0)
-
-    h_norm = F.normalize(h_fused, dim=-1)
-    sim = torch.mm(h_norm, h_norm.t())
-
-    label_dist = torch.abs(labels.unsqueeze(0) - labels.unsqueeze(1))
-    target_sim = torch.exp(-label_dist / temperature)
-
-    mask = ~torch.eye(B, dtype=torch.bool, device=h_fused.device)
-    return F.mse_loss(sim[mask], target_sim[mask])
-
-
 def toggle_state(enabled):
     return "on" if enabled else "off"
 
@@ -395,7 +371,7 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
         v_norm = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
         a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
 
-        logits, ib_loss, loss_dict, h_pooled = model(
+        logits, ib_loss, loss_dict, _ = model(
             input_ids, v_norm, a_norm, labels=label_ids, stage=stage)
 
         pred_flat = logits.view(-1)
@@ -407,13 +383,7 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
 
         l_task = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
 
-        if args.use_sac and h_pooled is not None:
-            l_sac = compute_sentiment_contrastive(h_pooled, label_flat)
-        else:
-            l_sac = pred_flat.new_tensor(0.0)
-        loss_dict['L_sac'] = l_sac.item()
-
-        loss = l_task + ib_loss + args.alpha_sac * l_sac
+        loss = l_task + ib_loss
 
         if args.gradient_accumulation_step > 1:
             loss = loss / args.gradient_accumulation_step
@@ -558,8 +528,7 @@ def main():
     print(f"  Select by      : {args.selection_metric}")
     print(f"  Loss terms     : L_lib={toggle_state(args.use_l_lib)} "
           f"L_tran={toggle_state(args.use_l_tran)} "
-          f"L_rib={toggle_state(args.use_l_rib)} "
-          f"SAC={toggle_state(args.use_sac)}")
+            f"L_rib={toggle_state(args.use_l_rib)}")
     print("=" * 60)
 
     set_seed(args.seed)
@@ -682,7 +651,6 @@ def main():
                         'use_l_lib': args.use_l_lib,
                         'use_l_tran': args.use_l_tran,
                         'use_l_rib': args.use_l_rib,
-                        'use_sac': args.use_sac,
                     },
                     'test_results': best_results,
                     'args': args,

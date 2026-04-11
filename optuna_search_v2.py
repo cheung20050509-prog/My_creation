@@ -47,7 +47,7 @@ DEFAULTS = {
     "beta_ib": 32.0, "num_infogate_layers": 3, "bottleneck_dim": 128,
     "mse_weight": 0.5, "dropout_prob": 0.1,
     "gamma_cyc": 1.0, "alpha_ib": 0.01, "alpha_nce": 0.05,
-    "alpha_sac": 0.1, "stage1_epochs": 10, "warmup_proportion": 0.1,
+    "stage1_epochs": 10, "warmup_proportion": 0.1,
     "weight_decay": 1e-3, "ema_decay": 0.999,
     "selector_target_temp": 0.35, "selector_rib_weight": 0.05,
     "gumbel_tau_start": 1.0, "gumbel_tau_end": 0.5,
@@ -91,7 +91,6 @@ def suggest_tier2(trial):
         "gamma_cyc": trial.suggest_float("gamma_cyc", 0.1, 3.0),
         "alpha_ib": trial.suggest_float("alpha_ib", 0.001, 0.05, log=True),
         "alpha_nce": trial.suggest_float("alpha_nce", 0.01, 0.2),
-        "alpha_sac": trial.suggest_float("alpha_sac", 0.01, 0.3),
         "stage1_epochs": trial.suggest_int("stage1_epochs", 3, 20),
         "warmup_proportion": trial.suggest_float("warmup_proportion", 0.02, 0.25),
         "weight_decay": trial.suggest_float("weight_decay", 1e-4, 0.1, log=True),
@@ -341,7 +340,6 @@ def objective(trial, cli):
         "--gamma_cyc", f"{params['gamma_cyc']:.4f}",
         "--alpha_ib", f"{params['alpha_ib']:.6f}",
         "--alpha_nce", f"{params['alpha_nce']:.4f}",
-        "--alpha_sac", f"{params['alpha_sac']:.4f}",
         "--stage1_epochs", str(params["stage1_epochs"]),
         "--warmup_proportion", f"{params['warmup_proportion']:.4f}",
         "--weight_decay", f"{params['weight_decay']:.6f}",
@@ -362,7 +360,6 @@ def objective(trial, cli):
         ("disable_l_lib", "--disable_l_lib"),
         ("disable_l_tran", "--disable_l_tran"),
         ("disable_l_rib", "--disable_l_rib"),
-        ("disable_sac", "--disable_sac"),
     ):
         if getattr(cli, attr, False):
             cmd.append(flag)
@@ -482,7 +479,6 @@ def main():
     pa.add_argument("--disable_l_lib", action="store_true")
     pa.add_argument("--disable_l_tran", action="store_true")
     pa.add_argument("--disable_l_rib", action="store_true")
-    pa.add_argument("--disable_sac", action="store_true")
     cli = pa.parse_args()
 
     ds = cli.dataset
