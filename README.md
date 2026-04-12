@@ -170,7 +170,6 @@ python train.py \
     --beta_ib 16 \
     --gamma_cyc 1.0 \
     --alpha_ib 0.005 \
-    --alpha_nce 0.05 \
     --mse_weight 0.5 \
     --cra_layers 8 \
     --dropout_prob 0.25 \

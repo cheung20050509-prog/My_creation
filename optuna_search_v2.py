@@ -1,5 +1,5 @@
 """Optuna v2 — MOSI/MOSEI/SIMSV2 hyperparameter search for InfoGate.
-Multi-objective (acc2_composite ↑, MAE ↓) with NSGA-II.
+Multi-objective (acc2_composite ↑, MAE ↓): BoTorch Sampler for rapid convergence.
 SQLite persistence, 3-tier search space, adaptive pruning.
 """
 
@@ -14,7 +14,13 @@ import time
 from datetime import datetime
 
 import optuna
-from optuna.samplers import NSGAIISampler, RandomSampler, TPESampler
+from optuna.samplers import NSGAIISampler, TPESampler
+from optuna.integration.botorch import BoTorchSampler
+
+try:
+    from optuna.samplers import MOTPESampler
+except ImportError:  # Optuna < 3.0
+    MOTPESampler = None
 
 from selection_utils import (
     DEFAULT_SELECTION_METRIC,
@@ -46,7 +52,7 @@ DEFAULTS = {
     "seed": 128, "learning_rate": 2e-5, "ig_learning_rate": 5e-4,
     "beta_ib": 32.0, "num_infogate_layers": 3, "bottleneck_dim": 128,
     "mse_weight": 0.5, "dropout_prob": 0.1,
-    "gamma_cyc": 1.0, "alpha_ib": 0.01, "alpha_nce": 0.05,
+    "gamma_cyc": 1.0, "alpha_ib": 0.01,
     "stage1_epochs": 10, "warmup_proportion": 0.1,
     "weight_decay": 1e-3, "ema_decay": 0.999,
     "selector_target_temp": 0.35, "selector_rib_weight": 0.05,
@@ -75,7 +81,7 @@ def suggest_tier1(trial, dataset="mosi", n_epochs_max=None, n_epochs_min=None):
         "train_batch_size": bs,
         "gradient_accumulation_step": accum,
         "n_epochs": trial.suggest_int("n_epochs", ep_lo, ep_hi),
-        "seed": trial.suggest_categorical("seed", [1, 42, 128, 256, 512, 1024, 2024]),
+        "seed": 128,  # Fixed seed
         "learning_rate": trial.suggest_float("learning_rate", 5e-6, 5e-5, log=True),
         "ig_learning_rate": trial.suggest_float("ig_learning_rate", 5e-5, 2e-3, log=True),
         "beta_ib": trial.suggest_float("beta_ib", 4.0, 64.0, log=True),
@@ -90,7 +96,6 @@ def suggest_tier2(trial):
     return {
         "gamma_cyc": trial.suggest_float("gamma_cyc", 0.1, 3.0),
         "alpha_ib": trial.suggest_float("alpha_ib", 0.001, 0.05, log=True),
-        "alpha_nce": trial.suggest_float("alpha_nce", 0.01, 0.2),
         "stage1_epochs": trial.suggest_int("stage1_epochs", 3, 20),
         "warmup_proportion": trial.suggest_float("warmup_proportion", 0.02, 0.25),
         "weight_decay": trial.suggest_float("weight_decay", 1e-4, 0.1, log=True),
@@ -339,7 +344,6 @@ def objective(trial, cli):
         "--dropout_prob", f"{params['dropout_prob']:.4f}",
         "--gamma_cyc", f"{params['gamma_cyc']:.4f}",
         "--alpha_ib", f"{params['alpha_ib']:.6f}",
-        "--alpha_nce", f"{params['alpha_nce']:.4f}",
         "--stage1_epochs", str(params["stage1_epochs"]),
         "--warmup_proportion", f"{params['warmup_proportion']:.4f}",
         "--weight_decay", f"{params['weight_decay']:.6f}",
@@ -377,7 +381,11 @@ def objective(trial, cli):
     print(f"{'='*60}")
 
     env = os.environ.copy()
-    env["CUDA_VISIBLE_DEVICES"] = str(cli.gpu)
+    # If the launcher already set CUDA_VISIBLE_DEVICES (e.g. run_optuna_three_5090.sh
+    # pins one physical GPU per process), do NOT overwrite — previously we always set
+    # str(cli.gpu) (often 0), which forced every trial onto physical GPU 0.
+    if "CUDA_VISIBLE_DEVICES" not in env:
+        env["CUDA_VISIBLE_DEVICES"] = str(cli.gpu)
 
     with open(log_path, "w") as log_f:
         proc = subprocess.Popen(
@@ -460,8 +468,10 @@ def main():
     pa = argparse.ArgumentParser(description="Optuna v2 — MOSI/MOSEI/SIMSV2 search")
     pa.add_argument("--dataset", type=str, default="mosi",
                     choices=["mosi", "mosei", "simsv2"])
-    pa.add_argument("--gpu", type=int, default=1)
-    pa.add_argument("--n_trials", type=int, default=30)
+    pa.add_argument("--gpu", type=int, default=1,
+                    help="Used only when CUDA_VISIBLE_DEVICES is unset: physical GPU id for train subprocess")
+    pa.add_argument("--n_trials", type=int, default=200,
+                    help="Total trials (should exceed n_startup_trials for a guided phase)")
     pa.add_argument("--n_epochs", type=int, default=None,
                     help="Override epoch range upper bound")
     pa.add_argument("--n_epochs_min", type=int, default=None,
@@ -474,8 +484,9 @@ def main():
                     choices=SELECTION_METRIC_CHOICES)
     pa.add_argument("--single_objective", action="store_true",
                     help="Single-obj TPE instead of multi-obj NSGA-II")
-    pa.add_argument("--n_startup_trials", type=int, default=50,
-                    help="Number of random startup trials before guided search")
+    pa.add_argument("--n_startup_trials", type=int, default=55,
+                    help="Random warmup trials before guided search (TPE/MOTPE); "
+                         "NSGA-II fallback uses this as population_size lower bound")
     pa.add_argument("--disable_l_lib", action="store_true")
     pa.add_argument("--disable_l_tran", action="store_true")
     pa.add_argument("--disable_l_rib", action="store_true")
@@ -483,7 +494,7 @@ def main():
 
     ds = cli.dataset
     if cli.study_name is None:
-        cli.study_name = f"infogate_{ds}_v2"
+        cli.study_name = f"infogate_{ds}_v3_botorch"
 
     log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna")
     ckpt_base = os.path.join(SCRIPT_DIR, "checkpoints", f"optuna_{ds}")
@@ -504,14 +515,15 @@ def main():
             sampler=TPESampler(n_startup_trials=n_startup),
             load_if_exists=True,
         )
+        mo_sampler_name = "TPE"
     else:
+        mo_sampler = BoTorchSampler(n_startup_trials=n_startup)
+        mo_sampler_name = f"BoTorch(n_startup_trials={n_startup})"
         study = optuna.create_study(
             study_name=cli.study_name,
             storage=cli.db,
             directions=["maximize", "minimize"],
-            sampler=NSGAIISampler(
-                population_size=max(n_startup, 50),
-            ),
+            sampler=mo_sampler,
             load_if_exists=True,
         )
 
@@ -519,7 +531,7 @@ def main():
     print(f"  Study:   {cli.study_name}")
     print(f"  Storage: {cli.db}")
     print(f"  GPU:     {cli.gpu}")
-    print(f"  Mode:    {'single-obj' if cli.single_objective else 'multi-obj NSGA-II'}")
+    print(f"  Mode:    {'single-obj TPE' if cli.single_objective else 'multi-obj ' + mo_sampler_name}")
     print(f"  Metric:  {cli.selection_metric}")
     print(f"  Tier:    {cli.search_tier}")
     print(f"  Trials:  {cli.n_trials} (existing: {len(study.trials)})")

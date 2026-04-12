@@ -33,7 +33,6 @@ nohup "$PYTHON" -u train.py \
     --beta_ib 15.6 \
     --gamma_cyc 0.582 \
     --alpha_ib 0.00227 \
-    --alpha_nce 0.05 \
     --mse_weight 0.67 \
     --cra_layers 8 \
     --cra_dims "64,32,16" \

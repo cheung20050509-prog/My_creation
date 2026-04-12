@@ -79,12 +79,12 @@ class InfoGate_BertModel(BertPreTrainedModel):
             input_ids=input_ids, attention_mask=attention_mask
         )[0]  # [B, T, 768]
 
-        logits, ib_loss, loss_dict, nce_extras = self.infogate(
+        logits, ib_loss, loss_dict, h_p = self.infogate(
             text_features, acoustic, visual,
             labels=labels, stage=stage,
             attention_mask=attention_mask,
         )
-        return logits, ib_loss, loss_dict, nce_extras
+        return logits, ib_loss, loss_dict, h_p
 
 
 class InfoGate_BertForSequenceClassification(BertPreTrainedModel):

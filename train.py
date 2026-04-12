@@ -59,7 +59,6 @@ parser.add_argument("--num_infogate_layers", type=int, default=3)
 parser.add_argument("--beta_ib", type=float, default=32)
 parser.add_argument("--gamma_cyc", type=float, default=1.0)
 parser.add_argument("--alpha_ib", type=float, default=0.01)
-parser.add_argument("--alpha_nce", type=float, default=0.05)
 parser.add_argument("--selector_target_temp", type=float, default=0.35,
                     help="Temperature for modality-quality routing targets.")
 parser.add_argument("--selector_balance_weight", type=float, default=0.0,
@@ -544,7 +543,7 @@ def main():
 
     os.makedirs(args.checkpoint_dir, exist_ok=True)
     ckpt_path = os.path.join(args.checkpoint_dir, f"infogate_{args.dataset}_best.pt")
-    select_start = args.n_epochs // 2
+    select_start = args.stage1_epochs
     select_higher_is_better = selection_higher_is_better(args.selection_metric)
     best_selection_score = float('-inf') if select_higher_is_better else float('inf')
     best_selection_tiebreak = None
@@ -619,7 +618,8 @@ def main():
         selection_score = compute_selection_score(args.selection_metric, **dev_kw)
         selection_tiebreak = build_selection_tiebreak(**dev_kw)
         print(f"  Dev   {fmt_metrics(dev_m)}")
-        print(f"  Select {args.selection_metric}={selection_score:.6f}")
+        score_str = f"acc2_composite={selection_score:.4f}" if args.selection_metric == "acc2_composite" else f"{args.selection_metric}={selection_score:.6f}"
+        print(f"  Select {score_str}")
 
         preds, labels = test_epoch(model, test_dl, stage=stage)
         test_m = score(preds, labels)

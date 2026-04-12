@@ -1,0 +1,496 @@
+\begin{thebibliography}{77}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Wu et~al.(2024)Wu, Wang, Chen, and Carneiro]{wu2024deep}
+Renjie Wu, Hu~Wang, Hsiang-Ting Chen, and Gustavo Carneiro.
+\newblock Deep multimodal learning with missing modality: A survey.
+\newblock \emph{arXiv preprint arXiv:2409.07825}, 2024.
+
+\bibitem[Ma et~al.(2022)Ma, Ren, Zhao, Testuggine, and Peng]{ma2022multimodal}
+Mengmeng Ma, Jian Ren, Long Zhao, Davide Testuggine, and Xi~Peng.
+\newblock Are multimodal transformers robust to missing modality?
+\newblock In \emph{2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages 18156--18165, 2022.
+\newblock \doi{10.1109/CVPR52688.2022.01764}.
+
+\bibitem[Ma et~al.(2021)Ma, Ren, Zhao, Tulyakov, Wu, and Peng]{ma2021smil}
+Mengmeng Ma, Jian Ren, Long Zhao, Sergey Tulyakov, Cathy Wu, and Xi~Peng.
+\newblock Smil: Multimodal learning with severely missing modality.
+\newblock \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, 35\penalty0 (3):\penalty0 2302--2310, May 2021.
+\newblock \doi{10.1609/aaai.v35i3.16330}.
+\newblock URL \url{https://ojs.aaai.org/index.php/AAAI/article/view/16330}.
+
+\bibitem[Lin and Hu(2023{\natexlab{a}})]{lin2023missmodal}
+Ronghao Lin and Haifeng Hu.
+\newblock {MissModal: Increasing Robustness to Missing Modality in Multimodal Sentiment Analysis}.
+\newblock \emph{Transactions of the Association for Computational Linguistics}, 11:\penalty0 1686--1702, 12 2023{\natexlab{a}}.
+\newblock ISSN 2307-387X.
+\newblock \doi{10.1162/tacl_a_00628}.
+\newblock URL \url{https://doi.org/10.1162/tacl\_a\_00628}.
+
+\bibitem[Yuan et~al.(2024)Yuan, Liu, Xu, and Gao]{yuan2024noise}
+Ziqi Yuan, Yihe Liu, Hua Xu, and Kai Gao.
+\newblock Noise imitation based adversarial training for robust multimodal sentiment analysis.
+\newblock \emph{IEEE Transactions on Multimedia}, 26:\penalty0 529--539, 2024.
+\newblock \doi{10.1109/TMM.2023.3267882}.
+
+\bibitem[Li et~al.(2024)Li, Yang, Liu, Wang, Chen, Wang, Wei, Jiang, Xu, Hou, Sun, Qian, Kou, and Zhang]{li2024toward}
+Mingcheng Li, Dingkang Yang, Yang Liu, Shunli Wang, Jiawei Chen, Shuaibing Wang, Jinjie Wei, Yue Jiang, Qingyao Xu, Xiaolu Hou, Mingyang Sun, Ziyun Qian, Dongliang Kou, and Lihua Zhang.
+\newblock Toward robust incomplete multimodal sentiment analysis via hierarchical representation learning.
+\newblock In \emph{The Thirty-eighth Annual Conference on Neural Information Processing Systems}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=XgwTH95kCl}.
+
+\bibitem[Lin and Hu(2024)]{lin2024adapt}
+Ronghao Lin and Haifeng Hu.
+\newblock Adapt and explore: Multimodal mixup for representation learning.
+\newblock \emph{Information Fusion}, 105:\penalty0 102216, 2024.
+\newblock ISSN 1566-2535.
+\newblock \doi{https://doi.org/10.1016/j.inffus.2023.102216}.
+\newblock URL \url{https://www.sciencedirect.com/science/article/pii/S1566253523005328}.
+
+\bibitem[Zhang et~al.(2024{\natexlab{a}})Zhang, Wang, and Yu]{zhang2024towards}
+Haoyu Zhang, Wenbin Wang, and Tianshu Yu.
+\newblock Towards robust multimodal sentiment analysis with incomplete data.
+\newblock In \emph{The Thirty-eighth Annual Conference on Neural Information Processing Systems}, 2024{\natexlab{a}}.
+\newblock URL \url{https://openreview.net/forum?id=mYEjc7qGRA}.
+
+\bibitem[Poklukar et~al.(2022)Poklukar, Vasco, Yin, Melo, Paiva, and Kragic]{poklukar2022geometric}
+Petra Poklukar, Miguel Vasco, Hang Yin, Francisco~S. Melo, Ana Paiva, and Danica Kragic.
+\newblock Geometric multimodal contrastive representation learning.
+\newblock In Kamalika Chaudhuri, Stefanie Jegelka, Le~Song, Csaba Szepesvari, Gang Niu, and Sivan Sabato, editors, \emph{Proceedings of the 39th International Conference on Machine Learning}, volume 162 of \emph{Proceedings of Machine Learning Research}, pages 17782--17800. PMLR, 17--23 Jul 2022.
+\newblock URL \url{https://proceedings.mlr.press/v162/poklukar22a.html}.
+
+\bibitem[Liu et~al.(2024)Liu, Zuo, Lian, Schuller, and Li]{liu2024cifmmin}
+Rui Liu, Haolin Zuo, Zheng Lian, Björn~W. Schuller, and Haizhou Li.
+\newblock Contrastive learning based modality-invariant feature acquisition for robust multimodal emotion recognition with missing modalities.
+\newblock \emph{IEEE Transactions on Affective Computing}, 15\penalty0 (4):\penalty0 1856--1873, 2024.
+\newblock \doi{10.1109/TAFFC.2024.3378570}.
+
+\bibitem[Hotelling(1992)]{hotelling1992cca}
+Harold Hotelling.
+\newblock \emph{Relations Between Two Sets of Variates}, pages 162--190.
+\newblock Springer New York, New York, NY, 1992.
+\newblock ISBN 978-1-4612-4380-9.
+\newblock \doi{10.1007/978-1-4612-4380-9_14}.
+\newblock URL \url{https://doi.org/10.1007/978-1-4612-4380-9_14}.
+
+\bibitem[Andrew et~al.(2013)Andrew, Arora, Bilmes, and Livescu]{andrew2013dcca}
+Galen Andrew, Raman Arora, Jeff Bilmes, and Karen Livescu.
+\newblock Deep canonical correlation analysis.
+\newblock In \emph{Proceedings of the 30th International Conference on International Conference on Machine Learning - Volume 28}, ICML'13, page III–1247–III–1255. JMLR.org, 2013.
+
+\bibitem[Wang et~al.(2015)Wang, Arora, Livescu, and Bilmes]{wang2015dccae}
+Weiran Wang, Raman Arora, Karen Livescu, and Jeff Bilmes.
+\newblock On deep multi-view representation learning.
+\newblock In \emph{Proceedings of the 32nd International Conference on International Conference on Machine Learning - Volume 37}, ICML'15, page 1083–1092. JMLR.org, 2015.
+
+\bibitem[Hazarika et~al.(2022)Hazarika, Li, Cheng, Zhao, Zimmermann, and Poria]{hazarika2022analyzing}
+Devamanyu Hazarika, Yingting Li, Bo~Cheng, Shuai Zhao, Roger Zimmermann, and Soujanya Poria.
+\newblock Analyzing modality robustness in multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 2022 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies}, pages 685--696, Seattle, United States, July 2022. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2022.naacl-main.50}.
+\newblock URL \url{https://aclanthology.org/2022.naacl-main.50}.
+
+\bibitem[Bengio et~al.(2006)Bengio, Lamblin, Popovici, and Larochelle]{bengio2006greedy}
+Yoshua Bengio, Pascal Lamblin, Dan Popovici, and Hugo Larochelle.
+\newblock Greedy layer-wise training of deep networks.
+\newblock In B.~Sch\"{o}lkopf, J.~Platt, and T.~Hoffman, editors, \emph{Advances in Neural Information Processing Systems}, volume~19. MIT Press, 2006.
+\newblock URL \url{https://proceedings.neurips.cc/paper_files/paper/2006/file/5da713a690c067105aeb2fae32403405-Paper.pdf}.
+
+\bibitem[Pham et~al.(2019)Pham, Liang, Manzini, Morency, and P{\'o}czos]{pham2019found}
+Hai Pham, Paul~Pu Liang, Thomas Manzini, Louis-Philippe Morency, and Barnab{\'a}s P{\'o}czos.
+\newblock Found in translation: Learning robust joint representations by cyclic translations between modalities.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, volume~33, pages 6892--6899, 2019.
+
+\bibitem[Zhao et~al.(2021)Zhao, Li, and Jin]{zhao2021missing}
+Jinming Zhao, Ruichen Li, and Qin Jin.
+\newblock Missing modality imagination network for emotion recognition with uncertain missing modalities.
+\newblock In \emph{Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)}, pages 2608--2618, Online, August 2021. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2021.acl-long.203}.
+\newblock URL \url{https://aclanthology.org/2021.acl-long.203}.
+
+\bibitem[Wu and Goodman(2018)]{wu2018mvae}
+Mike Wu and Noah Goodman.
+\newblock Multimodal generative models for scalable weakly-supervised learning.
+\newblock In \emph{Proceedings of the 32nd International Conference on Neural Information Processing Systems}, NIPS'18, page 5580–5590, Red Hook, NY, USA, 2018. Curran Associates Inc.
+
+\bibitem[Shi et~al.(2019)Shi, Siddharth, Paige, and Torr]{shi2019mmvae}
+Yuge Shi, N.~Siddharth, Brooks Paige, and Philip H.~S. Torr.
+\newblock \emph{Variational mixture-of-experts autoencoders for multi-modal deep generative models}.
+\newblock Curran Associates Inc., Red Hook, NY, USA, 2019.
+
+\bibitem[Vasco et~al.(2022{\natexlab{a}})Vasco, Yin, Melo, and Paiva]{vasco2022leveraging}
+Miguel Vasco, Hang Yin, Francisco~S. Melo, and Ana Paiva.
+\newblock Leveraging hierarchy in multimodal generative models for effective cross-modality inference.
+\newblock \emph{Neural Networks}, 146:\penalty0 238--255, 2022{\natexlab{a}}.
+\newblock ISSN 0893-6080.
+\newblock \doi{https://doi.org/10.1016/j.neunet.2021.11.019}.
+\newblock URL \url{https://www.sciencedirect.com/science/article/pii/S0893608021004470}.
+
+\bibitem[Vasco et~al.(2022{\natexlab{b}})Vasco, Yin, Melo, and Paiva]{vasco2022muse}
+Miguel Vasco, Hang Yin, Francisco~S. Melo, and Ana Paiva.
+\newblock How to sense the world: Leveraging hierarchy in multimodal perception for robust reinforcement learning agents.
+\newblock In \emph{Proceedings of the 21st International Conference on Autonomous Agents and Multiagent Systems}, AAMAS '22, page 1301–1309, Richland, SC, 2022{\natexlab{b}}. International Foundation for Autonomous Agents and Multiagent Systems.
+\newblock ISBN 9781450392136.
+
+\bibitem[Lian et~al.(2023)Lian, Chen, Sun, Liu, and Tao]{lian2023gcnet}
+Zheng Lian, Lan Chen, Licai Sun, Bin Liu, and Jianhua Tao.
+\newblock Gcnet: Graph completion network for incomplete multimodal learning in conversation.
+\newblock \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 45\penalty0 (7):\penalty0 8419--8432, 2023.
+\newblock \doi{10.1109/TPAMI.2023.3234553}.
+
+\bibitem[Shou et~al.(2024)Shou, Meng, Ai, Zhang, Yin, and Li]{shou2024adversarial}
+Yuntao Shou, Tao Meng, Wei Ai, Fuchen Zhang, Nan Yin, and Keqin Li.
+\newblock Adversarial alignment and graph fusion via information bottleneck for multimodal emotion recognition in conversations.
+\newblock \emph{Information Fusion}, 112:\penalty0 102590, 2024.
+\newblock ISSN 1566-2535.
+\newblock \doi{https://doi.org/10.1016/j.inffus.2024.102590}.
+\newblock URL \url{https://www.sciencedirect.com/science/article/pii/S1566253524003683}.
+
+\bibitem[Wang et~al.(2023{\natexlab{a}})Wang, Li, and Cui]{wang2023incomplete}
+Yuanzhi Wang, Yong Li, and Zhen Cui.
+\newblock Incomplete multimodality-diffused emotion recognition.
+\newblock In \emph{Thirty-seventh Conference on Neural Information Processing Systems}, 2023{\natexlab{a}}.
+\newblock URL \url{https://openreview.net/forum?id=BuGFwUS9B3}.
+
+\bibitem[Wang et~al.(2023{\natexlab{b}})Wang, Chen, Qian, Gao, Wei, Wang, Tian, and Gao]{wang2023large}
+Xiao Wang, Guangyao Chen, Guangwu Qian, Pengcheng Gao, Xiao-Yong Wei, Yaowei Wang, Yonghong Tian, and Wen Gao.
+\newblock Large-scale multi-modal pre-trained models: A comprehensive survey.
+\newblock \emph{Machine Intelligence Research}, 20\penalty0 (4):\penalty0 447--482, 2023{\natexlab{b}}.
+\newblock ISSN 2731-538X.
+\newblock \doi{10.1007/s11633-022-1410-8}.
+\newblock URL \url{https://www.mi-research.net/en/article/doi/10.1007/s11633-022-1410-8}.
+
+\bibitem[Zhang et~al.(2024{\natexlab{b}})Zhang, Yu, Dong, Li, Su, Chu, and Yu]{zhang2024mm}
+Duzhen Zhang, Yahan Yu, Jiahua Dong, Chenxing Li, Dan Su, Chenhui Chu, and Dong Yu.
+\newblock {MM}-{LLM}s: Recent advances in {M}ulti{M}odal large language models.
+\newblock In Lun-Wei Ku, Andre Martins, and Vivek Srikumar, editors, \emph{Findings of the Association for Computational Linguistics: ACL 2024}, pages 12401--12430, Bangkok, Thailand, August 2024{\natexlab{b}}. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2024.findings-acl.738}.
+\newblock URL \url{https://aclanthology.org/2024.findings-acl.738/}.
+
+\bibitem[Gkoumas et~al.(2021)Gkoumas, Li, Lioma, Yu, and Song]{gkoumas2021makes}
+Dimitris Gkoumas, Qiuchi Li, Christina Lioma, Yijun Yu, and Dawei Song.
+\newblock What makes the difference? an empirical comparison of fusion strategies for multimodal language analysis.
+\newblock \emph{Information Fusion}, 66:\penalty0 184--197, 2021.
+\newblock ISSN 1566-2535.
+\newblock \doi{https://doi.org/10.1016/j.inffus.2020.09.005}.
+\newblock URL \url{https://www.sciencedirect.com/science/article/pii/S1566253520303675}.
+
+\bibitem[Manzoor et~al.(2023)Manzoor, Albarri, Xian, Meng, Nakov, and Liang]{manzoor2023multmodality}
+Muhammad~Arslan Manzoor, Sarah Albarri, Ziting Xian, Zaiqiao Meng, Preslav Nakov, and Shangsong Liang.
+\newblock Multimodality representation learning: A survey on evolution, pretraining and its applications.
+\newblock \emph{ACM Trans. Multimedia Comput. Commun. Appl.}, 20\penalty0 (3), October 2023.
+\newblock ISSN 1551-6857.
+\newblock \doi{10.1145/3617833}.
+\newblock URL \url{https://doi.org/10.1145/3617833}.
+
+\bibitem[Tishby et~al.(1999)Tishby, Pereira, and Bialek]{tishby1999information}
+Naftali Tishby, Fernando~C. Pereira, and William Bialek.
+\newblock The information bottleneck method.
+\newblock In \emph{Proc. of the 37-th Annual Allerton Conference on Communication, Control and Computing}, pages 368--377, 1999.
+\newblock URL \url{https://arxiv.org/abs/physics/0004057}.
+
+\bibitem[Tishby and Zaslavsky(2015)]{tishby2015deepib}
+Naftali Tishby and Noga Zaslavsky.
+\newblock Deep learning and the information bottleneck principle.
+\newblock In \emph{2015 IEEE Information Theory Workshop (ITW)}, pages 1--5, 2015.
+\newblock \doi{10.1109/ITW.2015.7133169}.
+
+\bibitem[Saxe et~al.(2018)Saxe, Bansal, Dapello, Advani, Kolchinsky, Tracey, and Cox]{michael2018on}
+Andrew~Michael Saxe, Yamini Bansal, Joel Dapello, Madhu Advani, Artemy Kolchinsky, Brendan~Daniel Tracey, and David~Daniel Cox.
+\newblock On the information bottleneck theory of deep learning.
+\newblock In \emph{International Conference on Learning Representations}, 2018.
+\newblock URL \url{https://openreview.net/forum?id=ry_WPG-A-}.
+
+\bibitem[Alemi et~al.(2017)Alemi, Fischer, Dillon, and Murphy]{alemi2017vib}
+Alexander~A. Alemi, Ian Fischer, Joshua~V. Dillon, and Kevin Murphy.
+\newblock Deep variational information bottleneck.
+\newblock In \emph{International Conference on Learning Representations}, 2017.
+\newblock URL \url{https://openreview.net/forum?id=HyxQzBceg}.
+
+\bibitem[Diederik P.~Kingma(2014)]{kingma2014autoencoding}
+Max~Welling Diederik P.~Kingma.
+\newblock Auto-encoding variational bayes.
+\newblock In \emph{2nd International Conference on Learning Representations, {ICLR} 2014}, 2014.
+
+\bibitem[Tran et~al.(2017)Tran, Liu, Zhou, and Jin]{tran2017cra}
+Luan Tran, Xiaoming Liu, Jiayu Zhou, and Rong Jin.
+\newblock Missing modalities imputation via cascaded residual autoencoder.
+\newblock In \emph{Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)}, July 2017.
+
+\bibitem[Bahdanau et~al.(2015)Bahdanau, Cho, and Bengio]{bahdanau2015neural}
+Dzmitry Bahdanau, {Kyung Hyun} Cho, and Yoshua Bengio.
+\newblock Neural machine translation by jointly learning to align and translate.
+\newblock January 2015.
+\newblock 3rd International Conference on Learning Representations, ICLR 2015 ; Conference date: 07-05-2015 Through 09-05-2015.
+
+\bibitem[Wang et~al.(2020)Wang, Wan, and Wan]{wang2020transmodality}
+Zilong Wang, Zhaohong Wan, and Xiaojun Wan.
+\newblock Transmodality: An end2end fusion method with transformer for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of The Web Conference 2020}, WWW '20, page 2514–2520, New York, NY, USA, 2020. Association for Computing Machinery.
+\newblock ISBN 9781450370233.
+\newblock \doi{10.1145/3366423.3380000}.
+\newblock URL \url{https://doi.org/10.1145/3366423.3380000}.
+
+\bibitem[Hoang et~al.(2018)Hoang, Koehn, Haffari, and Cohn]{hoang2018iteractivebt}
+{Cong Duy Vu} Hoang, Philipp Koehn, Gholamreza Haffari, and Trevor Cohn.
+\newblock Iterative back-translation for neural machine translation.
+\newblock In \emph{Proceedings of the 2nd Workshop on Neural Machine Translation and Generation}, pages 18--24. Association for Computational Linguistics, July 2018.
+\newblock URL \url{https://sites.google.com/site/wnmt18/home, https://sites.google.com/site/wnmt18/}.
+\newblock 2nd Workshop on Neural Machine Translation and Generation, WNMT 2018 ; Conference date: 15-07-2018 Through 20-07-2018.
+
+\bibitem[Tsai et~al.(2019)Tsai, Bai, Liang, Kolter, Morency, and Salakhutdinov]{tsai2019multimodal}
+Yao-Hung~Hubert Tsai, Shaojie Bai, Paul~Pu Liang, J.~Zico Kolter, Louis-Philippe Morency, and Ruslan Salakhutdinov.
+\newblock Multimodal transformer for unaligned multimodal language sequences.
+\newblock In \emph{Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics}, pages 6558--6569, Florence, Italy, July 2019. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/P19-1656}.
+\newblock URL \url{https://aclanthology.org/P19-1656}.
+
+\bibitem[Girdhar et~al.(2023)Girdhar, El-Nouby, Liu, Singh, Alwala, Joulin, and Misra]{girdhar2023imagebind}
+Rohit Girdhar, Alaaeldin El-Nouby, Zhuang Liu, Mannat Singh, Kalyan~Vasudev Alwala, Armand Joulin, and Ishan Misra.
+\newblock Imagebind: One embedding space to bind them all.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, pages 15180--15190, June 2023.
+
+\bibitem[Devlin et~al.(2019)Devlin, Chang, Lee, and Toutanova]{devlin2019bert}
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova.
+\newblock {BERT}: Pre-training of deep bidirectional transformers for language understanding.
+\newblock In \emph{Proceedings of the 2019 Conference of the North {A}merican Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers)}, pages 4171--4186, Minneapolis, Minnesota, June 2019. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/N19-1423}.
+\newblock URL \url{https://aclanthology.org/N19-1423}.
+
+\bibitem[Reimers and Gurevych(2019)]{reimers2019sbert}
+Nils Reimers and Iryna Gurevych.
+\newblock Sentence-{BERT}: Sentence embeddings using {S}iamese {BERT}-networks.
+\newblock In Kentaro Inui, Jing Jiang, Vincent Ng, and Xiaojun Wan, editors, \emph{Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)}, pages 3982--3992, Hong Kong, China, November 2019. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/D19-1410}.
+\newblock URL \url{https://aclanthology.org/D19-1410}.
+
+\bibitem[Van~der Maaten and Hinton(2008)]{hinton2008visualizing}
+Laurens Van~der Maaten and Geoffrey Hinton.
+\newblock Visualizing data using t-sne.
+\newblock \emph{Journal of Machine Learning Research}, 9\penalty0 (86):\penalty0 2579--2605, 2008.
+\newblock URL \url{http://jmlr.org/papers/v9/vandermaaten08a.html}.
+
+\bibitem[Hazarika et~al.(2020)Hazarika, Zimmermann, and Poria]{hazarika2020misa}
+Devamanyu Hazarika, Roger Zimmermann, and Soujanya Poria.
+\newblock Misa: Modality-invariant and-specific representations for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 28th ACM International Conference on Multimedia}, pages 1122--1131, 2020.
+\newblock URL \url{https://doi.org/10.1145/3394171.3413678}.
+
+\bibitem[Lin and Hu(2023{\natexlab{b}})]{lin2023dynamically}
+Ronghao Lin and Haifeng Hu.
+\newblock Dynamically shifting multimodal representations via hybrid-modal attention for multimodal sentiment analysis.
+\newblock \emph{IEEE Transactions on Multimedia}, 26:\penalty0 2740--2755, 2023{\natexlab{b}}.
+\newblock \doi{10.1109/TMM.2023.3303711}.
+
+\bibitem[Peng et~al.(2022)Peng, Wei, Deng, Wang, and Hu]{peng2022Balanced}
+Xiaokang Peng, Yake Wei, Andong Deng, Dong Wang, and Di~Hu.
+\newblock Balanced multimodal learning via on-the-fly gradient modulation.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 2022.
+
+\bibitem[Lin and Hu(2023{\natexlab{c}})]{lin2023mtmd}
+Ronghao Lin and Haifeng Hu.
+\newblock Multi-task momentum distillation for multimodal sentiment analysis.
+\newblock \emph{IEEE Transactions on Affective Computing}, pages 1--18, 2023{\natexlab{c}}.
+\newblock \doi{10.1109/TAFFC.2023.3282410}.
+
+\bibitem[Lian et~al.(2024)Lian, Sun, Ren, Gu, Sun, Chen, Liu, and Tao]{lian2024merbench}
+Zheng Lian, Licai Sun, Yong Ren, Hao Gu, Haiyang Sun, Lan Chen, Bin Liu, and Jianhua Tao.
+\newblock Merbench: A unified evaluation benchmark for multimodal emotion recognition.
+\newblock \emph{arXiv preprint arXiv:2401.03429}, 2024.
+
+\bibitem[Han et~al.(2021)Han, Chen, and Poria]{han2021improving}
+Wei Han, Hui Chen, and Soujanya Poria.
+\newblock Improving multimodal fusion with hierarchical mutual information maximization for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing}, pages 9180--9192, Online and Punta Cana, Dominican Republic, November 2021. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2021.emnlp-main.723}.
+\newblock URL \url{https://aclanthology.org/2021.emnlp-main.723}.
+
+\bibitem[Zhang et~al.(2023)Zhang, Wang, Yin, Liu, Liu, and Yu]{zhang2023learning}
+Haoyu Zhang, Yu~Wang, Guanghao Yin, Kejun Liu, Yuanyuan Liu, and Tianshu Yu.
+\newblock Learning language-guided adaptive hyper-modality representation for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing}, pages 756--767, Singapore, December 2023. Association for Computational Linguistics.
+
+\bibitem[Xiao et~al.(2024)Xiao, Liu, Gupta, Cao, Li, Li, Fang, Cheng, and Bogdan]{xiao2024neuroinspired}
+Xiongye Xiao, Gengshuo Liu, Gaurav Gupta, Defu Cao, Shixuan Li, Yaxing Li, Tianqing Fang, Mingxi Cheng, and Paul Bogdan.
+\newblock Neuro-inspired information-theoretic hierarchical perception for multimodal learning.
+\newblock In \emph{The Twelfth International Conference on Learning Representations}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=Z9AZsU1Tju}.
+
+\bibitem[Hu et~al.(2022)Hu, Lin, Zhao, Lu, Wu, and Li]{hu2022unimse}
+Guimin Hu, Ting-En Lin, Yi~Zhao, Guangming Lu, Yuchuan Wu, and Yongbin Li.
+\newblock {U}ni{MSE}: Towards unified multimodal sentiment analysis and emotion recognition.
+\newblock In Yoav Goldberg, Zornitsa ozareva, and Yue Zhang, editors, \emph{Proceedings of the 2022 Conference on Empirical Methods in Natural Language Processing}, pages 7837--7851, Abu Dhabi, United Arab Emirates, December 2022. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2022.emnlp-main.534}.
+\newblock URL \url{https://aclanthology.org/2022.emnlp-main.534}.
+
+\bibitem[Li et~al.(2023)Li, Wang, Funakoshi, and Okumura]{li2023joyful}
+Dongyuan Li, Yusong Wang, Kotaro Funakoshi, and Manabu Okumura.
+\newblock Joyful: Joint modality fusion and graph contrastive learning for multimoda emotion recognition.
+\newblock In Houda Bouamor, Juan Pino, and Kalika Bali, editors, \emph{Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing}, pages 16051--16069, Singapore, December 2023. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2023.emnlp-main.996}.
+\newblock URL \url{https://aclanthology.org/2023.emnlp-main.996/}.
+
+\bibitem[Lin et~al.(2024)Lin, Zeng, Mai, and Hu]{lin2024semanticmac}
+Ronghao Lin, Ying Zeng, Sijie Mai, and Haifeng Hu.
+\newblock End-to-end semantic-centric video-based multimodal affective computing.
+\newblock \emph{arXiv preprint arXiv:2408.07694}, 2024.
+
+\bibitem[Cheng et~al.(2024)Cheng, Cheng, He, Wang, Lin, Lian, Peng, and Hauptmann]{cheng2024emotionllama}
+Zebang Cheng, Zhi-Qi Cheng, Jun-Yan He, Kai Wang, Yuxiang Lin, Zheng Lian, Xiaojiang Peng, and Alexander~G Hauptmann.
+\newblock Emotion-{LL}a{MA}: Multimodal emotion recognition and reasoning with instruction tuning.
+\newblock In \emph{The Thirty-eighth Annual Conference on Neural Information Processing Systems}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=qXZVSy9LFR}.
+
+\bibitem[Li et~al.(2025)Li, Wang, Zhang, Yu, and Chen]{li2025generating}
+Jin Li, Shoujin Wang, Qi~Zhang, Shui Yu, and Fang Chen.
+\newblock Generating with fairness: A modality-diffused counterfactual framework for incomplete multimodal recommendations.
+\newblock In \emph{Proceedings of the ACM on Web Conference 2025}, WWW '25, page 2787–2798, New York, NY, USA, 2025. Association for Computing Machinery.
+\newblock ISBN 9798400712746.
+\newblock \doi{10.1145/3696410.3714606}.
+\newblock URL \url{https://doi.org/10.1145/3696410.3714606}.
+
+\bibitem[Pipoli et~al.(2025)Pipoli, Saporita, Marchesini, Grana, Ficarra, and Bolelli]{pipoli2025imfuse}
+Vittorio Pipoli, Alessia Saporita, Kevin Marchesini, Costantino Grana, Elisa Ficarra, and Federico Bolelli.
+\newblock Im-fuse: A mamba-based fusion block for brain tumor segmentation with incomplete modalities.
+\newblock In James~C. Gee, Daniel~C. Alexander, Jaesung Hong, Juan~Eugenio Iglesias, Carole~H. Sudre, Archana Venkataraman, Polina Golland, Jong~Hyo Kim, and Jinah Park, editors, \emph{Medical Image Computing and Computer Assisted Intervention -- MICCAI 2025}, pages 225--235, Cham, 2025. Springer Nature Switzerland.
+\newblock ISBN 978-3-032-04984-1.
+
+\bibitem[Liang et~al.(2024)Liang, Zadeh, and Morency]{liang2024foundations}
+Paul~Pu Liang, Amir Zadeh, and Louis-Philippe Morency.
+\newblock Foundations \& trends in multimodal machine learning: Principles, challenges, and open questions.
+\newblock \emph{ACM Comput. Surv.}, apr 2024.
+\newblock ISSN 0360-0300.
+\newblock \doi{10.1145/3656580}.
+\newblock URL \url{https://doi.org/10.1145/3656580}.
+\newblock Just Accepted.
+
+\bibitem[Zhao et~al.(2024)Zhao, Zhang, and Geng]{zhao2024deep}
+Fei Zhao, Chengcui Zhang, and Baocheng Geng.
+\newblock Deep multimodal data fusion.
+\newblock \emph{ACM Comput. Surv.}, 56\penalty0 (9), April 2024.
+\newblock ISSN 0360-0300.
+\newblock \doi{10.1145/3649447}.
+\newblock URL \url{https://doi.org/10.1145/3649447}.
+
+\bibitem[Vaswani et~al.(2017)Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, and Polosukhin]{vaswani2017attention}
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan~N Gomez, \L~ukasz Kaiser, and Illia Polosukhin.
+\newblock Attention is all you need.
+\newblock In I.~Guyon, U.~Von Luxburg, S.~Bengio, H.~Wallach, R.~Fergus, S.~Vishwanathan, and R.~Garnett, editors, \emph{Advances in Neural Information Processing Systems}, volume~30. Curran Associates, Inc., 2017.
+\newblock URL \url{https://proceedings.neurips.cc/paper/2017/file/3f5ee243547dee91fbd053c1c4a845aa-Paper.pdf}.
+
+\bibitem[Xu et~al.(2023)Xu, Zhu, and Clifton]{xu2023multimodal}
+Peng Xu, Xiatian Zhu, and David~A. Clifton.
+\newblock Multimodal learning with transformers: A survey.
+\newblock \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 45\penalty0 (10):\penalty0 12113--12132, 2023.
+\newblock \doi{10.1109/TPAMI.2023.3275156}.
+
+\bibitem[Huan et~al.(2024)Huan, Zhong, Chen, and Liang]{huan2024unimf}
+Ruohong Huan, Guowei Zhong, Peng Chen, and Ronghua Liang.
+\newblock Unimf: A unified multimodal framework for multimodal sentiment analysis in missing modalities and unaligned multimodal sequences.
+\newblock \emph{IEEE Transactions on Multimedia}, 26:\penalty0 5753--5768, 2024.
+\newblock \doi{10.1109/TMM.2023.3338769}.
+
+\bibitem[Tang et~al.(2024)Tang, Yi, Fu, and Tian]{tang2024incomplete}
+Jingjing Tang, Qingqing Yi, Saiji Fu, and Yingjie Tian.
+\newblock Incomplete multi-view learning: Review, analysis, and prospects.
+\newblock \emph{Applied Soft Computing}, 153:\penalty0 111278, 2024.
+\newblock ISSN 1568-4946.
+\newblock \doi{https://doi.org/10.1016/j.asoc.2024.111278}.
+\newblock URL \url{https://www.sciencedirect.com/science/article/pii/S1568494624000528}.
+
+\bibitem[Zhang et~al.(2022)Zhang, Cui, Han, Zhou, Fu, and Hu]{zhang2022cpmnet}
+Changqing Zhang, Yajie Cui, Zongbo Han, Joey~Tianyi Zhou, Huazhu Fu, and Qinghua Hu.
+\newblock Deep partial multi-view learning.
+\newblock \emph{IEEE Transactions on Pattern Analysis and Machine Intelligence}, 44\penalty0 (5):\penalty0 2402--2415, 2022.
+\newblock \doi{10.1109/TPAMI.2020.3037734}.
+
+\bibitem[Shwartz-Ziv and Tishby(2017)]{shwartz2017opening}
+Ravid Shwartz-Ziv and Naftali Tishby.
+\newblock {Opening the Black Box of Deep Neural Networks via Information}.
+\newblock 3 2017.
+
+\bibitem[Kawaguchi et~al.(2023)Kawaguchi, Deng, Ji, and Huang]{icml2023howdoesib}
+Kenji Kawaguchi, Zhun Deng, Xu~Ji, and Jiaoyang Huang.
+\newblock How does information bottleneck help deep learning?
+\newblock In \emph{International Conference on Machine Learning (ICML)}, 2023.
+
+\bibitem[Wang et~al.()Wang, Boudreau, Luo, Tan, and Zhou]{wang2019deep}
+Qi~Wang, Claire Boudreau, Qixing Luo, Pang-Ning Tan, and Jiayu Zhou.
+\newblock \emph{Deep Multi-view Information Bottleneck}, pages 37--45.
+\newblock \doi{10.1137/1.9781611975673.5}.
+\newblock URL \url{https://epubs.siam.org/doi/abs/10.1137/1.9781611975673.5}.
+
+\bibitem[Federici et~al.(2020)Federici, Dutta, Forré, Kushman, and Akata]{federici2020Learning}
+Marco Federici, Anjan Dutta, Patrick Forré, Nate Kushman, and Zeynep Akata.
+\newblock Learning robust representations via multi-view information bottleneck.
+\newblock In \emph{International Conference on Learning Representations}, 2020.
+\newblock URL \url{https://openreview.net/forum?id=B1xwcyHFDr}.
+
+\bibitem[Wan et~al.(2021)Wan, Zhang, Zhu, and Hu]{Wan2021multiview}
+Zhibin Wan, Changqing Zhang, Pengfei Zhu, and Qinghua Hu.
+\newblock Multi-view information-bottleneck representation learning.
+\newblock \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, 35\penalty0 (11):\penalty0 10085--10092, May 2021.
+\newblock \doi{10.1609/aaai.v35i11.17210}.
+\newblock URL \url{https://ojs.aaai.org/index.php/AAAI/article/view/17210}.
+
+\bibitem[Kingma and Welling(2014)]{kingma2014vae}
+Diederik~P. Kingma and Max Welling.
+\newblock {Auto-Encoding Variational Bayes}.
+\newblock In \emph{2nd International Conference on Learning Representations, {ICLR} 2014, Banff, AB, Canada, April 14-16, 2014, Conference Track Proceedings}, 2014.
+
+\bibitem[Lee and van~der Schaar(2021)]{lee2021deepimv}
+Changhee Lee and Mihaela van~der Schaar.
+\newblock A variational information bottleneck approach to multi-omics data integration.
+\newblock In Arindam Banerjee and Kenji Fukumizu, editors, \emph{Proceedings of The 24th International Conference on Artificial Intelligence and Statistics}, volume 130 of \emph{Proceedings of Machine Learning Research}, pages 1513--1521. PMLR, 13--15 Apr 2021.
+\newblock URL \url{https://proceedings.mlr.press/v130/lee21a.html}.
+
+\bibitem[Liang et~al.(2023)Liang, Deng, Ma, Zou, Morency, and Salakhutdinov]{liang2023factorized}
+Paul~Pu Liang, Zihao Deng, Martin~Q. Ma, James~Y Zou, Louis-Philippe Morency, and Ruslan Salakhutdinov.
+\newblock Factorized contrastive learning: Going beyond multi-view redundancy.
+\newblock In A.~Oh, T.~Naumann, A.~Globerson, K.~Saenko, M.~Hardt, and S.~Levine, editors, \emph{Advances in Neural Information Processing Systems}, volume~36, pages 32971--32998. Curran Associates, Inc., 2023.
+\newblock URL \url{https://proceedings.neurips.cc/paper_files/paper/2023/file/6818dcc65fdf3cbd4b05770fb957803e-Paper-Conference.pdf}.
+
+\bibitem[Loshchilov and Hutter(2019)]{loshchilov2018decoupled}
+Ilya Loshchilov and Frank Hutter.
+\newblock Decoupled weight decay regularization.
+\newblock In \emph{International Conference on Learning Representations}, 2019.
+\newblock URL \url{https://openreview.net/forum?id=Bkg6RiCqY7}.
+
+\bibitem[Poria et~al.(2017)Poria, Cambria, Bajpai, and Hussain]{poria2017review}
+Soujanya Poria, Erik Cambria, Rajiv Bajpai, and Amir Hussain.
+\newblock A review of affective computing: From unimodal analysis to multimodal fusion.
+\newblock \emph{Information Fusion}, 37:\penalty0 98--125, 2017.
+\newblock ISSN 1566-2535.
+\newblock \doi{https://doi.org/10.1016/j.inffus.2017.02.003}.
+\newblock URL \url{https://www.sciencedirect.com/science/article/pii/S1566253517300738}.
+
+\bibitem[A.V. et~al.(2024)A.V., T., D., and E.]{geetha2024multimodal}
+Geetha A.V., Mala T., Priyanka D., and Uma E.
+\newblock Multimodal emotion recognition with deep learning: Advancements, challenges, and future directions.
+\newblock \emph{Information Fusion}, 105:\penalty0 102218, 2024.
+\newblock ISSN 1566-2535.
+\newblock \doi{https://doi.org/10.1016/j.inffus.2023.102218}.
+\newblock URL \url{https://www.sciencedirect.com/science/article/pii/S1566253523005341}.
+
+\bibitem[Liu et~al.(2020)Liu, Ott, Goyal, Du, Joshi, Chen, Levy, Lewis, Zettlemoyer, and Stoyanov]{liu2019roberta}
+Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov.
+\newblock Ro{\{}bert{\}}a: A robustly optimized {\{}bert{\}} pretraining approach, 2020.
+\newblock URL \url{https://openreview.net/forum?id=SyxS0T4tvS}.
+
+\bibitem[He et~al.(2023)He, Gao, and Chen]{he2023debertav3}
+Pengcheng He, Jianfeng Gao, and Weizhu Chen.
+\newblock De{BERT}av3: Improving de{BERT}a using {ELECTRA}-style pre-training with gradient-disentangled embedding sharing.
+\newblock In \emph{The Eleventh International Conference on Learning Representations}, 2023.
+\newblock URL \url{https://openreview.net/forum?id=sE7-XhLxHA}.
+
+\bibitem[Wei et~al.(2025)Wei, Luo, Wang, and Luo]{wei2024robust}
+Shicai Wei, Yang Luo, Yuji Wang, and Chunbo Luo.
+\newblock Robust multimodal learning via representation decoupling.
+\newblock In Ale{\v{s}} Leonardis, Elisa Ricci, Stefan Roth, Olga Russakovsky, Torsten Sattler, and G{\"u}l Varol, editors, \emph{Computer Vision -- ECCV 2024}, pages 38--54, Cham, 2025. Springer Nature Switzerland.
+\newblock ISBN 978-3-031-72946-1.
+
+\end{thebibliography}

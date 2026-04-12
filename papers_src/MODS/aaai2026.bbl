@@ -1,0 +1,269 @@
+\begin{thebibliography}{53}
+\providecommand{\natexlab}[1]{#1}
+
+\bibitem[{Delbrouck et~al.(2020)Delbrouck, Tits, Brousmiche, and Dupont}]{delbrouck2020transformer}
+Delbrouck, J.-B.; Tits, N.; Brousmiche, M.; and Dupont, S. 2020.
+\newblock A transformer-based joint-encoding for emotion recognition and sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:2006.15955}.
+
+\bibitem[{Drus and Khalid(2019)}]{drus2019sentiment}
+Drus, Z.; and Khalid, H. 2019.
+\newblock Sentiment analysis in social media and its application: Systematic literature review.
+\newblock \emph{Procedia Computer Science}, 161: 707--714.
+
+\bibitem[{Gallagher, Furey, and Curran(2019)}]{gallagher2019application}
+Gallagher, C.; Furey, E.; and Curran, K. 2019.
+\newblock The application of sentiment analysis and text analytics to customer experience reviews to understand what customers are really saying.
+\newblock \emph{International Journal of Data Warehousing and Mining (IJDWM)}, 15(4): 21--47.
+
+\bibitem[{Han et~al.(2021)Han, Chen, Gelbukh, Zadeh, Morency, and Poria}]{han2021bi}
+Han, W.; Chen, H.; Gelbukh, A.; Zadeh, A.; Morency, L.-p.; and Poria, S. 2021.
+\newblock Bi-bimodal modality fusion for correlation-controlled multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 2021 international conference on multimodal interaction}, 6--15.
+
+\bibitem[{Han, Chen, and Poria(2021)}]{han2021improving}
+Han, W.; Chen, H.; and Poria, S. 2021.
+\newblock Improving multimodal fusion with hierarchical mutual information maximization for multimodal sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:2109.00412}.
+
+\bibitem[{Hazarika, Zimmermann, and Poria(2020)}]{hazarika2020misa}
+Hazarika, D.; Zimmermann, R.; and Poria, S. 2020.
+\newblock Misa: Modality-invariant and-specific representations for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 28th ACM International Conference on Multimedia}, 1122--1131.
+
+\bibitem[{Hochreiter and Schmidhuber(1997)}]{hochreiter1997long}
+Hochreiter, S.; and Schmidhuber, J. 1997.
+\newblock Long short-term memory.
+\newblock \emph{Neural Computation}, 9(8): 1735--1780.
+
+\bibitem[{Kingma and Ba(2014)}]{kingma2014adam}
+Kingma, D.~P.; and Ba, J. 2014.
+\newblock Adam: A method for stochastic optimization.
+\newblock \emph{arXiv preprint arXiv:1412.6980}.
+
+\bibitem[{Kipf and Welling(2016)}]{kipf2016semi}
+Kipf, T.~N.; and Welling, M. 2016.
+\newblock Semi-supervised classification with graph convolutional networks.
+\newblock \emph{{arXiv preprint arXiv:1609.02907}}.
+
+\bibitem[{Lei et~al.(2023)Lei, Yang, Li, Wang, Chen, and Zhang}]{lei2023text}
+Lei, Y.; Yang, D.; Li, M.; Wang, S.; Chen, J.; and Zhang, L. 2023.
+\newblock Text-oriented modality reinforcement network for multimodal sentiment analysis from unaligned multimodal sequences.
+\newblock In \emph{CAAI International Conference on Artificial Intelligence}, 189--200. Springer.
+
+\bibitem[{Li, Wang, and Cui(2023)}]{li2023decoupled}
+Li, Y.; Wang, Y.; and Cui, Z. 2023.
+\newblock Decoupled Multimodal Distilling for Emotion Recognition.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 6631--6640.
+
+\bibitem[{Li et~al.(2022)Li, Zhou, Zhang, Liu, Yang, Lian, and Hu}]{li2022amoa}
+Li, Z.; Zhou, Y.; Zhang, W.; Liu, Y.; Yang, C.; Lian, Z.; and Hu, S. 2022.
+\newblock AMOA: Global acoustic feature enhanced modal-order-aware network for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 29th International Conference on Computational Linguistics}, 7136--7146.
+
+\bibitem[{Liang et~al.(2021)Liang, Lin, Feng, Zhang, and Lv}]{liang2021attention}
+Liang, T.; Lin, G.; Feng, L.; Zhang, Y.; and Lv, F. 2021.
+\newblock Attention is not enough: Mitigating the distribution discrepancy in asynchronous multimodal sequence fusion.
+\newblock In \emph{Proceedings of the IEEE/CVF International Conference on Computer Vision}, 8148--8156.
+
+\bibitem[{Lin and Hu(2022)}]{lin2022multimodal}
+Lin, R.; and Hu, H. 2022.
+\newblock Multimodal contrastive learning via uni-modal coding and cross-modal prediction for multimodal sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:2210.14556}.
+
+\bibitem[{Lin and Hu(2023)}]{lin2023dynamically}
+Lin, R.; and Hu, H. 2023.
+\newblock Dynamically shifting multimodal representations via hybrid-modal attention for multimodal sentiment analysis.
+\newblock \emph{IEEE Transactions on Multimedia}, 26: 2740--2755.
+
+\bibitem[{Liu et~al.(2022)Liu, Yuan, Mao, Liang, Yang, Qiu, Cheng, Li, Xu, and Gao}]{liu2022make}
+Liu, Y.; Yuan, Z.; Mao, H.; Liang, Z.; Yang, W.; Qiu, Y.; Cheng, T.; Li, X.; Xu, H.; and Gao, K. 2022.
+\newblock Make acoustic and visual cues matter: Ch-sims v2. 0 dataset and av-mixup consistent module.
+\newblock In \emph{Proceedings of the 2022 international conference on multimodal interaction}, 247--258.
+
+\bibitem[{Liu et~al.(2018)Liu, Shen, Lakshminarasimhan, Liang, Zadeh, and Morency}]{liu2018efficient}
+Liu, Z.; Shen, Y.; Lakshminarasimhan, V.~B.; Liang, P.~P.; Zadeh, A.; and Morency, L.-P. 2018.
+\newblock Efficient low-rank multimodal fusion with modality-specific factors.
+\newblock \emph{arXiv preprint arXiv:1806.00064}.
+
+\bibitem[{Lv et~al.(2021)Lv, Chen, Huang, Duan, and Lin}]{lv2021progressive}
+Lv, F.; Chen, X.; Huang, Y.; Duan, L.; and Lin, G. 2021.
+\newblock Progressive modality reinforcement for human multimodal emotion recognition from unaligned multimodal sequences.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 2554--2562.
+
+\bibitem[{Ma, Zhang, and Sun(2023)}]{ma2023multimodal}
+Ma, F.; Zhang, Y.; and Sun, X. 2023.
+\newblock Multimodal sentiment analysis with preferential fusion and distance-aware contrastive learning.
+\newblock In \emph{2023 IEEE International Conference on Multimedia and Expo (ICME)}, 1367--1372. IEEE.
+
+\bibitem[{Mai et~al.(2022)Mai, Zeng, Zheng, and Hu}]{mai2022hybrid}
+Mai, S.; Zeng, Y.; Zheng, S.; and Hu, H. 2022.
+\newblock Hybrid contrastive learning of tri-modal representation for multimodal sentiment analysis.
+\newblock \emph{IEEE Transactions on Affective Computing}, 14(3): 2276--2289.
+
+\bibitem[{Mao et~al.(2022)Mao, Yuan, Xu, Yu, Liu, and Gao}]{mao2022m}
+Mao, H.; Yuan, Z.; Xu, H.; Yu, W.; Liu, Y.; and Gao, K. 2022.
+\newblock M-SENA: An integrated platform for multimodal sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:2203.12441}.
+
+\bibitem[{Ortis, Farinella, and Battiato(2019)}]{ortis2019overview}
+Ortis, A.; Farinella, G.~M.; and Battiato, S. 2019.
+\newblock An Overview on Image Sentiment Analysis: Methods, Datasets and Current Challenges.
+\newblock \emph{ICETE (1)}, 296--306.
+
+\bibitem[{Paszke et~al.(2019)Paszke, Gross, Massa, Lerer, Bradbury, Chanan, Killeen, Lin, Gimelshein, Antiga et~al.}]{paszke2019pytorch}
+Paszke, A.; Gross, S.; Massa, F.; Lerer, A.; Bradbury, J.; Chanan, G.; Killeen, T.; Lin, Z.; Gimelshein, N.; Antiga, L.; et~al. 2019.
+\newblock Pytorch: An imperative style, high-performance deep learning library.
+\newblock \emph{Advances in Neural Information Processing Systems}, 32.
+
+\bibitem[{Sabour, Frosst, and Hinton(2017)}]{sabour2017dynamic}
+Sabour, S.; Frosst, N.; and Hinton, G.~E. 2017.
+\newblock Dynamic routing between capsules.
+\newblock \emph{Advances in neural information processing systems}, 30.
+
+\bibitem[{Sun et~al.(2020)Sun, Sarma, Sethares, and Liang}]{sun2020learning}
+Sun, Z.; Sarma, P.; Sethares, W.; and Liang, Y. 2020.
+\newblock Learning relationships between text, audio, and video via deep canonical correlation for multimodal language analysis.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, volume~34, 8992--8999.
+
+\bibitem[{Tsai and Wang(2021)}]{tsai2021analyzing}
+Tsai, M.~H.; and Wang, Y. 2021.
+\newblock Analyzing Twitter data to evaluate people’s attitudes towards public health policies and events in the era of COVID-19.
+\newblock \emph{International Journal of Environmental Research and Public Health}, 18(12): 6272.
+
+\bibitem[{Tsai et~al.(2019)Tsai, Bai, Liang, Kolter, Morency, and Salakhutdinov}]{tsai2019multimodal}
+Tsai, Y.-H.~H.; Bai, S.; Liang, P.~P.; Kolter, J.~Z.; Morency, L.-P.; and Salakhutdinov, R. 2019.
+\newblock Multimodal transformer for unaligned multimodal language sequences.
+\newblock In \emph{Proceedings of the conference. Association for Computational Linguistics. Meeting}, volume 2019, 6558. NIH Public Access.
+
+\bibitem[{Vaswani et~al.(2017)Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, and Polosukhin}]{vaswani2017attention}
+Vaswani, A.; Shazeer, N.; Parmar, N.; Uszkoreit, J.; Jones, L.; Gomez, A.~N.; Kaiser, {\L}.; and Polosukhin, I. 2017.
+\newblock Attention is all you need.
+\newblock \emph{Advances in Neural Information Processing Systems}, 30.
+
+\bibitem[{Wang et~al.(2023{\natexlab{a}})Wang, Guo, Tian, Liu, He, and Luo}]{wang2023tetfn}
+Wang, D.; Guo, X.; Tian, Y.; Liu, J.; He, L.; and Luo, X. 2023{\natexlab{a}}.
+\newblock TETFN: A text enhanced transformer fusion network for multimodal sentiment analysis.
+\newblock \emph{Pattern Recognition}, 136: 109259.
+
+\bibitem[{Wang et~al.(2022)Wang, Liu, Wang, Tian, He, and Gao}]{wang2022cross}
+Wang, D.; Liu, S.; Wang, Q.; Tian, Y.; He, L.; and Gao, X. 2022.
+\newblock Cross-modal Enhancement Network for Multimodal Sentiment Analysis.
+\newblock \emph{IEEE Transactions on Multimedia}.
+
+\bibitem[{Wang et~al.(2023{\natexlab{b}})Wang, Li, Liang, Morency, Bell, and Lai}]{wang2023cross}
+Wang, Y.; Li, Y.; Liang, P.~P.; Morency, L.-P.; Bell, P.; and Lai, C. 2023{\natexlab{b}}.
+\newblock Cross-attention is not enough: Incongruity-aware dynamic hierarchical fusion for multimodal affect recognition.
+\newblock \emph{arXiv preprint arXiv:2305.13583}.
+
+\bibitem[{Wu et~al.(2023)Wu, Dai, Qin, Liu, Lin, Cao, and Sui}]{wu2023denoising}
+Wu, S.; Dai, D.; Qin, Z.; Liu, T.; Lin, B.; Cao, Y.; and Sui, Z. 2023.
+\newblock Denoising Bottleneck with Mutual Information Maximization for Video Multimodal Fusion.
+\newblock \emph{arXiv preprint arXiv:2305.14652}.
+
+\bibitem[{Wu et~al.(2021)Wu, Lin, Zhao, Qin, and Zhu}]{wu2021text}
+Wu, Y.; Lin, Z.; Zhao, Y.; Qin, B.; and Zhu, L.-N. 2021.
+\newblock A text-centered shared-private framework via cross-modal prediction for multimodal sentiment analysis.
+\newblock In \emph{Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021}, 4730--4738.
+
+\bibitem[{Xiao, Yang, and Ning(2021)}]{xiao2021research}
+Xiao, X.; Yang, J.; and Ning, X. 2021.
+\newblock Research on multimodal emotion analysis algorithm based on deep learning.
+\newblock In \emph{Journal of Physics: Conference Series}, volume 1802, 032054. IOP Publishing.
+
+\bibitem[{Yang et~al.(2023{\natexlab{a}})Yang, Chen, Wang, Wang, Li, Liu, Zhao, Huang, Dong, Zhai, and Zhang}]{yang2023context}
+Yang, D.; Chen, Z.; Wang, Y.; Wang, S.; Li, M.; Liu, S.; Zhao, X.; Huang, S.; Dong, Z.; Zhai, P.; and Zhang, L. 2023{\natexlab{a}}.
+\newblock Context De-Confounded Emotion Recognition.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 19005--19015.
+
+\bibitem[{Yang et~al.(2022{\natexlab{a}})Yang, Huang, Kuang, Du, and Zhang}]{yang2022disentangled}
+Yang, D.; Huang, S.; Kuang, H.; Du, Y.; and Zhang, L. 2022{\natexlab{a}}.
+\newblock Disentangled Representation Learning for Multimodal Emotion Recognition.
+\newblock In \emph{Proceedings of the 30th ACM International Conference on Multimedia}, 1642--1651.
+
+\bibitem[{Yang et~al.(2022{\natexlab{b}})Yang, Huang, Liu, and Zhang}]{yang2022contextual}
+Yang, D.; Huang, S.; Liu, Y.; and Zhang, L. 2022{\natexlab{b}}.
+\newblock Contextual and Cross-Modal Interaction for Multi-Modal Speech Emotion Recognition.
+\newblock \emph{IEEE Signal Processing Letters}, 29: 2093--2097.
+
+\bibitem[{Yang et~al.(2022{\natexlab{c}})Yang, Huang, Wang, Liu, Zhai, Su, Li, and Zhang}]{yang2022emotion}
+Yang, D.; Huang, S.; Wang, S.; Liu, Y.; Zhai, P.; Su, L.; Li, M.; and Zhang, L. 2022{\natexlab{c}}.
+\newblock Emotion Recognition for Multiple Context Awareness.
+\newblock In \emph{Proceedings of the European Conference on Computer Vision}, volume 13697, 144--162.
+
+\bibitem[{Yang et~al.(2022{\natexlab{d}})Yang, Kuang, Huang, and Zhang}]{yang2022learning}
+Yang, D.; Kuang, H.; Huang, S.; and Zhang, L. 2022{\natexlab{d}}.
+\newblock Learning Modality-Specific and -Agnostic Representations for Asynchronous Multimodal Language Sequences.
+\newblock In \emph{Proceedings of the 30th ACM International Conference on Multimedia}, 1708–1717.
+
+\bibitem[{Yang et~al.(2024{\natexlab{a}})Yang, Kuang, Yang, Li, and Zhang}]{yang2024TSIF}
+Yang, D.; Kuang, H.; Yang, K.; Li, M.; and Zhang, L. 2024{\natexlab{a}}.
+\newblock Towards Asynchronous Multimodal Signal Interaction and Fusion via Tailored Transformers.
+\newblock \emph{IEEE Signal Processing Letters}.
+
+\bibitem[{Yang et~al.(2024{\natexlab{b}})Yang, Li, Qu, Yang, Zhai, Wang, and Zhang}]{yang2024asynchronous}
+Yang, D.; Li, M.; Qu, L.; Yang, K.; Zhai, P.; Wang, S.; and Zhang, L. 2024{\natexlab{b}}.
+\newblock Asynchronous Multimodal Video Sequence Fusion via Learning Modality-Exclusive and-Agnostic Representations.
+\newblock \emph{IEEE Transactions on Circuits and Systems for Video Technology}.
+
+\bibitem[{Yang et~al.(2024{\natexlab{c}})Yang, Li, Xiao, Liu, Yang, Chen, Wang, Zhai, Li, and Zhang}]{yang2024MCIS}
+Yang, D.; Li, M.; Xiao, D.; Liu, Y.; Yang, K.; Chen, Z.; Wang, Y.; Zhai, P.; Li, K.; and Zhang, L. 2024{\natexlab{c}}.
+\newblock Towards Multimodal Sentiment Analysis Debiasing via Bias Purification.
+\newblock In \emph{Proceedings of the European Conference on Computer Vision (ECCV)}.
+
+\bibitem[{Yang et~al.(2023{\natexlab{b}})Yang, Liu, Huang, Li, Zhao, Wang, Yang, Wang, Zhai, and Zhang}]{yang2023target}
+Yang, D.; Liu, Y.; Huang, C.; Li, M.; Zhao, X.; Wang, Y.; Yang, K.; Wang, Y.; Zhai, P.; and Zhang, L. 2023{\natexlab{b}}.
+\newblock Target and source modality co-reinforcement for emotion understanding from asynchronous multimodal sequences.
+\newblock \emph{Knowledge-Based Systems}, 265: 110370.
+
+\bibitem[{Yang et~al.(2024{\natexlab{d}})Yang, Yang, Li, Wang, Wang, and Zhang}]{yang2024robust}
+Yang, D.; Yang, K.; Li, M.; Wang, S.; Wang, S.; and Zhang, L. 2024{\natexlab{d}}.
+\newblock Robust emotion recognition in context debiasing.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, 12447--12457.
+
+\bibitem[{Yu et~al.(2020)Yu, Xu, Meng, Zhu, Ma, Wu, Zou, and Yang}]{yu2020ch}
+Yu, W.; Xu, H.; Meng, F.; Zhu, Y.; Ma, Y.; Wu, J.; Zou, J.; and Yang, K. 2020.
+\newblock Ch-sims: A chinese multimodal sentiment analysis dataset with fine-grained annotation of modality.
+\newblock In \emph{Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics}, 3718--3727.
+
+\bibitem[{Yu et~al.(2021)Yu, Xu, Yuan, and Wu}]{yu2021learning}
+Yu, W.; Xu, H.; Yuan, Z.; and Wu, J. 2021.
+\newblock Learning modality-specific representations with self-supervised multi-task learning for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the AAAI conference on artificial intelligence}, 10790--10797.
+
+\bibitem[{Zadeh et~al.(2017)Zadeh, Chen, Poria, Cambria, and Morency}]{zadeh2017tensor}
+Zadeh, A.; Chen, M.; Poria, S.; Cambria, E.; and Morency, L.-P. 2017.
+\newblock Tensor fusion network for multimodal sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:1707.07250}.
+
+\bibitem[{Zadeh et~al.(2018{\natexlab{a}})Zadeh, Liang, Mazumder, Poria, Cambria, and Morency}]{zadeh2018memory}
+Zadeh, A.; Liang, P.~P.; Mazumder, N.; Poria, S.; Cambria, E.; and Morency, L.-P. 2018{\natexlab{a}}.
+\newblock Memory fusion network for multi-view sequential learning.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, volume~32.
+
+\bibitem[{Zadeh et~al.(2016)Zadeh, Zellers, Pincus, and Morency}]{zadeh2016mosi}
+Zadeh, A.; Zellers, R.; Pincus, E.; and Morency, L.-P. 2016.
+\newblock Mosi: multimodal corpus of sentiment intensity and subjectivity analysis in online opinion videos.
+\newblock \emph{arXiv preprint arXiv:1606.06259}.
+
+\bibitem[{Zadeh et~al.(2018{\natexlab{b}})Zadeh, Liang, Poria, Cambria, and Morency}]{zadeh2018multimodal}
+Zadeh, A.~B.; Liang, P.~P.; Poria, S.; Cambria, E.; and Morency, L.-P. 2018{\natexlab{b}}.
+\newblock Multimodal language analysis in the wild: Cmu-mosei dataset and interpretable dynamic fusion graph.
+\newblock In \emph{Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics}, 2236--2246.
+
+\bibitem[{Zeng et~al.(2023)Zeng, Mai, Yan, and Hu}]{zeng2023multimodal}
+Zeng, Y.; Mai, S.; Yan, W.; and Hu, H. 2023.
+\newblock Multimodal reaction: Information modulation for cross-modal representation learning.
+\newblock \emph{IEEE Trans. Multimedia}.
+
+\bibitem[{Zeng et~al.(2024)Zeng, Yan, Mai, and Hu}]{zeng2024disentanglement}
+Zeng, Y.; Yan, W.; Mai, S.; and Hu, H. 2024.
+\newblock Disentanglement Translation Network for multimodal sentiment analysis.
+\newblock \emph{Inf. Fusion}, 102: 102031.
+
+\bibitem[{Zhang et~al.(2023)Zhang, Wang, Yin, Liu, Liu, and Yu}]{zhang2023learning}
+Zhang, H.; Wang, Y.; Yin, G.; Liu, K.; Liu, Y.; and Yu, T. 2023.
+\newblock Learning language-guided adaptive hyper-modality representation for multimodal sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:2310.05804}.
+
+\end{thebibliography}

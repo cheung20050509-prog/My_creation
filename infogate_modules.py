@@ -389,7 +389,7 @@ class InfoGate(nn.Module):
     Also computes:
         - Cyclic token-level IB loss  (L_tib)
         - Cyclic translation loss     (L_tran, stage 2 only)
-        - Exports nce_extras for InfoNCE computation in the training loop
+        - Fourth return value is the primary pooled representation (for diagnostics)
     """
 
     def __init__(self, args):
@@ -660,7 +660,7 @@ class InfoGate(nn.Module):
             logits:     [B, 1]
             ib_loss:    scalar
             loss_dict:  dict of detailed losses
-            nce_extras: dict for InfoNCE (training) or None
+            h_p: pooled primary representation before the classifier (same as adaptive_aggregate output)
         """
         Bs, T = text.size(0), text.size(1)
         device = text.device
