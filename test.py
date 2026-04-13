@@ -12,8 +12,9 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from transformers import DebertaV2Tokenizer
+from transformers import DebertaV2Tokenizer, BertTokenizer
 from deberta_infogate import InfoGate_DeBertaForSequenceClassification
+from bert_infogate import InfoGate_BertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
 
@@ -41,6 +42,10 @@ parser.add_argument("--checkpoint", type=str,
                     default="checkpoints/infogate_mosi_best.pt")
 
 args = parser.parse_args()
+
+if args.dataset == "simsv2":
+    if "deberta-v3-base" in args.model:
+        args.model = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bert-base-chinese")
 
 global_configs.set_dataset_config(args.dataset)
 ACOUSTIC_DIM = global_configs.ACOUSTIC_DIM
@@ -91,32 +96,67 @@ def prepare_deberta_input(tokens, visual, acoustic, tokenizer):
 
 def convert_to_features(examples, max_seq_length, tokenizer):
     features = []
-    for example in examples:
-        (words, visual, acoustic), label_id, segment = example
-        tokens, inversions = [], []
-        for idx, word in enumerate(words):
-            toks = tokenizer.tokenize(word)
-            tokens.extend(toks)
-            inversions.extend([idx] * len(toks))
+    if args.dataset == "simsv2":
+        # examples is a dict
+        num_samples = len(examples["raw_text"])
+        for i in range(num_samples):
+            words = examples["raw_text"][i]
+            visual = examples["vision"][i]
+            acoustic = examples["audio"][i]
+            label_id = examples["regression_labels"][i]
+            
+            # Ensure it's a scalar value
+            if isinstance(label_id, (list, tuple, np.ndarray)):
+                label_id = label_id[0]
 
-        aligned_v = np.array([visual[i] for i in inversions])
-        aligned_a = np.array([acoustic[i] for i in inversions])
+            tokens = tokenizer.tokenize(words)
+            if len(tokens) > max_seq_length - 2:
+                tokens = tokens[:max_seq_length - 2]
+                visual = visual[:max_seq_length - 2]
+                acoustic = acoustic[:max_seq_length - 2]
+            else:
+                # pad or truncate if needed, SIMSv2 pre-extracts features usually matching text tokens
+                # Let's just truncate visual/acoustic to the length of tokens.
+                min_len = min(len(tokens), len(visual), len(acoustic))
+                tokens = tokens[:min_len]
+                visual = visual[:min_len]
+                acoustic = acoustic[:min_len]
 
-        if len(tokens) > max_seq_length - 2:
-            tokens = tokens[:max_seq_length - 2]
-            aligned_a = aligned_a[:max_seq_length - 2]
-            aligned_v = aligned_v[:max_seq_length - 2]
+            ids, vis, aud, mask, seg = prepare_deberta_input(
+                tokens, visual, acoustic, tokenizer)
 
-        ids, vis, aud, mask, seg = prepare_deberta_input(
-            tokens, aligned_v, aligned_a, tokenizer)
-        features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+            features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+    else:
+        for example in examples:
+            (words, visual, acoustic), label_id, segment = example
+            tokens, inversions = [], []
+            for idx, word in enumerate(words):
+                toks = tokenizer.tokenize(word)
+                tokens.extend(toks)
+                inversions.extend([idx] * len(toks))
+
+            aligned_v = np.array([visual[i] for i in inversions])
+            aligned_a = np.array([acoustic[i] for i in inversions])
+
+            if len(tokens) > max_seq_length - 2:
+                tokens = tokens[:max_seq_length - 2]
+                aligned_a = aligned_a[:max_seq_length - 2]
+                aligned_v = aligned_v[:max_seq_length - 2]
+
+            ids, vis, aud, mask, seg = prepare_deberta_input(
+                tokens, aligned_v, aligned_a, tokenizer)
+            features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
     return features
 
+def get_tokenizer(model):
+    if args.dataset == "simsv2":
+        return BertTokenizer.from_pretrained(model)
+    return DebertaV2Tokenizer.from_pretrained(model)
 
 def get_test_dataloader():
     with open(f"datasets/{args.dataset}.pkl", "rb") as fh:
         data = pickle.load(fh)
-    tok = DebertaV2Tokenizer.from_pretrained(args.model)
+    tok = get_tokenizer(args.model)
     feats = convert_to_features(data["test"], args.max_seq_length, tok)
     ds = TensorDataset(
         torch.tensor(np.array([f.input_ids for f in feats]), dtype=torch.long),
@@ -143,8 +183,12 @@ def set_seed(seed):
 
 
 def load_model(ckpt_path):
-    model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
-        args.model, multimodal_config=args, num_labels=1)
+    if args.dataset == "simsv2":
+        model = InfoGate_BertForSequenceClassification.from_pretrained(
+            args.model, multimodal_config=args, num_labels=1)
+    else:
+        model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
+            args.model, multimodal_config=args, num_labels=1)
 
     if os.path.exists(ckpt_path):
         print(f"Loading checkpoint: {ckpt_path}")
@@ -177,10 +221,7 @@ def test_model(model, loader):
             visual = visual.squeeze(1)
             acoustic = acoustic.squeeze(1)
 
-            v_n = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
-            a_n = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
-
-            logits, _, _, _ = model(input_ids, v_n, a_n, stage=2)
+            logits, _, _, _ = model(input_ids, visual, acoustic, stage=2)
 
             logits = logits.squeeze(-1).cpu().numpy()
             label_ids = label_ids.cpu().numpy().flatten()
@@ -192,6 +233,8 @@ def test_model(model, loader):
 
 
 def compute_metrics(preds, labels, dataset="mosi", use_zero=False):
+    preds = np.asarray(preds).flatten()
+    labels = np.asarray(labels).flatten()
     nz = np.array([i for i, e in enumerate(labels) if e != 0 or use_zero])
     p, y = preds[nz], labels[nz]
     mae = np.mean(np.abs(p - y))
@@ -204,8 +247,8 @@ def compute_metrics(preds, labels, dataset="mosi", use_zero=False):
         p5 = np.clip(np.round(p * 2), -2, 2).astype(int)
         y5 = np.clip(np.round(y * 2), -2, 2).astype(int)
         result['Acc5'] = accuracy_score(y5, p5)
-        p3 = np.sign(p).astype(int)
-        y3 = np.sign(y).astype(int)
+        p3 = np.sign(preds).astype(int)
+        y3 = np.sign(labels).astype(int)
         result['Acc3'] = accuracy_score(y3, p3)
     else:
         p7 = np.clip(np.round(p), -3, 3).astype(int)

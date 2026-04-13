@@ -359,11 +359,8 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
         visual = visual.squeeze(1)
         acoustic = acoustic.squeeze(1)
 
-        v_norm = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
-        a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
-
         logits, ib_loss, loss_dict, _ = model(
-            input_ids, v_norm, a_norm, labels=label_ids, stage=stage)
+            input_ids, visual, acoustic, labels=label_ids, stage=stage)
 
         pred_flat = logits.view(-1)
         label_flat = label_ids.view(-1)
@@ -412,10 +409,7 @@ def eval_epoch(model, loader, stage=2):
             visual = visual.squeeze(1)
             acoustic = acoustic.squeeze(1)
 
-            v_norm = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
-            a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
-
-            logits, _, _, _ = model(input_ids, v_norm, a_norm, stage=stage)
+            logits, _, _, _ = model(input_ids, visual, acoustic, stage=stage)
             pred_flat = logits.view(-1)
             label_flat = label_ids.view(-1)
             loss = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
@@ -434,10 +428,7 @@ def test_epoch(model, loader, stage=2, desc="Test"):
             visual = visual.squeeze(1)
             acoustic = acoustic.squeeze(1)
 
-            v_norm = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
-            a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
-
-            logits, _, _, _ = model(input_ids, v_norm, a_norm, stage=stage)
+            logits, _, _, _ = model(input_ids, visual, acoustic, stage=stage)
             preds.extend(logits.view(-1).cpu().numpy().tolist())
             labels.extend(label_ids.view(-1).cpu().numpy().tolist())
 
@@ -445,8 +436,8 @@ def test_epoch(model, loader, stage=2, desc="Test"):
 
 
 def score(preds, y, use_zero=False):
-    preds = preds.flatten()
-    y = y.flatten()
+    preds = np.asarray(preds).flatten()
+    y = np.asarray(y).flatten()
     nz = np.array([i for i, e in enumerate(y) if e != 0 or use_zero])
     p, y2 = preds[nz], y[nz]
     mae = np.mean(np.abs(p - y2))
@@ -461,9 +452,9 @@ def score(preds, y, use_zero=False):
         p5 = np.clip(np.round(p * 2), -2, 2).astype(int)
         y5 = np.clip(np.round(y2 * 2), -2, 2).astype(int)
         result["acc5"] = accuracy_score(y5, p5)
-        # Acc3: sign-based (negative / neutral / positive)
-        p3 = np.sign(p).astype(int)
-        y3 = np.sign(y2).astype(int)
+        # Acc3 keeps neutral labels instead of filtering zero values out.
+        p3 = np.sign(preds).astype(int)
+        y3 = np.sign(y).astype(int)
         result["acc3"] = accuracy_score(y3, p3)
     else:
         p7 = np.clip(np.round(p), -3, 3).astype(int) + 3

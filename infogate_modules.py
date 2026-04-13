@@ -235,7 +235,7 @@ class InfoGateLayer(nn.Module):
         self.ffn_a2 = PositionwiseFFN(hidden_dim, dropout=dropout)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask=None):
+    def forward(self, B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask=None, is_last_layer=False):
         B_p_n = self.ln_p1(B_p)
         B_a1_n = self.ln_a1(B_a1)
         B_a2_n = self.ln_a2(B_a2)
@@ -261,6 +261,11 @@ class InfoGateLayer(nn.Module):
         gated_a2 = align_a2 * self.gate_a2(B_p_up, ca_a2)
         B_p_fused = B_p_up + self.dropout(gated_a1) + self.dropout(gated_a2)
 
+        B_p_out = B_p_fused + self.ffn_p(self.ln_p2(B_p_fused))
+
+        if is_last_layer:
+            return B_p_out, B_a1, B_a2
+
         # Bidirectional: primary -> auxiliaries
         B_p_fn = self.ln_p2(B_p_fused)
         ca_p_a1 = self.ca_p_to_a1(B_a1_n, B_p_fn, B_p_fn, conf_p, tok_mask)
@@ -272,8 +277,6 @@ class InfoGateLayer(nn.Module):
 
         B_a2_out = B_a2 + self.dropout(ca_p_a2)
         B_a2_out = B_a2_out + self.ffn_a2(self.ln_a2_ff(B_a2_out))
-
-        B_p_out = B_p_fused + self.ffn_p(self.ln_p2(B_p_fused))
 
         return B_p_out, B_a1_out, B_a2_out
 
@@ -288,8 +291,9 @@ class InfoGateModule(nn.Module):
         self.final_ln = nn.LayerNorm(hidden_dim)
 
     def forward(self, B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask=None):
-        for layer in self.layers:
-            B_p, B_a1, B_a2 = layer(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask)
+        for i, layer in enumerate(self.layers):
+            is_last = (i == len(self.layers) - 1)
+            B_p, B_a1, B_a2 = layer(B_p, conf_p, B_a1, conf_a1, B_a2, conf_a2, tok_mask, is_last_layer=is_last)
         return self.final_ln(B_p)
 
 
@@ -400,8 +404,10 @@ class InfoGate(nn.Module):
         self.proj_t = nn.Sequential(
             nn.Linear(text_dim, unified_dim), nn.ReLU(), nn.Dropout(dropout))
         self.proj_a = nn.Sequential(
+            nn.LayerNorm(acoustic_dim),
             nn.Linear(acoustic_dim, unified_dim), nn.ReLU(), nn.Dropout(dropout))
         self.proj_v = nn.Sequential(
+            nn.LayerNorm(visual_dim),
             nn.Linear(visual_dim, unified_dim), nn.ReLU(), nn.Dropout(dropout))
 
         # --- 2. IB encoders ---
@@ -409,10 +415,10 @@ class InfoGate(nn.Module):
         self.ib_enc_a = IBEncoder(unified_dim, ib_hidden, bn_dim, dropout)
         self.ib_enc_v = IBEncoder(unified_dim, ib_hidden, bn_dim, dropout)
 
-        # --- 3. IB decoders (9 = 3 intra + 6 inter) for cyclic IB loss ---
+        # --- 3. IB decoders (3 intra) for self-reconstruction IB loss ---
         self.decoders = nn.ModuleDict({
-            f'{s}_{t}': IBDecoder(bn_dim, ib_hidden, unified_dim, dropout)
-            for s in self.modalities for t in self.modalities
+            m: IBDecoder(bn_dim, ib_hidden, unified_dim, dropout)
+            for m in self.modalities
         })
 
         # --- 5. MSelector ---
@@ -424,11 +430,6 @@ class InfoGate(nn.Module):
 
         # --- 7. Aggregation ---
         self.agg_proj = nn.Linear(bn_dim, 1)
-
-        # --- 8. InfoNCE reverse projections ---
-        self.reverse_proj_a = nn.Linear(bn_dim, bn_dim)
-        self.reverse_proj_l = nn.Linear(bn_dim, bn_dim)
-        self.reverse_proj_v = nn.Linear(bn_dim, bn_dim)
 
         # --- 9. Label-level IB predictors (per-modality, for L_lib) ---
         self.label_preds = nn.ModuleDict({
@@ -487,13 +488,12 @@ class InfoGate(nn.Module):
 
     def _cyclic_tib(self, F_dict, B, mu, lv, mask):
         loss = torch.tensor(0.0, device=B['t'].device)
+        
+        # Intra-modal (self-reconstruction) only
         for m in self.modalities:
             loss = loss + self._token_ib(
-                B[m], mu[m], lv[m], F_dict[m], self.decoders[f'{m}_{m}'], mask)
-        for s, t in [('t', 'a'), ('t', 'v'), ('a', 'v')]:
-            l_st = self._token_ib(B[s], mu[s], lv[s], F_dict[t], self.decoders[f'{s}_{t}'], mask)
-            l_ts = self._token_ib(B[t], mu[t], lv[t], F_dict[s], self.decoders[f'{t}_{s}'], mask)
-            loss = loss + 0.5 * (l_st + l_ts)
+                B[m], mu[m], lv[m], F_dict[m], self.decoders[m], mask)
+                
         return loss
 
     def _label_ib(self, B_pooled, mu_pooled, lv_pooled, labels):
