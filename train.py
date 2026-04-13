@@ -57,7 +57,6 @@ parser.add_argument("--bottleneck_dim", type=int, default=128)
 parser.add_argument("--num_heads", type=int, default=4)
 parser.add_argument("--num_infogate_layers", type=int, default=3)
 parser.add_argument("--beta_ib", type=float, default=32)
-parser.add_argument("--gamma_cyc", type=float, default=1.0)
 parser.add_argument("--alpha_ib", type=float, default=0.01)
 parser.add_argument("--selector_target_temp", type=float, default=0.35,
                     help="Temperature for modality-quality routing targets.")
@@ -65,17 +64,11 @@ parser.add_argument("--selector_balance_weight", type=float, default=0.0,
                     help="Batch-level routing entropy regularization weight.")
 parser.add_argument("--selector_rib_weight", type=float, default=0.05,
                     help="Overall weight of the routing supervision loss.")
-parser.add_argument("--text_residual_weight", type=float, default=0.0,
-                    help="Optional weight for the legacy text-residual prediction head.")
 parser.add_argument("--disable_l_lib", action="store_true",
                     help="Ablate the label-level IB loss.")
-parser.add_argument("--disable_l_tran", action="store_true",
-                    help="Ablate the stage-2 translation loss.")
 parser.add_argument("--disable_l_rib", action="store_true",
                     help="Ablate the routing IB prior loss.")
 parser.add_argument("--mse_weight", type=float, default=0.5)
-parser.add_argument("--cra_layers", type=int, default=8)
-parser.add_argument("--cra_dims", default="64,32,16", type=str)
 
 parser.add_argument("--ema_decay", type=float, default=0.999)
 parser.add_argument("--ema_start_epoch", type=int, default=5)
@@ -96,11 +89,10 @@ if args.dataset == "simsv2":
     if "deberta-v3-base" in args.model:
         args.model = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bert-base-chinese")
 
-if isinstance(args.cra_dims, str):
-    args.cra_dims = [int(x) for x in args.cra_dims.split(',')]
+if isinstance(args.model, str):
+    pass # Added to ensure valid code block
 
 args.use_l_lib = not args.disable_l_lib
-args.use_l_tran = not args.disable_l_tran
 args.use_l_rib = not args.disable_l_rib
 
 global_configs.set_dataset_config(args.dataset)
@@ -518,15 +510,12 @@ def main():
     print(f"  InfoGate layers: {args.num_infogate_layers}")
     print(f"  Bottleneck dim : {args.bottleneck_dim}")
     print(f"  beta_ib        : {args.beta_ib}")
-    print(f"  gamma_cyc      : {args.gamma_cyc}")
     print(f"  mse_weight     : {args.mse_weight}")
     print(f"  selector_temp  : {args.selector_target_temp}")
     print(f"  selector_bal   : {args.selector_balance_weight}")
     print(f"  selector_rib_w : {args.selector_rib_weight}")
-    print(f"  text_residual  : {args.text_residual_weight}")
     print(f"  Select by      : {args.selection_metric}")
     print(f"  Loss terms     : L_lib={toggle_state(args.use_l_lib)} "
-          f"L_tran={toggle_state(args.use_l_tran)} "
             f"L_rib={toggle_state(args.use_l_rib)}")
     print("=" * 60)
 
@@ -649,7 +638,6 @@ def main():
                     'selection_score': selection_score,
                     'ablation': {
                         'use_l_lib': args.use_l_lib,
-                        'use_l_tran': args.use_l_tran,
                         'use_l_rib': args.use_l_rib,
                     },
                     'test_results': best_results,

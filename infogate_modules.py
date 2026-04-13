@@ -92,24 +92,6 @@ class ResidualAutoencoder(nn.Module):
         return self.dec(F.relu(self.enc(x))) + x
 
 
-class CRA(nn.Module):
-    """Cascaded Residual Autoencoder for cross-modal translation in IB space."""
-    def __init__(self, bottleneck_dim=128, num_layers=8, hidden_dims=None):
-        super().__init__()
-        if hidden_dims is None:
-            hidden_dims = [64, 32, 16]
-        self.layers = nn.ModuleList([
-            ResidualAutoencoder(bottleneck_dim, hidden_dims[i % len(hidden_dims)])
-            for i in range(num_layers)
-        ])
-
-    def forward(self, B):
-        x = B
-        for layer in self.layers:
-            x = layer(x)
-        return x
-
-
 class PositionwiseFFN(nn.Module):
     def __init__(self, hidden_dim, ffn_dim=None, dropout=0.1):
         super().__init__()
@@ -388,7 +370,6 @@ class InfoGate(nn.Module):
 
     Also computes:
         - Cyclic token-level IB loss  (L_tib)
-        - Cyclic translation loss     (L_tran, stage 2 only)
         - Fourth return value is the primary pooled representation (for diagnostics)
     """
 
@@ -405,19 +386,14 @@ class InfoGate(nn.Module):
         num_heads = args.get('num_heads', 4)
         num_layers = args.get('num_infogate_layers', 3)
         dropout = args.get('dropout_prob', 0.1)
-        cra_layers = args.get('cra_layers', 8)
-        cra_dims = args.get('cra_dims', [64, 32, 16])
 
         self.beta_ib = args.get('beta_ib', 32)
-        self.gamma_cyc = args.get('gamma_cyc', 1.0)
         self.alpha_ib = args.get('alpha_ib', 0.01)
         self.use_l_lib = args.get('use_l_lib', True)
-        self.use_l_tran = args.get('use_l_tran', True)
         self.use_l_rib = args.get('use_l_rib', True)
         self.selector_target_temp = args.get('selector_target_temp', 0.35)
         self.selector_balance_weight = args.get('selector_balance_weight', 0.0)
         self.selector_rib_weight = args.get('selector_rib_weight', 0.05)
-        self.text_residual_weight = args.get('text_residual_weight', 0.0)
         self.bottleneck_dim = bn_dim
 
         # --- 1. Unimodal projectors ---
@@ -437,13 +413,6 @@ class InfoGate(nn.Module):
         self.decoders = nn.ModuleDict({
             f'{s}_{t}': IBDecoder(bn_dim, ib_hidden, unified_dim, dropout)
             for s in self.modalities for t in self.modalities
-        })
-
-        # --- 4. CRA translators (3 shared bi-directional) ---
-        self.translators = nn.ModuleDict({
-            'a_t': CRA(bn_dim, cra_layers, cra_dims),
-            't_v': CRA(bn_dim, cra_layers, cra_dims),
-            'a_v': CRA(bn_dim, cra_layers, cra_dims),
         })
 
         # --- 5. MSelector ---
@@ -472,16 +441,6 @@ class InfoGate(nn.Module):
         self.primary_ln = nn.LayerNorm(bn_dim)
         self.primary_dropout = nn.Dropout(dropout)
         self.primary_classifier = nn.Linear(bn_dim, 1)
-
-        # Optional text residual path kept for ablation / compatibility.
-        # expand bottleneck back to text_dim, add as residual to DeBERTa output
-        self.expand = nn.Linear(bn_dim, text_dim)
-        self.fuse_ln = nn.LayerNorm(text_dim)
-        self.fuse_dropout = nn.Dropout(dropout)
-        self.beta_shift = 1.0
-        self.pooler_dense = nn.Linear(text_dim, text_dim)
-        self.cls_dropout = nn.Dropout(dropout)
-        self.classifier = nn.Linear(text_dim, 1)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -580,28 +539,6 @@ class InfoGate(nn.Module):
         return rib_kl, rib_balance, target, errors.detach(), usage_entropy.detach()
 
     # ------------------------------------------------------------------
-    # Translation loss
-    # ------------------------------------------------------------------
-
-    def _translate(self, src, tgt, bottleneck):
-        key = '_'.join(sorted((src, tgt)))
-        return self.translators[key](bottleneck)
-
-    def _translation_loss(self, B_pooled):
-        total = B_pooled['t'].new_tensor(0.0)
-        rec_t = B_pooled['t'].new_tensor(0.0)
-        cyc_t = B_pooled['t'].new_tensor(0.0)
-        for s, t in [('t', 'a'), ('a', 't'), ('t', 'v'), ('v', 't'), ('a', 'v'), ('v', 'a')]:
-            t_rec = self._translate(s, t, B_pooled[s])
-            s_cyc = self._translate(t, s, t_rec)
-            rec = F.mse_loss(t_rec, B_pooled[t])
-            cyc = F.mse_loss(s_cyc, B_pooled[s])
-            total = total + rec + cyc
-            rec_t = rec_t + rec
-            cyc_t = cyc_t + cyc
-        return total, rec_t, cyc_t
-
-    # ------------------------------------------------------------------
     # Routing
     # ------------------------------------------------------------------
 
@@ -654,7 +591,7 @@ class InfoGate(nn.Module):
             acoustic: [B, T, acoustic_dim]
             visual:   [B, T, visual_dim]
             labels:   [B]  (unused here, reserved for label-level IB extension)
-            stage:    1 = IB only; 2 = IB + cyclic translation
+            stage:    1 = IB only; 2 = with routing supervision
             attention_mask: [B, T] valid-token mask
         Returns:
             logits:     [B, 1]
@@ -701,12 +638,6 @@ class InfoGate(nn.Module):
         else:
             L_lib = zero
 
-        # 6. Translation loss (stage 2 only) ---------------------------
-        if stage == 2 and self.use_l_tran:
-            L_tran, L_rec, L_cyc = self._translation_loss(B_pooled)
-        else:
-            L_tran, L_rec, L_cyc = zero, zero, zero
-
         # 7. MSelector (order: acoustic, language, visual) -------------
         B_a_seq, B_l_seq, B_v_seq, weights, primary_onehot, primary_idx = self.mselector(
             B['a'], B['t'], B['v'], tok_mask)
@@ -737,18 +668,8 @@ class InfoGate(nn.Module):
         # Consistent with MODS: only use the enhanced primary modality
         logits = self.primary_classifier(self.primary_dropout(self.primary_ln(h_p)))
 
-        # Optional text residual head for controlled ablations.
-        if self.text_residual_weight > 0.0:
-            h_expand = self.beta_shift * self.expand(B_p_enhanced)
-            fused_seq = self.fuse_dropout(self.fuse_ln(text + h_expand))
-            pooled = torch.tanh(self.pooler_dense(fused_seq[:, 0, :]))
-            text_logits = self.classifier(self.cls_dropout(pooled))
-            logits = logits + self.text_residual_weight * text_logits
-
         # 12. Combine IB losses ----------------------------------------
         ib_loss = self.alpha_ib * (L_tib + L_lib)
-        if stage == 2 and self.use_l_tran:
-            ib_loss = ib_loss + self.gamma_cyc * L_tran
 
         # 13. Routing Information Bottleneck (L_rib)
         # Use per-sample modality quality as the routing target and a mild
@@ -759,9 +680,6 @@ class InfoGate(nn.Module):
         loss_dict = {
             'L_tib': L_tib.item() if torch.is_tensor(L_tib) else L_tib,
             'L_lib': L_lib.item() if torch.is_tensor(L_lib) else L_lib,
-            'L_tran': L_tran.item() if torch.is_tensor(L_tran) else L_tran,
-            'L_rec': L_rec.item() if torch.is_tensor(L_rec) else L_rec,
-            'L_cyc': L_cyc.item() if torch.is_tensor(L_cyc) else L_cyc,
             'L_rib': L_rib.item() if torch.is_tensor(L_rib) else L_rib,
             'L_rib_kl': L_rib_kl.item() if torch.is_tensor(L_rib_kl) else L_rib_kl,
             'L_rib_balance': L_rib_balance.item() if torch.is_tensor(L_rib_balance) else L_rib_balance,

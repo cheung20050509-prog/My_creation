@@ -52,14 +52,13 @@ DEFAULTS = {
     "seed": 128, "learning_rate": 2e-5, "ig_learning_rate": 5e-4,
     "beta_ib": 32.0, "num_infogate_layers": 3, "bottleneck_dim": 128,
     "mse_weight": 0.5, "dropout_prob": 0.1,
-    "gamma_cyc": 1.0, "alpha_ib": 0.01,
+    "alpha_ib": 0.01,
     "stage1_epochs": 10, "warmup_proportion": 0.1,
     "weight_decay": 1e-3, "ema_decay": 0.999,
     "selector_target_temp": 0.35, "selector_rib_weight": 0.05,
     "gumbel_tau_start": 1.0, "gumbel_tau_end": 0.5,
-    "num_heads": 4, "cra_layers": 8, "unified_dim": 256,
+    "num_heads": 4, "unified_dim": 256,
     "ema_start_epoch": 5,
-    "text_residual_weight": 0.0,
 }
 
 
@@ -94,13 +93,11 @@ def suggest_tier1(trial, dataset="mosi", n_epochs_max=None, n_epochs_min=None):
 
 def suggest_tier2(trial):
     return {
-        "gamma_cyc": trial.suggest_float("gamma_cyc", 0.1, 3.0),
         "alpha_ib": trial.suggest_float("alpha_ib", 0.001, 0.05, log=True),
         "stage1_epochs": trial.suggest_int("stage1_epochs", 3, 20),
         "warmup_proportion": trial.suggest_float("warmup_proportion", 0.02, 0.25),
         "weight_decay": trial.suggest_float("weight_decay", 1e-4, 0.1, log=True),
         "ema_decay": trial.suggest_categorical("ema_decay", [0.99, 0.995, 0.999, 0.9995]),
-        "text_residual_weight": trial.suggest_float("text_res_w", 0.0, 1.0),
     }
 
 
@@ -111,7 +108,6 @@ def suggest_tier3(trial):
         "gumbel_tau_start": trial.suggest_float("gumbel_tau_start", 0.5, 2.0),
         "gumbel_tau_end": trial.suggest_float("gumbel_tau_end", 0.1, 1.0),
         "num_heads": trial.suggest_categorical("num_heads", [2, 4, 8]),
-        "cra_layers": trial.suggest_categorical("cra_layers", [4, 6, 8, 10]),
         "unified_dim": trial.suggest_categorical("unified_dim", [128, 256, 384]),
         "ema_start_epoch": trial.suggest_categorical("ema_start_epoch", [3, 5, 8, 10]),
     }
@@ -256,9 +252,9 @@ BATCH_CANDIDATES = {
 }
 
 DATASET_EPOCH_RANGE = {
-    "mosi":   (40, 100),
-    "mosei":  (40, 100),
-    "simsv2": (30, 80),
+    "mosi":   (60, 150),
+    "mosei":  (60, 150),
+    "simsv2": (60, 150),
 }
 
 
@@ -342,7 +338,6 @@ def objective(trial, cli):
         "--bottleneck_dim", str(params["bottleneck_dim"]),
         "--mse_weight", f"{params['mse_weight']:.4f}",
         "--dropout_prob", f"{params['dropout_prob']:.4f}",
-        "--gamma_cyc", f"{params['gamma_cyc']:.4f}",
         "--alpha_ib", f"{params['alpha_ib']:.6f}",
         "--stage1_epochs", str(params["stage1_epochs"]),
         "--warmup_proportion", f"{params['warmup_proportion']:.4f}",
@@ -353,16 +348,13 @@ def objective(trial, cli):
         "--gumbel_tau_start", f"{params['gumbel_tau_start']:.4f}",
         "--gumbel_tau_end", f"{params['gumbel_tau_end']:.4f}",
         "--num_heads", str(params["num_heads"]),
-        "--cra_layers", str(params["cra_layers"]),
         "--unified_dim", str(params["unified_dim"]),
         "--ib_hidden_dim", str(ib_hidden_dim),
         "--ema_start_epoch", str(params["ema_start_epoch"]),
-        "--text_residual_weight", f"{params['text_residual_weight']:.4f}",
     ]
 
     for attr, flag in (
         ("disable_l_lib", "--disable_l_lib"),
-        ("disable_l_tran", "--disable_l_tran"),
         ("disable_l_rib", "--disable_l_rib"),
     ):
         if getattr(cli, attr, False):
@@ -488,13 +480,12 @@ def main():
                     help="Random warmup trials before guided search (TPE/MOTPE); "
                          "NSGA-II fallback uses this as population_size lower bound")
     pa.add_argument("--disable_l_lib", action="store_true")
-    pa.add_argument("--disable_l_tran", action="store_true")
     pa.add_argument("--disable_l_rib", action="store_true")
     cli = pa.parse_args()
 
     ds = cli.dataset
     if cli.study_name is None:
-        cli.study_name = f"infogate_{ds}_v3_botorch"
+        cli.study_name = f"infogate_{ds}_v5_botorch"
 
     log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna")
     ckpt_base = os.path.join(SCRIPT_DIR, "checkpoints", f"optuna_{ds}")

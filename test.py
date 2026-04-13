@@ -36,17 +36,11 @@ parser.add_argument("--num_heads", type=int, default=4)
 parser.add_argument("--num_infogate_layers", type=int, default=3)
 parser.add_argument("--dropout_prob", type=float, default=0.1)
 parser.add_argument("--beta_ib", type=float, default=32)
-parser.add_argument("--gamma_cyc", type=float, default=10)
-parser.add_argument("--cra_layers", type=int, default=8)
-parser.add_argument("--cra_dims", default="64,32,16", type=str)
 
 parser.add_argument("--checkpoint", type=str,
                     default="checkpoints/infogate_mosi_best.pt")
 
 args = parser.parse_args()
-
-if isinstance(args.cra_dims, str):
-    args.cra_dims = [int(x) for x in args.cra_dims.split(',')]
 
 global_configs.set_dataset_config(args.dataset)
 ACOUSTIC_DIM = global_configs.ACOUSTIC_DIM

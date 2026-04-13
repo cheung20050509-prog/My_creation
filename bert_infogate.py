@@ -53,7 +53,6 @@ class InfoGate_BertModel(BertPreTrainedModel):
             'num_infogate_layers': getattr(multimodal_config, 'num_infogate_layers', 3),
             'dropout_prob': getattr(multimodal_config, 'dropout_prob', 0.1),
             'beta_ib': getattr(multimodal_config, 'beta_ib', 32),
-            'gamma_cyc': getattr(multimodal_config, 'gamma_cyc', 1.0),
             'alpha_ib': getattr(multimodal_config, 'alpha_ib', 0.01),
             'use_l_lib': getattr(multimodal_config, 'use_l_lib', True),
             'use_l_tran': getattr(multimodal_config, 'use_l_tran', True),
@@ -61,9 +60,6 @@ class InfoGate_BertModel(BertPreTrainedModel):
             'selector_target_temp': getattr(multimodal_config, 'selector_target_temp', 0.35),
             'selector_balance_weight': getattr(multimodal_config, 'selector_balance_weight', 0.0),
             'selector_rib_weight': getattr(multimodal_config, 'selector_rib_weight', 0.05),
-            'text_residual_weight': getattr(multimodal_config, 'text_residual_weight', 0.0),
-            'cra_layers': getattr(multimodal_config, 'cra_layers', 8),
-            'cra_dims': getattr(multimodal_config, 'cra_dims', [64, 32, 16]),
             'gumbel_tau': getattr(multimodal_config, 'gumbel_tau_start', 1.0),
         }
 
