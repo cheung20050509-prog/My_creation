@@ -1,6 +1,6 @@
 """Utilities for checkpoint selection and HPO objectives."""
 
-DEFAULT_SELECTION_METRIC = "acc2_composite"
+DEFAULT_SELECTION_METRIC = "mae"
 
 SELECTION_METRIC_CHOICES = (
     "acc2_composite",

@@ -30,6 +30,10 @@ N_START="${N_START:-55}"
 SEARCH_TIER="${SEARCH_TIER:-2}"
 PARALLEL="${PARALLEL:-1}"
 GPU_BASE="${GPU_BASE:-0}"
+STAGE1_TRIALS="${STAGE1_TRIALS:-60}"
+STAGE2_TRIALS="${STAGE2_TRIALS:-140}"
+STAGE2_TOP_K="${STAGE2_TOP_K:-8}"
+DISABLE_TWO_STAGE_MOSI="${DISABLE_TWO_STAGE_MOSI:-0}"
 
 mkdir -p logs/optuna
 
@@ -37,6 +41,10 @@ run_optuna () {
   local dataset=$1
   local gpu=$2
   local log="logs/optuna/run_${dataset}_gpu${gpu}.log"
+  local extra_args=()
+  if [[ "${DISABLE_TWO_STAGE_MOSI}" == "1" ]]; then
+    extra_args+=(--disable_two_stage_mosi)
+  fi
   echo "[$(date -Iseconds)] starting ${dataset} on CUDA ${gpu} -> ${log}" >&2
   nohup env CUDA_VISIBLE_DEVICES="${gpu}" "${PYTHON}" -u optuna_search_v2.py \
     --dataset "${dataset}" \
@@ -44,6 +52,10 @@ run_optuna () {
     --n_trials "${N_TRIALS}" \
     --n_startup_trials "${N_START}" \
     --search_tier "${SEARCH_TIER}" \
+    --stage1_trials "${STAGE1_TRIALS}" \
+    --stage2_trials "${STAGE2_TRIALS}" \
+    --stage2_top_k "${STAGE2_TOP_K}" \
+    "${extra_args[@]}" \
     >> "${log}" 2>&1 &
   echo $!
 }
@@ -55,6 +67,10 @@ if [[ "${PARALLEL}" == "1" ]]; then
   p3=$(run_optuna simsv2 $((GPU_BASE + 2)))
   echo "Launched 3 jobs (PIDs: ${p1} ${p2} ${p3}). Logs under logs/optuna/run_*.log"
 else
+  extra_args=()
+  if [[ "${DISABLE_TWO_STAGE_MOSI}" == "1" ]]; then
+    extra_args+=(--disable_two_stage_mosi)
+  fi
   for ds in mosi mosei simsv2; do
     env CUDA_VISIBLE_DEVICES="${GPU_BASE}" "${PYTHON}" -u optuna_search_v2.py \
       --dataset "${ds}" \
@@ -62,6 +78,10 @@ else
       --n_trials "${N_TRIALS}" \
       --n_startup_trials "${N_START}" \
       --search_tier "${SEARCH_TIER}" \
+      --stage1_trials "${STAGE1_TRIALS}" \
+      --stage2_trials "${STAGE2_TRIALS}" \
+      --stage2_top_k "${STAGE2_TOP_K}" \
+      "${extra_args[@]}" \
       2>&1 | tee "logs/optuna/run_${ds}_sequential.log"
   done
 fi

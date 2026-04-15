@@ -438,27 +438,32 @@ def test_epoch(model, loader, stage=2, desc="Test"):
 def score(preds, y, use_zero=False):
     preds = np.asarray(preds).flatten()
     y = np.asarray(y).flatten()
-    nz = np.array([i for i, e in enumerate(y) if e != 0 or use_zero])
-    p, y2 = preds[nz], y[nz]
-    mae = np.mean(np.abs(p - y2))
-    corr = np.corrcoef(p, y2)[0][1] if len(p) > 1 else 0.0
-    pb = p >= 0
-    yb = y2 >= 0
+
+    # Full set for MAE, Corr, Acc7
+    mae = np.mean(np.abs(preds - y))
+    corr = np.corrcoef(preds, y)[0][1] if len(preds) > 1 else 0.0
+
+    # Filtered set for Acc2, F1
+    nz = np.array([i for i, e in enumerate(y) if e != 0])
+    p_nz, y_nz = preds[nz], y[nz]
+    pb = p_nz >= 0
+    yb = y_nz >= 0
     acc2 = accuracy_score(yb, pb)
     f1 = f1_score(yb, pb, average="weighted")
+
     result = {"acc2": acc2, "mae": mae, "corr": corr, "f1": f1}
     if args.dataset == "simsv2":
         # Acc5: 5-class {-1, -0.5, 0, 0.5, 1} → int {-2, -1, 0, 1, 2}
-        p5 = np.clip(np.round(p * 2), -2, 2).astype(int)
-        y5 = np.clip(np.round(y2 * 2), -2, 2).astype(int)
+        p5 = np.clip(np.round(preds * 2), -2, 2).astype(int)
+        y5 = np.clip(np.round(y * 2), -2, 2).astype(int)
         result["acc5"] = accuracy_score(y5, p5)
         # Acc3 keeps neutral labels instead of filtering zero values out.
         p3 = np.sign(preds).astype(int)
         y3 = np.sign(y).astype(int)
         result["acc3"] = accuracy_score(y3, p3)
     else:
-        p7 = np.clip(np.round(p), -3, 3).astype(int) + 3
-        y7 = np.clip(np.round(y2), -3, 3).astype(int) + 3
+        p7 = np.clip(np.round(preds), -3, 3).astype(int) + 3
+        y7 = np.clip(np.round(y), -3, 3).astype(int) + 3
         result["acc7"] = accuracy_score(y7, p7)
     return result
 

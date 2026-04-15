@@ -1,0 +1,169 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+
+\title{Motivation Note for the Current InfoGate Framework}
+\author{}
+\date{April 11, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Multimodal sentiment analysis aims to predict sentiment from language,
+acoustic, and visual signals. Compared with unimodal sentiment analysis, it can
+capture richer affective evidence, but it also introduces a harder fusion
+problem: different modalities do not contribute equally, their sequence quality
+is highly uneven, and their usefulness can change from one sample to another.
+In practice, the main difficulty is not simply how to combine more modalities,
+but how to identify which modality should dominate the current decision and how
+to prevent noisy auxiliary information from corrupting that dominant stream.
+
+This issue is especially visible in primary-centric multimodal sentiment
+methods. Prior work has shown that treating all modalities symmetrically can
+blur the most informative signal, while fixed language-centric strategies are
+too rigid for samples where acoustic or visual cues carry the decisive emotion.
+Dynamic primary-modality selection is therefore a promising direction.
+However, once the primary modality is allowed to vary across samples, a new
+problem appears: the selector and fusion module can only be as reliable as the
+features they consume. If those features still contain task-irrelevant
+variation, sequential redundancy, or uncertain cross-modal evidence, then both
+primary-modality selection and cross-modal injection become unstable.
+
+The current InfoGate framework is motivated by this gap. Instead of asking only
+which modality should be primary, it asks a stricter question: how can we
+first purify multimodal representations into a more task-relevant space, then
+perform dynamic primary selection inside that space, and finally inject
+auxiliary information into the primary stream in a reliability-aware manner?
+Under this view, the core problem is not ordinary multimodal fusion, but
+\emph{noise-aware, sample-adaptive, primary-centric fusion}. The framework is
+designed to solve exactly this problem.
+
+\section{Related Work}
+
+\noindent \textbf{Symmetric multimodal fusion.} Many multimodal sentiment methods
+focus on stronger cross-modal interaction while treating the three modalities in
+a roughly symmetric way. This line has produced effective fusion architectures,
+but it implicitly assumes that all modalities deserve comparable trust for the
+current sample. When one modality is much cleaner or more emotionally decisive
+than the others, symmetric fusion can mix useful evidence with distraction.
+
+\noindent \textbf{Static language-centric modeling.} Another line of work gives
+language a persistent dominant role, since text often has the highest semantic
+density in sentiment analysis. This is a reasonable prior, but it is still a
+global prior. It breaks down on samples where sentiment is expressed mainly by
+voice or facial dynamics rather than literal wording.
+
+\noindent \textbf{Dynamic primary-modality selection.} More recent work, such as
+MODS, moves beyond fixed modality priority and argues that the dominant modality
+should be selected dynamically for each sample. This is an important step, but
+it still leaves two open questions: what kind of features should be used for
+selection, and how should auxiliary modalities be injected after the primary
+stream is chosen? If raw or weakly filtered representations are used, then
+dynamic selection alone does not fully solve the noise problem.
+
+\noindent \textbf{Information bottleneck and informative spaces.} ITHP and CyIN
+suggest a complementary direction: rather than trusting raw multimodal features,
+the model should compress them into a more informative latent space that keeps
+task-relevant content and suppresses nuisance variation. This idea is especially
+appealing for multimodal sentiment analysis, where acoustic and visual streams
+often contain long, redundant, and unstable sequences. The current InfoGate
+framework follows this intuition and combines it with primary-centric fusion.
+
+\section{Motivation of the Current Framework}
+
+The current framework is motivated by three concrete observations.
+
+First, sample-wise modality dominance is real, but dynamic selection is only
+useful if the selector sees representations that are already reasonably clean.
+If the acoustic or visual stream remains cluttered with redundancy, or if the
+text stream contains sentiment-irrelevant lexical variation, then the routing
+decision can be unstable. A primary selector should therefore act on
+task-oriented features rather than on raw projected features.
+
+Second, auxiliary modalities are not uniformly helpful even after a primary
+stream has been selected. Standard cross-attention assumes that all auxiliary
+tokens are equally eligible to influence the primary representation, which is too
+strong an assumption for multimodal sentiment data. Some auxiliary tokens are
+supportive, some are neutral, and some are actively harmful. The fusion module
+therefore needs a way to reflect uncertainty and to attenuate unreliable
+cross-modal evidence instead of injecting it indiscriminately.
+
+Third, if the final prediction is meant to reflect the dominant sentiment signal,
+then the last-stage representation should remain primary-centric. Directly
+concatenating large residual features from text or from all modalities can make
+the classifier succeed by bypassing the intended routing logic, which weakens
+the meaning of primary-modality modeling. A cleaner design is to let the model
+predict from the enhanced primary bottleneck stream itself.
+
+These observations motivate the present framework: an information-filtered,
+confidence-aware, dynamically routed, primary-centric multimodal sentiment
+architecture.
+
+\section{What Problem Is Solved, and What Solution Is Proposed}
+
+The framework can be summarized as a problem--solution mapping shown in Table~1.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\linewidth} >{\raggedright\arraybackslash}p{0.60\linewidth}}
+\toprule
+Problem & Proposed solution in the current framework \\
+\midrule
+Sample-dependent modality dominance & Use MSelector to choose the primary modality dynamically for each sample instead of fixing language as the default center. \\
+Noisy and task-irrelevant unimodal features & Apply Information Bottleneck encoders to each modality so that routing and fusion operate on compressed latent representations rather than raw projected features. \\
+Auxiliary modalities have uneven reliability & Derive per-token confidence from the bottleneck uncertainty and use it to modulate cross-attention, so uncertain auxiliary evidence is down-weighted. \\
+Auxiliary information should not be injected with equal strength & Introduce adaptive information gates that control how much each auxiliary cross-attention branch contributes to the primary stream. \\
+The final classifier may bypass primary-centric fusion & Remove the direct multimodal highway and predict only from the enhanced primary bottleneck representation. \\
+Cross-modal semantics can drift apart during training & Use bottleneck reconstruction and CRA-style translation regularization to keep modality interaction in a more consistent informative space. \\
+\bottomrule
+\end{tabular}
+\caption{Problem--solution view of the current InfoGate framework.}
+\end{table}
+
+Operationally, the framework first encodes text, acoustic, and visual inputs into
+a shared hidden space. Each modality is then passed through an Information
+Bottleneck encoder that produces both a compressed latent feature and a
+confidence estimate. These bottlenecked features are pooled and sent to the
+dynamic MSelector, which predicts a sample-specific routing distribution over
+modalities and determines the primary stream. After routing, the two auxiliary
+streams interact with the primary stream through confidence-modulated
+cross-attention. Their contributions are further filtered by adaptive gates,
+allowing the model to preserve helpful evidence while suppressing noisy or
+misaligned information. Finally, the enhanced primary stream alone is aggregated
+and passed to the prediction head, keeping the decision process consistent with
+the primary-centric design.
+
+\section{Discussion}
+
+This motivation is broadly defensible. The problem statement is concrete, the
+modules correspond to identifiable failure modes, and the overall framework has
+a clear internal logic: first filter information, then select the dominant
+stream, then fuse auxiliary evidence under uncertainty control, and finally make
+the decision from the enhanced primary representation. This is a stronger story
+than merely saying the model uses several good modules together.
+
+At the same time, the framing should remain disciplined. The current branch is
+best presented as a solution for complete-modality multimodal sentiment
+analysis, with dynamic primary selection and noise-aware fusion as the central
+contributions. Although the code still contains translation-style regularization,
+the present version should not be overclaimed as a full missing-modality system
+unless that setting is explicitly evaluated again. Likewise, the motivation is
+strongest when it emphasizes \emph{task-relevant information control} and
+\emph{primary-centric fusion stability}, rather than making broad claims about
+all multimodal learning settings.
+
+In short, the motivation can stand. A clean one-sentence formulation is the
+following: existing primary-centric MSA methods recognize that different samples
+need different dominant modalities, but they do not sufficiently control the
+quality and reliability of the information entering selection and fusion;
+therefore, the current framework proposes an Information Bottleneck-guided,
+confidence-aware, dynamically routed primary-centric architecture to make
+modality selection and cross-modal interaction more stable and task-relevant.
+
+\end{document}

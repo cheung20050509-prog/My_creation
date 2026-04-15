@@ -16,3 +16,7 @@ datasets
 .env
 .venv/
 venv/
+
+# LaTeX/paper build artifacts (keep sources tracked; ignore regenerated outputs)
+paper_files/*.pdf
+paper_files/*.aux
