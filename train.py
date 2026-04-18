@@ -21,6 +21,7 @@ from deberta_infogate import InfoGate_DeBertaForSequenceClassification
 from bert_infogate import InfoGate_BertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
+from simsv2_metrics import compute_simsv2_kuda_metrics
 from selection_utils import (
     DEFAULT_SELECTION_METRIC,
     SELECTION_METRIC_CHOICES,
@@ -439,6 +440,9 @@ def score(preds, y, use_zero=False):
     preds = np.asarray(preds).flatten()
     y = np.asarray(y).flatten()
 
+    if args.dataset == "simsv2":
+        return compute_simsv2_kuda_metrics(preds, y)
+
     # Full set for MAE, Corr, Acc7
     mae = np.mean(np.abs(preds - y))
     corr = np.corrcoef(preds, y)[0][1] if len(preds) > 1 else 0.0
@@ -452,19 +456,9 @@ def score(preds, y, use_zero=False):
     f1 = f1_score(yb, pb, average="weighted")
 
     result = {"acc2": acc2, "mae": mae, "corr": corr, "f1": f1}
-    if args.dataset == "simsv2":
-        # Acc5: 5-class {-1, -0.5, 0, 0.5, 1} → int {-2, -1, 0, 1, 2}
-        p5 = np.clip(np.round(preds * 2), -2, 2).astype(int)
-        y5 = np.clip(np.round(y * 2), -2, 2).astype(int)
-        result["acc5"] = accuracy_score(y5, p5)
-        # Acc3 keeps neutral labels instead of filtering zero values out.
-        p3 = np.sign(preds).astype(int)
-        y3 = np.sign(y).astype(int)
-        result["acc3"] = accuracy_score(y3, p3)
-    else:
-        p7 = np.clip(np.round(preds), -3, 3).astype(int) + 3
-        y7 = np.clip(np.round(y), -3, 3).astype(int) + 3
-        result["acc7"] = accuracy_score(y7, p7)
+    p7 = np.clip(np.round(preds), -3, 3).astype(int) + 3
+    y7 = np.clip(np.round(y), -3, 3).astype(int) + 3
+    result["acc7"] = accuracy_score(y7, p7)
     return result
 
 

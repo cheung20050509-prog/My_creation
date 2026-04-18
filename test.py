@@ -18,6 +18,7 @@ from deberta_infogate import InfoGate_DeBertaForSequenceClassification
 from bert_infogate import InfoGate_BertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
+from simsv2_metrics import clip_simsv2_pairs, compute_simsv2_kuda_metrics
 
 # ============================================================
 # CLI
@@ -322,11 +323,20 @@ def test_model(model, loader):
     return np.array(preds), np.array(labels)
 
 
-def filter_prediction_pairs(preds, labels, use_zero=False):
+def normalize_prediction_pairs(preds, labels, dataset=None):
+    dataset = dataset or args.dataset
+    if dataset == "simsv2":
+        return clip_simsv2_pairs(preds, labels)
+
     preds = np.asarray(preds).flatten()
     labels = np.asarray(labels).flatten()
     if preds.shape != labels.shape:
         raise ValueError(f"pred/label shape mismatch: {preds.shape} vs {labels.shape}")
+    return preds, labels
+
+
+def filter_prediction_pairs(preds, labels, use_zero=False, dataset=None):
+    preds, labels = normalize_prediction_pairs(preds, labels, dataset=dataset)
     mask = np.ones(labels.shape[0], dtype=bool) if use_zero else (labels != 0)
     return preds[mask], labels[mask], mask
 
@@ -453,29 +463,32 @@ def print_prediction_summary(preds, labels, use_zero=False):
 
 
 def compute_metrics(preds, labels, dataset="mosi", use_zero=False):
+    if dataset == "simsv2":
+        metrics = compute_simsv2_kuda_metrics(preds, labels)
+        return {
+            "MAE": metrics["mae"],
+            "Corr": metrics["corr"],
+            "Acc2": metrics["acc2"],
+            "F1": metrics["f1"],
+            "Acc5": metrics["acc5"],
+            "Acc3": metrics["acc3"],
+        }
+
     # Full set for MAE, Corr, Acc7
-    p_full, y_full, _ = filter_prediction_pairs(preds, labels, use_zero=True)
+    p_full, y_full, _ = filter_prediction_pairs(preds, labels, use_zero=True, dataset=dataset)
     mae = np.mean(np.abs(p_full - y_full))
     corr = safe_corrcoef(p_full, y_full)
 
     # Filtered set for Acc2, F1
-    p_nz, y_nz, _ = filter_prediction_pairs(preds, labels, use_zero=False)
+    p_nz, y_nz, _ = filter_prediction_pairs(preds, labels, use_zero=False, dataset=dataset)
     pb, yb = (p_nz >= 0), (y_nz >= 0)
     acc2 = accuracy_score(yb, pb)
     f1 = f1_score(yb, pb, average="weighted")
 
     result = {'MAE': mae, 'Corr': corr, 'Acc2': acc2, 'F1': f1}
-    if dataset == "simsv2":
-        p5 = np.clip(np.round(p_full * 2), -2, 2).astype(int)
-        y5 = np.clip(np.round(y_full * 2), -2, 2).astype(int)
-        result['Acc5'] = accuracy_score(y5, p5)
-        p3 = np.sign(p_full).astype(int)
-        y3 = np.sign(y_full).astype(int)
-        result['Acc3'] = accuracy_score(y3, p3)
-    else:
-        p7 = np.clip(np.round(p_full), -3, 3).astype(int)
-        y7 = np.clip(np.round(y_full), -3, 3).astype(int)
-        result['Acc7'] = accuracy_score(y7, p7)
+    p7 = np.clip(np.round(p_full), -3, 3).astype(int)
+    y7 = np.clip(np.round(y_full), -3, 3).astype(int)
+    result['Acc7'] = accuracy_score(y7, p7)
     return result
 
 

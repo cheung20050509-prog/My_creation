@@ -318,11 +318,11 @@ def should_prune_simsv2(epoch, metrics):
         return False
     acc2, mae = metrics["Acc2"], metrics["MAE"]
     if epoch >= 40:
-        return acc2 < 0.78 and mae > 0.48
+        return acc2 < 0.72 and mae > 0.55
     if epoch >= 20:
-        return acc2 < 0.74 and mae > 0.52
+        return acc2 < 0.68 and mae > 0.58
     if epoch >= 10:
-        return acc2 < 0.68 and mae > 0.60
+        return acc2 < 0.62 and mae > 0.65
     return False
 
 
@@ -347,6 +347,27 @@ DATASET_EPOCH_RANGE = {
 }
 
 
+def apply_dataset_bounds_overrides(dataset):
+    """Per-dataset overrides for search bounds, applied at startup.
+
+    Currently only SIMSV2 is widened/repositioned based on top-10 trial analysis
+    of the previous study (see notes in repo): ema_decay was pinned at the
+    upper edge, dropout_prob was pinned at the lower edge, learning_rate was
+    biased toward its upper bound, n_epochs hugged its upper bound, and
+    mse_weight was approaching its upper bound; bottleneck_dim collapsed to
+    128 (so 256 is added) and effective batch always landed at 64 (so the
+    batch grid is trimmed accordingly).
+    """
+    if dataset == "simsv2":
+        LOG_FLOAT_BOUNDS["learning_rate"] = (5e-6, 1e-4)
+        LINEAR_FLOAT_BOUNDS["dropout_prob"] = (0.0, 0.25)
+        LINEAR_FLOAT_BOUNDS["mse_weight"] = (0.0, 3.5)
+        DATASET_EPOCH_RANGE["simsv2"] = (60, 110)
+        CATEGORICAL_SPACE["ema_decay"] = [0.999, 0.9995, 0.99975, 0.9999, 0.99995]
+        CATEGORICAL_SPACE["bottleneck_dim"] = [128, 192, 256]
+        BATCH_CANDIDATES["simsv2"] = [(16, 4), (32, 2), (64, 1), (32, 4)]
+
+
 def better_than(candidate, best_value, higher_is_better):
     if best_value is None:
         return True
@@ -361,6 +382,56 @@ def clone_cli(cli, **updates):
 
 def sanitize_name(name):
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+
+
+def sqlite_uri_to_path(db_uri: str):
+    """Return filesystem path for sqlite:///... URIs; None if not a file sqlite URI."""
+    if not db_uri or not isinstance(db_uri, str):
+        return None
+    prefix = "sqlite:///"
+    if not db_uri.startswith(prefix):
+        return None
+    path = db_uri[len(prefix):]
+    path = os.path.normpath(path)
+    if not os.path.isabs(path):
+        path = os.path.join(SCRIPT_DIR, path)
+    return os.path.abspath(path)
+
+
+def infer_artefact_root_from_db_uri(db_uri: str):
+    """If DB lives under <run>/db/*.db, return <run> so trial logs/checkpoints stay per-run."""
+    db_path = sqlite_uri_to_path(db_uri)
+    if not db_path:
+        return None
+    parent = os.path.dirname(db_path)
+    if os.path.basename(parent) == "db":
+        return os.path.dirname(parent)
+    return None
+
+
+def resolve_artefact_root(cli):
+    explicit = getattr(cli, "artefact_root", None)
+    if explicit:
+        return os.path.abspath(explicit)
+    return infer_artefact_root_from_db_uri(cli.db)
+
+
+def trial_train_log_dir(cli):
+    root = getattr(cli, "artefact_root", None)
+    if root:
+        return os.path.join(root, "train_logs")
+    return os.path.join(SCRIPT_DIR, "logs", "optuna")
+
+
+def trial_ckpt_base(cli, dataset, stage_label):
+    if stage_label:
+        sub = f"optuna_{dataset}_{stage_label}"
+    else:
+        sub = f"optuna_{dataset}"
+    root = getattr(cli, "artefact_root", None)
+    if root:
+        return os.path.join(root, "checkpoints", sub)
+    return os.path.join(SCRIPT_DIR, "checkpoints", sub)
 
 
 def ordered_choice_subset(original_choices, values, best_value=None):
@@ -615,6 +686,9 @@ def print_study_header(cli, mode_label, existing_trials):
     print(f"Optuna v2 — {cli.dataset.upper()}")
     print(f"  Study:   {cli.study_name}")
     print(f"  Storage: {cli.db}")
+    if getattr(cli, "artefact_root", None):
+        print(f"  Run dir: {cli.artefact_root}")
+        print(f"  Train logs: {trial_train_log_dir(cli)}")
     print(f"  GPU:     {cli.gpu}")
     print(f"  Mode:    {mode_label}")
     print(f"  Metric:  {cli.selection_metric}")
@@ -716,13 +790,12 @@ def objective(trial, cli):
                                   local_space=getattr(cli, 'local_space', None))
     ds = cli.dataset
 
-    log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna")
     stage_label = getattr(cli, "stage_label", None)
+    log_dir = trial_train_log_dir(cli)
+    ckpt_base = trial_ckpt_base(cli, ds, stage_label)
     if stage_label:
-        ckpt_base = os.path.join(SCRIPT_DIR, "checkpoints", f"optuna_{ds}_{stage_label}")
         log_path = os.path.join(log_dir, f"{ds}_{stage_label}_trial_{trial.number}.log")
     else:
-        ckpt_base = os.path.join(SCRIPT_DIR, "checkpoints", f"optuna_{ds}")
         log_path = os.path.join(log_dir, f"{ds}_trial_{trial.number}.log")
     os.makedirs(log_dir, exist_ok=True)
 
@@ -881,6 +954,14 @@ def main():
     pa.add_argument("--search_tier", type=int, default=2, choices=[1, 2, 3])
     pa.add_argument("--study_name", type=str, default=None)
     pa.add_argument("--db", type=str, default=None)
+    pa.add_argument(
+        "--artefact_root",
+        type=str,
+        default=None,
+        help="Per-run directory for train subprocess logs (train_logs/) and checkpoints "
+             "(checkpoints/). If omitted and --db is sqlite under .../<run>/db/*.db, "
+             "defaults to .../<run>/. Otherwise legacy layout logs/optuna/ + checkpoints/ is used.",
+    )
     pa.add_argument("--selection_metric", type=str,
                     default=DEFAULT_SELECTION_METRIC,
                     choices=SELECTION_METRIC_CHOICES)
@@ -902,20 +983,28 @@ def main():
     cli = pa.parse_args()
 
     ds = cli.dataset
+    apply_dataset_bounds_overrides(ds)
     if cli.study_name is None:
         if not cli.multi_objective:
             cli.study_name = f"infogate_{ds}_v6_tpe_mae"
         else:
             cli.study_name = f"infogate_{ds}_v5_botorch"
 
-    log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna")
-    ckpt_base = os.path.join(SCRIPT_DIR, "checkpoints", f"optuna_{ds}")
-    os.makedirs(log_dir, exist_ok=True)
-    os.makedirs(ckpt_base, exist_ok=True)
-
     if cli.db is None:
+        log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna")
+        os.makedirs(log_dir, exist_ok=True)
         db_path = os.path.join(log_dir, f"{cli.study_name}.db")
         cli.db = f"sqlite:///{db_path}"
+
+    cli.artefact_root = resolve_artefact_root(cli)
+    if cli.artefact_root:
+        os.makedirs(os.path.join(cli.artefact_root, "train_logs"), exist_ok=True)
+        os.makedirs(os.path.join(cli.artefact_root, "checkpoints"), exist_ok=True)
+    else:
+        log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna")
+        ckpt_base = os.path.join(SCRIPT_DIR, "checkpoints", f"optuna_{ds}")
+        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(ckpt_base, exist_ok=True)
 
     use_two_stage_mosi = (
         ds == "mosi"
@@ -940,7 +1029,7 @@ def main():
         optimize_with_cleanup(
             stage1_study,
             stage1_cli,
-            os.path.join(SCRIPT_DIR, "checkpoints", "optuna_mosi_s1_random"),
+            trial_ckpt_base(stage1_cli, "mosi", "s1_random"),
         )
         print_study_summary(stage1_study, stage1_cli)
 
@@ -967,7 +1056,7 @@ def main():
         optimize_with_cleanup(
             stage2_study,
             stage2_cli,
-            os.path.join(SCRIPT_DIR, "checkpoints", "optuna_mosi_s2_local"),
+            trial_ckpt_base(stage2_cli, "mosi", "s2_local"),
         )
         print_study_summary(stage2_study, stage2_cli)
         return
@@ -976,7 +1065,7 @@ def main():
                     stage_label=None, local_space=None)
     study, mode_label = create_study_for_cli(cli)
     print_study_header(cli, mode_label, len(study.trials))
-    optimize_with_cleanup(study, cli, ckpt_base)
+    optimize_with_cleanup(study, cli, trial_ckpt_base(cli, ds, None))
     print_study_summary(study, cli)
 
 
