@@ -350,21 +350,43 @@ DATASET_EPOCH_RANGE = {
 def apply_dataset_bounds_overrides(dataset):
     """Per-dataset overrides for search bounds, applied at startup.
 
-    Currently only SIMSV2 is widened/repositioned based on top-10 trial analysis
-    of the previous study (see notes in repo): ema_decay was pinned at the
-    upper edge, dropout_prob was pinned at the lower edge, learning_rate was
-    biased toward its upper bound, n_epochs hugged its upper bound, and
-    mse_weight was approaching its upper bound; bottleneck_dim collapsed to
-    128 (so 256 is added) and effective batch always landed at 64 (so the
-    batch grid is trimmed accordingly).
+    SIMSV2: widened/repositioned based on top-trial analysis (ema_decay,
+    dropout_prob, learning_rate, n_epochs, mse_weight near upper bound,
+    batch grid, bottleneck_dim).
+
+    MOSI: mse_weight upper bound raised from 2.0 to 3.5 — Stage2 best trials
+    clustered near mse_weight≈2.0 (saved in saved_hparams/ before this change).
     """
+    if dataset == "mosi":
+        # Tier-3 widened/tightened bounds for v3, based on TOP-12 of msew35_s2_local
+        # (MAE-min): all top trials cluster at batch_config=(32,1), bd=96, nL=5,
+        # ema_decay=0.995, and stage1_epochs hit upper bound 20.
+        LOG_FLOAT_BOUNDS["learning_rate"]    = (1e-5, 3e-5)
+        LOG_FLOAT_BOUNDS["ig_learning_rate"] = (2e-4, 1e-3)
+        LOG_FLOAT_BOUNDS["beta_ib"]          = (20.0, 50.0)
+        LOG_FLOAT_BOUNDS["alpha_ib"]         = (3e-3, 1.5e-2)
+        LOG_FLOAT_BOUNDS["weight_decay"]     = (3e-4, 5e-3)
+        LINEAR_FLOAT_BOUNDS["mse_weight"]    = (0.5, 3.0)
+        LINEAR_FLOAT_BOUNDS["dropout_prob"]  = (0.20, 0.45)   # extend upper from 0.4
+        LINEAR_FLOAT_BOUNDS["warmup_proportion"] = (0.05, 0.20)
+        INT_BOUNDS["stage1_epochs"]          = (10, 25)       # extend upper from 20
+        DATASET_EPOCH_RANGE["mosi"]          = (100, 135)
+        CATEGORICAL_SPACE["bottleneck_dim"]  = [96, 128]
+        CATEGORICAL_SPACE["num_infogate_layers"] = [4, 5]
+        CATEGORICAL_SPACE["ema_decay"]       = [0.995, 0.999]
+        BATCH_CANDIDATES["mosi"]             = [(16, 2), (32, 1), (32, 2)]
     if dataset == "simsv2":
         LOG_FLOAT_BOUNDS["learning_rate"] = (5e-6, 1e-4)
-        LINEAR_FLOAT_BOUNDS["dropout_prob"] = (0.0, 0.25)
-        LINEAR_FLOAT_BOUNDS["mse_weight"] = (0.0, 3.5)
+        LOG_FLOAT_BOUNDS["alpha_ib"] = (1e-3, 0.1)
+        LOG_FLOAT_BOUNDS["weight_decay"] = (1e-4, 0.3)
+        LINEAR_FLOAT_BOUNDS["mse_weight"] = (0.0, 5.0)
+        LINEAR_FLOAT_BOUNDS["dropout_prob"] = (0.0, 0.20)
+        LINEAR_FLOAT_BOUNDS["warmup_proportion"] = (0.05, 0.40)
+        INT_BOUNDS["stage1_epochs"] = (4, 16)
         DATASET_EPOCH_RANGE["simsv2"] = (60, 110)
-        CATEGORICAL_SPACE["ema_decay"] = [0.999, 0.9995, 0.99975, 0.9999, 0.99995]
-        CATEGORICAL_SPACE["bottleneck_dim"] = [128, 192, 256]
+        CATEGORICAL_SPACE["bottleneck_dim"] = [96, 128, 192]
+        CATEGORICAL_SPACE["num_infogate_layers"] = [3, 4]
+        CATEGORICAL_SPACE["ema_decay"] = [0.995, 0.999, 0.9995, 0.99975, 0.9999]
         BATCH_CANDIDATES["simsv2"] = [(16, 4), (32, 2), (64, 1), (32, 4)]
 
 
@@ -708,6 +730,137 @@ def print_study_header(cli, mode_label, existing_trials):
     print()
 
 
+# ══════════════════════════════════════════════════════════════
+# Warm-start: enqueue top trials from existing studies
+# ══════════════════════════════════════════════════════════════
+
+# Historical batch grids used by previous SIMSv2 studies. Used to translate a
+# legacy trial's `batch_config` index back to its (bs, accum) tuple, then re-
+# index against the current `BATCH_CANDIDATES[dataset]`.
+_LEGACY_BATCH_GRIDS = {
+    "simsv2": {
+        "v1": [(8, 4), (16, 2), (16, 4), (32, 1), (32, 2), (64, 1)],
+        "v2": [(16, 4), (32, 2), (64, 1), (32, 4)],
+    },
+    "mosi": {
+        # Both s1_random and s2_local of v1 + msew35 used the same 6-element grid.
+        "v1": [(8, 4), (8, 8), (16, 2), (16, 4), (32, 1), (32, 2)],
+    },
+}
+
+
+def _legacy_batch_grid(dataset, source_study_name):
+    grids = _LEGACY_BATCH_GRIDS.get(dataset, {})
+    if not grids:
+        return BATCH_CANDIDATES.get(dataset, [])
+    name = (source_study_name or "").lower()
+    # Match v2 only when it appears as a study version suffix (e.g. simsv2_v2, _v2_)
+    # so that the dataset name "simsv2" itself does not trip the check.
+    if f"{dataset}_v2" in name or "_v2_" in name or name.endswith("_v2"):
+        return grids.get("v2", BATCH_CANDIDATES.get(dataset, []))
+    return grids.get("v1", BATCH_CANDIDATES.get(dataset, []))
+
+
+def _filter_param_for_current_space(key, value, dataset, source_study_name):
+    """Return (kept, new_value). Drops a param if it lies outside current bounds.
+
+    n_epochs is clipped instead of dropped so warm-start trials stay close to
+    their original training budget.
+    """
+    if key in LOG_FLOAT_BOUNDS or key in LINEAR_FLOAT_BOUNDS:
+        bounds = LOG_FLOAT_BOUNDS.get(key) or LINEAR_FLOAT_BOUNDS.get(key)
+        lo, hi = bounds
+        return (lo <= float(value) <= hi, float(value))
+    if key in INT_BOUNDS:
+        lo, hi = INT_BOUNDS[key]
+        v = int(value)
+        return (lo <= v <= hi, v)
+    if key in CATEGORICAL_SPACE:
+        choices = CATEGORICAL_SPACE[key]
+        return (value in choices, value)
+    if key == "n_epochs":
+        lo, hi = DATASET_EPOCH_RANGE[dataset]
+        v = int(value)
+        clipped = max(lo, min(hi, v))
+        return (True, clipped)
+    if key == "batch_config":
+        old_grid = _legacy_batch_grid(dataset, source_study_name)
+        new_grid = BATCH_CANDIDATES.get(dataset, [])
+        try:
+            tup = old_grid[int(value)]
+        except (IndexError, TypeError, ValueError):
+            return (False, None)
+        if tup in new_grid:
+            return (True, new_grid.index(tup))
+        return (False, None)
+    return (False, None)
+
+
+def enqueue_top_trials_into_study(study, dataset, source_db_uris, top_k):
+    """Seed `study` with the top-k completed trials (by Optuna value, lower=better)
+    pulled from each `source_db_uri`. Each enqueued trial only carries params that
+    pass current search-space validation; missing params will be sampled fresh
+    by the running sampler. Skips trials that lose more than half of their params
+    to validation.
+    """
+    if not source_db_uris:
+        return 0
+    enqueued_total = 0
+    print(f"\n[enqueue] dataset={dataset}, top_k_per_db={top_k}")
+    for uri in source_db_uris:
+        uri = uri.strip()
+        if not uri:
+            continue
+        try:
+            summaries = optuna.get_all_study_summaries(storage=uri)
+        except Exception as e:
+            print(f"[enqueue]   skip {uri}: cannot list studies ({e})")
+            continue
+        for summary in summaries:
+            try:
+                src = optuna.load_study(study_name=summary.study_name, storage=uri)
+            except Exception as e:
+                print(f"[enqueue]   {uri}::{summary.study_name}: load failed ({e})")
+                continue
+            done = [t for t in src.trials
+                    if t.state == optuna.trial.TrialState.COMPLETE
+                    and t.value is not None]
+            if not done:
+                continue
+            done.sort(key=lambda t: t.value)  # lower MAE first
+            picked = done[:top_k]
+            print(f"[enqueue]   from {summary.study_name}: "
+                  f"picking {len(picked)} of {len(done)} complete trials")
+            for t in picked:
+                filtered = {}
+                dropped = []
+                for k, v in t.params.items():
+                    keep, new_v = _filter_param_for_current_space(
+                        k, v, dataset, summary.study_name)
+                    if keep:
+                        filtered[k] = new_v
+                    else:
+                        dropped.append(k)
+                if not t.params:
+                    continue
+                if len(filtered) < 0.5 * len(t.params):
+                    print(f"[enqueue]     trial {t.number}: dropped too many params "
+                          f"({len(dropped)}/{len(t.params)}); skip")
+                    continue
+                try:
+                    study.enqueue_trial(filtered, skip_if_exists=True)
+                    enqueued_total += 1
+                    if dropped:
+                        print(f"[enqueue]     trial {t.number}: queued "
+                              f"(dropped {len(dropped)}: {dropped})")
+                    else:
+                        print(f"[enqueue]     trial {t.number}: queued (full match)")
+                except Exception as e:
+                    print(f"[enqueue]     trial {t.number}: enqueue failed ({e})")
+    print(f"[enqueue] total enqueued: {enqueued_total}\n")
+    return enqueued_total
+
+
 def print_study_summary(study, cli):
     print("\n" + "=" * 60)
     print("Search complete!")
@@ -980,6 +1133,15 @@ def main():
                     help="Disable MOSI-specific two-stage search and fall back to one study.")
     pa.add_argument("--disable_l_lib", action="store_true")
     pa.add_argument("--disable_l_rib", action="store_true")
+    pa.add_argument("--stage_label", type=str, default=None,
+                    help="Optional stage tag; partitions train_logs/ and checkpoints/ "
+                         "so a new study does not overwrite earlier studies' artefacts.")
+    pa.add_argument("--enqueue_top_from", type=str, default=None,
+                    help="Comma-separated sqlite URIs whose TOP-K complete trials "
+                         "(by Optuna value, lower=better) are enqueued as warm-start "
+                         "seeds in the new study before sampling begins.")
+    pa.add_argument("--enqueue_top_k", type=int, default=10,
+                    help="Number of top trials per source DB to enqueue.")
     cli = pa.parse_args()
 
     ds = cli.dataset
@@ -1062,10 +1224,16 @@ def main():
         return
 
     cli = clone_cli(cli, sampler_name="tpe", sampler_seed=128,
-                    stage_label=None, local_space=None)
+                    stage_label=cli.stage_label, local_space=None)
     study, mode_label = create_study_for_cli(cli)
+    if getattr(cli, "enqueue_top_from", None):
+        enqueue_top_trials_into_study(
+            study, cli.dataset,
+            [u.strip() for u in cli.enqueue_top_from.split(",") if u.strip()],
+            cli.enqueue_top_k,
+        )
     print_study_header(cli, mode_label, len(study.trials))
-    optimize_with_cleanup(study, cli, trial_ckpt_base(cli, ds, None))
+    optimize_with_cleanup(study, cli, trial_ckpt_base(cli, ds, cli.stage_label))
     print_study_summary(study, cli)
 
 
