@@ -399,6 +399,8 @@ class InfoGate(nn.Module):
         self.selector_balance_weight = args.get('selector_balance_weight', 0.0)
         self.selector_rib_weight = args.get('selector_rib_weight', 0.05)
         self.bottleneck_dim = bn_dim
+        # 'regression' (default) or 'binary'. Switches per-modality L_lib / L_rib losses.
+        self.task_type = args.get('task_type', 'regression')
 
         # --- 1. Unimodal projectors ---
         self.proj_t = nn.Sequential(
@@ -503,7 +505,10 @@ class InfoGate(nn.Module):
         for m in self.modalities:
             kl = self._compute_kl(mu_pooled[m], lv_pooled[m])
             y_pred = self.label_preds[m](B_pooled[m]).squeeze(-1)
-            pred_loss = F.l1_loss(y_pred, labels)
+            if self.task_type == 'binary':
+                pred_loss = F.binary_cross_entropy_with_logits(y_pred, labels.float())
+            else:
+                pred_loss = F.l1_loss(y_pred, labels)
             total = total + kl + self.beta_ib * pred_loss
         return total / 3.0
 
@@ -515,7 +520,13 @@ class InfoGate(nn.Module):
             self.label_preds['t'](B_pooled['t']).squeeze(-1),
             self.label_preds['v'](B_pooled['v']).squeeze(-1),
         ], dim=1)
-        errors = torch.abs(preds - labels.unsqueeze(1))
+        if self.task_type == 'binary':
+            lbl = labels.float().unsqueeze(1).expand_as(preds)
+            errors = F.binary_cross_entropy_with_logits(preds, lbl, reduction='none')
+            diff_thresh = 0.1
+        else:
+            errors = torch.abs(preds - labels.unsqueeze(1))
+            diff_thresh = 0.5
 
         target_logits = -errors.detach() / max(self.selector_target_temp, 1e-6)
         target = F.softmax(target_logits, dim=-1)
@@ -526,11 +537,12 @@ class InfoGate(nn.Module):
             reduction='none',
         ).sum(dim=-1)
 
-        # High divergence mask: only enforce routing if max_error - min_error > 0.5
-        # Otherwise, the modalities perform similarly, so don't force a sharp target.
+        # High divergence mask: only enforce routing if max-min error gap is large enough
+        # so modalities are clearly distinguishable. Threshold differs by loss scale:
+        # L1 (regression) uses 0.5; BCE (binary) uses 0.1.
         error_diff = errors.max(dim=-1)[0] - errors.min(dim=-1)[0]
-        mask = (error_diff > 0.5).float()
-        
+        mask = (error_diff > diff_thresh).float()
+
         rib_kl = (kl * mask).sum() / mask.sum().clamp_min(1.0)
 
         batch_usage = weights.mean(dim=0)

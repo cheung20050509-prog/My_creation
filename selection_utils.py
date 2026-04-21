@@ -11,6 +11,8 @@ SELECTION_METRIC_CHOICES = (
     "corr",
     "mae",
     "legacy_dev_score",
+    "binary_acc",
+    "binary_f1",
 )
 
 _HIGHER_IS_BETTER = {
@@ -20,6 +22,8 @@ _HIGHER_IS_BETTER = {
     "acc5",
     "f1",
     "corr",
+    "binary_acc",
+    "binary_f1",
 }
 
 
@@ -49,6 +53,10 @@ def compute_selection_score(metric, acc2, mae, corr, f1,
         return mae
     if metric == "legacy_dev_score":
         return mae - 0.5 * corr
+    if metric == "binary_acc":
+        return acc2
+    if metric == "binary_f1":
+        return f1
     raise ValueError(f"Unsupported selection metric: {metric}")
 
 

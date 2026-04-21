@@ -16,6 +16,8 @@ def set_dataset_config(dataset_name):
         "mosi":  {"ACOUSTIC_DIM": 74, "VISUAL_DIM": 47, "TEXT_DIM": 768},
         "mosei": {"ACOUSTIC_DIM": 74, "VISUAL_DIM": 35, "TEXT_DIM": 768},
         "simsv2": {"ACOUSTIC_DIM": 25, "VISUAL_DIM": 177, "TEXT_DIM": 768},
+        "ur_funny": {"ACOUSTIC_DIM": 81, "VISUAL_DIM": 91, "TEXT_DIM": 768},
+        "mustard":  {"ACOUSTIC_DIM": 81, "VISUAL_DIM": 91, "TEXT_DIM": 768},
     }
 
     config = dataset_configs.get(dataset_name)

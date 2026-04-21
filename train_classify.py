@@ -1,0 +1,514 @@
+"""InfoGate training script for binary classification (UR-FUNNY / MUSTARD).
+
+Mirrors `train.py` but switches:
+  - data: HKT-style (context + punchline) via `data_humor.build_humor_loaders`
+  - task: binary classification with BCEWithLogitsLoss
+  - metrics: Accuracy + weighted-F1 (the regression-only fields are left as
+    placeholders so the existing `fmt_metrics` / selection helpers keep working)
+  - selection: defaults to `binary_acc` (higher is better)
+"""
+
+import argparse
+import os
+import random
+import numpy as np
+
+from sklearn.metrics import accuracy_score, f1_score
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from tqdm import tqdm
+
+from transformers import get_linear_schedule_with_warmup, DebertaV2Tokenizer
+from torch.optim import AdamW
+
+from deberta_infogate import InfoGate_DeBertaForSequenceClassification
+import global_configs
+from global_configs import DEVICE
+from data_humor import build_humor_loaders
+from selection_utils import (
+    SELECTION_METRIC_CHOICES,
+    build_selection_tiebreak,
+    compute_selection_score,
+    selection_higher_is_better,
+)
+
+# ============================================================
+# CLI
+# ============================================================
+parser = argparse.ArgumentParser(description="InfoGate Binary Classification Training")
+parser.add_argument("--model", type=str,
+                    default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base"))
+parser.add_argument("--dataset", type=str, choices=["ur_funny", "mustard"], default="ur_funny")
+parser.add_argument("--max_seq_length", type=int, default=64,
+                    help="HKT default: 64 for humor, 77 for sarcasm.")
+parser.add_argument("--train_batch_size", type=int, default=16)
+parser.add_argument("--dev_batch_size", type=int, default=128)
+parser.add_argument("--test_batch_size", type=int, default=128)
+parser.add_argument("--n_epochs", type=int, default=50)
+parser.add_argument("--stage1_epochs", type=int, default=8)
+parser.add_argument("--dropout_prob", type=float, default=0.25)
+parser.add_argument("--learning_rate", type=float, default=2e-5)
+parser.add_argument("--ig_learning_rate", type=float, default=5e-4)
+parser.add_argument("--gradient_accumulation_step", type=int, default=2)
+parser.add_argument("--warmup_proportion", type=float, default=0.1)
+parser.add_argument("--weight_decay", type=float, default=0.01)
+parser.add_argument("--seed", type=int, default=42)
+
+# InfoGate-specific
+parser.add_argument("--unified_dim", type=int, default=256)
+parser.add_argument("--ib_hidden_dim", type=int, default=256)
+parser.add_argument("--bottleneck_dim", type=int, default=128)
+parser.add_argument("--num_heads", type=int, default=4)
+parser.add_argument("--num_infogate_layers", type=int, default=3)
+parser.add_argument("--beta_ib", type=float, default=16.0)
+parser.add_argument("--alpha_ib", type=float, default=0.005)
+parser.add_argument("--selector_target_temp", type=float, default=0.6,
+                    help="Temperature for modality-quality routing targets (BCE scale).")
+parser.add_argument("--selector_balance_weight", type=float, default=0.0,
+                    help="Batch-level routing entropy regularization weight.")
+parser.add_argument("--selector_rib_weight", type=float, default=0.05,
+                    help="Overall weight of the routing supervision loss.")
+parser.add_argument("--disable_l_lib", action="store_true",
+                    help="Ablate the label-level IB loss.")
+parser.add_argument("--disable_l_rib", action="store_true",
+                    help="Ablate the routing IB prior loss.")
+
+parser.add_argument("--ema_decay", type=float, default=0.999)
+parser.add_argument("--ema_start_epoch", type=int, default=5)
+
+parser.add_argument("--gumbel_tau_start", type=float, default=1.0)
+parser.add_argument("--gumbel_tau_end", type=float, default=0.5)
+
+parser.add_argument("--checkpoint_dir", type=str, default="checkpoints")
+parser.add_argument("--selection_metric", type=str,
+                    default="binary_acc",
+                    choices=SELECTION_METRIC_CHOICES)
+
+args = parser.parse_args()
+
+# Hard-code task type for this entry point.
+args.task_type = "binary"
+args.use_l_lib = not args.disable_l_lib
+args.use_l_rib = not args.disable_l_rib
+# Field expected by save dict / scoring helpers (regression placeholder).
+args.mse_weight = 0.0
+
+global_configs.set_dataset_config(args.dataset)
+ACOUSTIC_DIM = global_configs.ACOUSTIC_DIM
+VISUAL_DIM = global_configs.VISUAL_DIM
+TEXT_DIM = global_configs.TEXT_DIM
+
+
+# ============================================================
+# Data
+# ============================================================
+
+def setup_data():
+    tokenizer = DebertaV2Tokenizer.from_pretrained(args.model)
+    return build_humor_loaders(
+        dataset=args.dataset,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length,
+        acoustic_dim=ACOUSTIC_DIM,
+        visual_dim=VISUAL_DIM,
+        train_batch_size=args.train_batch_size,
+        dev_batch_size=args.dev_batch_size,
+        test_batch_size=args.test_batch_size,
+        gradient_accumulation_step=args.gradient_accumulation_step,
+        n_epochs=args.n_epochs,
+    )
+
+
+# ============================================================
+# Seed & model setup
+# ============================================================
+
+def set_seed(seed):
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.enabled = False
+    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+
+def build_model(n_opt):
+    model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
+        args.model, multimodal_config=args, num_labels=1)
+    backbone_prefix = "dberta.model."
+    model.to(DEVICE)
+
+    no_decay = {"bias", "LayerNorm.bias", "LayerNorm.weight"}
+    ig_lr = getattr(args, 'ig_learning_rate', 5e-4)
+
+    backbone_decay, backbone_no_decay = [], []
+    ig_decay, ig_no_decay = [], []
+    for n, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+        is_nd = any(nd in n for nd in no_decay)
+        if n.startswith(backbone_prefix):
+            (backbone_no_decay if is_nd else backbone_decay).append(p)
+        else:
+            (ig_no_decay if is_nd else ig_decay).append(p)
+
+    groups = [
+        {"params": backbone_decay,    "lr": args.learning_rate, "weight_decay": args.weight_decay},
+        {"params": backbone_no_decay, "lr": args.learning_rate, "weight_decay": 0.0},
+        {"params": ig_decay,          "lr": ig_lr,              "weight_decay": args.weight_decay},
+        {"params": ig_no_decay,       "lr": ig_lr,              "weight_decay": 0.0},
+    ]
+    optimizer = AdamW(groups, lr=args.learning_rate)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=int(args.warmup_proportion * n_opt),
+        num_training_steps=max(n_opt, 1),
+    )
+    return model, optimizer, scheduler
+
+
+# ============================================================
+# EMA (identical to train.py)
+# ============================================================
+
+class EMA:
+    def __init__(self, model, decay=0.999):
+        self.decay = decay
+        self.shadow = {n: p.clone().detach()
+                       for n, p in model.named_parameters() if p.requires_grad}
+        self.backup = {}
+
+    @torch.no_grad()
+    def update(self, model):
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self.shadow:
+                self.shadow[n].mul_(self.decay).add_(p.data, alpha=1 - self.decay)
+
+    def apply(self, model):
+        self.backup = {n: p.data.clone() for n, p in model.named_parameters()
+                       if p.requires_grad and n in self.shadow}
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self.shadow:
+                p.data.copy_(self.shadow[n])
+
+    def restore(self, model):
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self.backup:
+                p.data.copy_(self.backup[n])
+        self.backup = {}
+
+    def state_dict(self):
+        return {n: v.clone() for n, v in self.shadow.items()}
+
+    def load_state_dict(self, state_dict):
+        for n, v in state_dict.items():
+            if n in self.shadow:
+                self.shadow[n].copy_(v)
+
+    def reset(self, model):
+        for n, p in model.named_parameters():
+            if p.requires_grad and n in self.shadow:
+                self.shadow[n].copy_(p.data)
+
+
+def toggle_state(enabled):
+    return "on" if enabled else "off"
+
+
+# ============================================================
+# Train / Eval / Test
+# ============================================================
+
+def task_loss(logits, labels):
+    return F.binary_cross_entropy_with_logits(
+        logits.view(-1), labels.view(-1).float())
+
+
+def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
+    model.train()
+    total_loss, steps = 0.0, 0
+    sum_task, sum_ib = 0.0, 0.0
+    sum_detail = {}
+
+    train_pbar = tqdm(loader, desc=f"Train (stage {stage})")
+    for step, batch in enumerate(train_pbar):
+        batch = tuple(t.to(DEVICE) for t in batch)
+        input_ids, visual, acoustic, label_ids = batch
+        visual = visual.squeeze(1)
+        acoustic = acoustic.squeeze(1)
+
+        logits, ib_loss, loss_dict, _ = model(
+            input_ids, visual, acoustic, labels=label_ids, stage=stage)
+
+        pred_flat = logits.view(-1)
+        label_flat = label_ids.view(-1)
+
+        loss_dict['pred_mean'] = pred_flat.mean().item()
+        loss_dict['pred_std'] = pred_flat.std(unbiased=False).item()
+
+        l_task = task_loss(logits, label_ids)
+
+        loss = l_task + ib_loss
+
+        if args.gradient_accumulation_step > 1:
+            loss = loss / args.gradient_accumulation_step
+        loss.backward()
+        total_loss += loss.item()
+        sum_task += l_task.item()
+        sum_ib += ib_loss.item()
+        for k, v in loss_dict.items():
+            sum_detail[k] = sum_detail.get(k, 0.0) + v
+        steps += 1
+
+        train_pbar.set_postfix({"task": f"{l_task.item():.3f}",
+                                "ib": f"{ib_loss.item():.3f}",
+                                "p_std": f"{loss_dict['pred_std']:.2f}"})
+
+        if (step + 1) % args.gradient_accumulation_step == 0:
+            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
+            if ema is not None:
+                ema.update(model)
+
+    n = max(steps, 1)
+    detail = {k: v / n for k, v in sum_detail.items()}
+    return total_loss / n, sum_task / n, sum_ib / n, detail
+
+
+def test_epoch(model, loader, stage=2, desc="Test"):
+    model.eval()
+    preds, labels = [], []
+    with torch.no_grad():
+        for batch in tqdm(loader, desc=desc):
+            batch = tuple(t.to(DEVICE) for t in batch)
+            input_ids, visual, acoustic, label_ids = batch
+            visual = visual.squeeze(1)
+            acoustic = acoustic.squeeze(1)
+
+            logits, _, _, _ = model(input_ids, visual, acoustic, stage=stage)
+            preds.extend(logits.view(-1).cpu().numpy().tolist())
+            labels.extend(label_ids.view(-1).cpu().numpy().tolist())
+
+    return np.array(preds).flatten(), np.array(labels).flatten()
+
+
+def score(preds, y):
+    """Binary classification metrics. Returns a dict with the field names that
+    `fmt_metrics`, `selection_kwargs`, and `compute_selection_score` expect.
+    Regression-only fields (mae/corr/acc7) are present as placeholders so the
+    existing helpers keep working without branching.
+    """
+    preds = np.asarray(preds).flatten()
+    y = np.asarray(y).flatten()
+    prob = 1.0 / (1.0 + np.exp(-preds))
+    yhat = (prob >= 0.5).astype(int)
+    ytrue = y.astype(int)
+
+    acc = accuracy_score(ytrue, yhat)
+    f1_w = f1_score(ytrue, yhat, average="weighted") if len(ytrue) else 0.0
+
+    return {
+        "acc2": float(acc),
+        "f1": float(f1_w),
+        # Placeholders so legacy helpers keep working; not meaningful for binary.
+        "mae": float(np.mean(np.abs(prob - ytrue))) if len(ytrue) else 0.0,
+        "corr": 0.0,
+        "acc7": 0.0,
+    }
+
+
+def fmt_metrics(m, prefix=""):
+    return (f"{prefix}Acc={m['acc2']*100:.2f}%  F1={m['f1']*100:.2f}%  "
+            f"BCE-prob-MAE={m['mae']:.4f}")
+
+
+def selection_kwargs(m):
+    return dict(acc2=m["acc2"], mae=m["mae"], corr=m["corr"], f1=m["f1"],
+                acc7=m.get("acc7", 0.0))
+
+
+# ============================================================
+# Main
+# ============================================================
+
+def main():
+    print("=" * 60)
+    print("InfoGate Binary Classification Training")
+    print(f"  Dataset        : {args.dataset}")
+    print(f"  Task type      : {args.task_type}")
+    print(f"  Epochs         : {args.n_epochs} (stage1: {args.stage1_epochs})")
+    print(f"  Batch size     : {args.train_batch_size}"
+          f" x grad_accum {args.gradient_accumulation_step}")
+    print(f"  Max seq len    : {args.max_seq_length}")
+    print(f"  LR (backbone)  : {args.learning_rate}")
+    print(f"  LR (InfoGate)  : {args.ig_learning_rate}")
+    print(f"  InfoGate layers: {args.num_infogate_layers}")
+    print(f"  Bottleneck dim : {args.bottleneck_dim}")
+    print(f"  beta_ib        : {args.beta_ib}")
+    print(f"  alpha_ib       : {args.alpha_ib}")
+    print(f"  selector_temp  : {args.selector_target_temp}")
+    print(f"  selector_rib_w : {args.selector_rib_weight}")
+    print(f"  Select by      : {args.selection_metric}")
+    print(f"  Loss terms     : L_lib={toggle_state(args.use_l_lib)}"
+          f"  L_rib={toggle_state(args.use_l_rib)}")
+    print("=" * 60)
+
+    set_seed(args.seed)
+    train_dl, dev_dl, test_dl, n_opt = setup_data()
+    model, optimizer, scheduler = build_model(n_opt)
+    ema = EMA(model, decay=args.ema_decay)
+
+    total_p = sum(p.numel() for p in model.parameters())
+    train_p = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Parameters: {total_p:,} total, {train_p:,} trainable")
+    print(f"EMA: decay={args.ema_decay}, start_epoch={args.ema_start_epoch}")
+    print("=" * 60)
+
+    os.makedirs(args.checkpoint_dir, exist_ok=True)
+    ckpt_path = os.path.join(args.checkpoint_dir, f"infogate_{args.dataset}_best.pt")
+    select_start = args.stage1_epochs
+    select_higher_is_better = selection_higher_is_better(args.selection_metric)
+    best_selection_score = float('-inf') if select_higher_is_better else float('inf')
+    best_selection_tiebreak = None
+    best_results = None
+    best_test_acc = -1.0
+    best_test_results = None
+    last_test_results = None
+
+    for epoch in range(args.n_epochs):
+        stage = 1 if epoch < args.stage1_epochs else 2
+        tau_s = getattr(args, 'gumbel_tau_start', 1.0)
+        tau_e = getattr(args, 'gumbel_tau_end', 0.5)
+        tau = tau_s + (tau_e - tau_s) * epoch / max(args.n_epochs - 1, 1)
+        m = model.module if hasattr(model, 'module') else model
+        ig = m.dberta.infogate
+        ig.mselector.gumbel_tau = tau
+
+        eval_with_ema = epoch >= args.ema_start_epoch
+        if epoch == args.ema_start_epoch:
+            ema.reset(model)
+        tr_loss, tr_task, tr_ib, tr_detail = train_epoch(
+            model, train_dl, optimizer, scheduler, stage,
+            ema=ema if eval_with_ema else None)
+
+        print(f"\nEpoch {epoch + 1}/{args.n_epochs}  [stage {stage}]"
+              f"{'  (EMA eval)' if eval_with_ema else ''}")
+        print(f"  Loss  total={tr_loss:.4f}  task={tr_task:.4f}  ib={tr_ib:.4f}")
+        detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items()
+                                if k.startswith('L_'))
+        print(f"  Detail  {detail_str}")
+        diag_keys = ['w_acoustic', 'w_language', 'w_visual',
+                     'target_acoustic', 'target_language', 'target_visual',
+                     'primary_a', 'primary_l', 'primary_v',
+                     'err_acoustic', 'err_language', 'err_visual',
+                     'conf_t', 'conf_a', 'conf_v', 'fusion_conf',
+                     'routing_entropy', 'pred_mean', 'pred_std']
+        diag_vals = {k: tr_detail[k] for k in diag_keys if k in tr_detail}
+        if diag_vals:
+            w_str = (f"w=[a:{diag_vals.get('w_acoustic',0):.3f} "
+                     f"l:{diag_vals.get('w_language',0):.3f} "
+                     f"v:{diag_vals.get('w_visual',0):.3f}]")
+            tgt_str = (f"target=[a:{diag_vals.get('target_acoustic',0):.3f} "
+                       f"l:{diag_vals.get('target_language',0):.3f} "
+                       f"v:{diag_vals.get('target_visual',0):.3f}]")
+            p_str = (f"primary=[a:{diag_vals.get('primary_a',0):.2f} "
+                     f"l:{diag_vals.get('primary_l',0):.2f} "
+                     f"v:{diag_vals.get('primary_v',0):.2f}]")
+            err_str = (f"err=[a:{diag_vals.get('err_acoustic',0):.3f} "
+                       f"l:{diag_vals.get('err_language',0):.3f} "
+                       f"v:{diag_vals.get('err_visual',0):.3f}]")
+            c_str = (f"conf=[t:{diag_vals.get('conf_t',0):.3f} "
+                     f"a:{diag_vals.get('conf_a',0):.3f} "
+                     f"v:{diag_vals.get('conf_v',0):.3f} "
+                     f"fused:{diag_vals.get('fusion_conf',0):.3f}]")
+            rib_str = f"route_H={diag_vals.get('routing_entropy',0):.3f}"
+            pred_str = (f"pred_logit=[mean:{diag_vals.get('pred_mean',0):.3f} "
+                        f"std:{diag_vals.get('pred_std',0):.3f}]")
+            print(f"  Diag  {w_str}  {tgt_str}  {p_str}\n"
+                  f"  Qual  {err_str}  {c_str}  {rib_str}  gumbel_tau={tau:.3f}\n"
+                  f"  Stats {pred_str}")
+
+        if eval_with_ema:
+            ema.apply(model)
+
+        dev_preds, dev_labels = test_epoch(model, dev_dl, stage=stage, desc="Dev")
+        dev_m = score(dev_preds, dev_labels)
+        dev_kw = selection_kwargs(dev_m)
+        selection_score = compute_selection_score(args.selection_metric, **dev_kw)
+        selection_tiebreak = build_selection_tiebreak(**dev_kw)
+        print(f"  Dev   {fmt_metrics(dev_m)}")
+        print(f"  Select {args.selection_metric}={selection_score:.6f}")
+
+        preds, labels = test_epoch(model, test_dl, stage=stage)
+        test_m = score(preds, labels)
+        print(f"  Test  {fmt_metrics(test_m)}")
+
+        last_test_results = test_m
+
+        if epoch >= select_start:
+            if best_selection_tiebreak is None:
+                should_save = True
+            else:
+                better_score = (selection_score > best_selection_score
+                                if select_higher_is_better
+                                else selection_score < best_selection_score)
+                same_score = abs(selection_score - best_selection_score) <= 1e-12
+                should_save = better_score or (same_score and selection_tiebreak > best_selection_tiebreak)
+
+            if should_save:
+                best_selection_score = selection_score
+                best_selection_tiebreak = selection_tiebreak
+                best_results = test_m
+                save_dict = {
+                    'epoch': epoch + 1,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'dev_acc': dev_m["acc2"],
+                    'dev_f1': dev_m["f1"],
+                    'selection_metric': args.selection_metric,
+                    'selection_score': selection_score,
+                    'ablation': {
+                        'use_l_lib': args.use_l_lib,
+                        'use_l_rib': args.use_l_rib,
+                    },
+                    'test_results': best_results,
+                    'args': args,
+                }
+                if eval_with_ema:
+                    save_dict['ema_state_dict'] = ema.state_dict()
+                torch.save(save_dict, ckpt_path)
+                print(f"  >> Best model saved ({args.selection_metric}={selection_score:.6f}, "
+                      f"Acc={dev_m['acc2']*100:.2f}%, F1={dev_m['f1']*100:.2f}%) to {ckpt_path}")
+
+        if test_m["acc2"] > best_test_acc:
+            best_test_acc = test_m["acc2"]
+            best_test_results = {**test_m, "epoch": epoch + 1}
+
+        if eval_with_ema:
+            ema.restore(model)
+
+    print("\n" + "=" * 60)
+    print(f"Best Results ({args.selection_metric}, epoch >= {select_start + 1}):")
+    if best_results:
+        print(f"  Selection score: {best_selection_score:.6f}")
+        print(f"  Acc: {best_results['acc2']*100:.2f}%")
+        print(f"  F1:  {best_results['f1']*100:.2f}%")
+    print(f"\nLast Epoch ({args.n_epochs}) Results:")
+    if last_test_results:
+        print(f"  Acc: {last_test_results['acc2']*100:.2f}%")
+        print(f"  F1:  {last_test_results['f1']*100:.2f}%")
+    print("\nBest Test Acc (oracle, for reference only):")
+    if best_test_results:
+        print(f"  Epoch: {best_test_results['epoch']}")
+        print(f"  Acc:   {best_test_results['acc2']*100:.2f}%")
+        print(f"  F1:    {best_test_results['f1']*100:.2f}%")
+
+
+if __name__ == '__main__':
+    main()
