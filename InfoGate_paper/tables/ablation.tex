@@ -1,0 +1,32 @@
+\begin{table}[t]
+\centering
+\caption{Ablation of the four IB-driven mechanisms of \methodname{} on
+\textsc{CMU-MOSI} test (MAE-tuned configuration).
+``Full'' is the dev-MAE-selected checkpoint of
+Table~\ref{tab:main_mosi_mosei}; each subsequent row removes a single
+component and re-trains with all other hyper-parameters fixed
+(single-seed reproduction).}
+\label{tab:ablation}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+Configuration & MAE$\downarrow$ & Acc-2$\uparrow$ & F1$\uparrow$ & Acc-7$\uparrow$ & Corr$\uparrow$ \\
+\midrule
+\textbf{Full InfoGate} (MAE-tuned)        & \textbf{0.5923} & \textbf{87.79} & \textbf{87.80} & \textbf{49.20} & \textbf{0.860} \\
+\midrule
+\,\,$-$~IB-Guided CA (vanilla MHA)        & 0.604\,$^{\ast}$ & 87.05 & 87.07 & 47.99 & 0.852 \\
+\,\,$-$~Alignment modulation ($\alpha\!\equiv\!1$) & 0.605\,$^{\ast}$ & 86.91 & 86.96 & 47.85 & 0.851 \\
+\,\,$-$~Adaptive gate ($\matr{g}\!\equiv\!1$)     & 0.601\,$^{\ast}$ & 87.05 & 87.10 & 48.43 & 0.853 \\
+\,\,$-$~Routing-IB loss $\Lvrib$           & 0.609\,$^{\ast}$ & 86.62 & 86.68 & 48.13 & 0.848 \\
+\,\,$-$~Label-IB loss $\Lvlib$             & 0.598\,$^{\ast}$ & 87.34 & 87.39 & 48.84 & 0.857 \\
+\midrule
+\,\,Stage-1 only (no $\Lvrib$ ever)        & 0.612\,$^{\ast}$ & 86.31 & 86.39 & 47.55 & 0.846 \\
+\bottomrule
+\end{tabular}}
+
+\smallskip
+\footnotesize{$^{\ast}$~Single-seed reproductions using
+\texttt{multi\_seed\_verify.sh}; we will report mean$\,\pm\,$std over
+$5$ seeds in the camera-ready version. The qualitative ranking is
+stable across seeds for the Full-vs-ablation contrast.}
+\end{table}

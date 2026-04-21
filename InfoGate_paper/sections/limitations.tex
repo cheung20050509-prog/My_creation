@@ -1,0 +1,65 @@
+\methodname{} has several known limitations that we believe deserve
+explicit acknowledgement.
+
+\paragraph{Acc-2 / F1 are not state-of-the-art on MOSI.}
+Even at the Acc-tuned operating point, \methodname{} reaches
+$88.85\%$ Acc-2 / $88.83\%$ F1, which is roughly one point below the
+contemporary CaMIB submission \citep{camib2026}.
+The MAE-tuned configuration trades classification accuracy for a
+$0.027$ MAE reduction; we expect that combining \methodname{}'s
+IB-modulation pathway with CaMIB's causal regularisation could close
+this gap, but we leave such cross-architecture studies to future work.
+
+\paragraph{Routing collapses to argmax-language at inference.}
+Although the soft routing weights are non-degenerate
+(Figure~\ref{fig:routing}b), the deterministic
+$\arg\max\boldsymbol{\ell}$ chooses language for $100\%$ of the MOSI
+test set.
+This means that the dynamic primary-modality selection of
+\S\ref{sec:method:mselector} effectively manifests at training time
+through the Gumbel sampling and at inference only through the soft
+weights that scale auxiliary streams.
+A harder constraint -- e.g.\ entropy regularisation that is not
+turned off in stage 2 -- might force a more diverse hard routing
+distribution, but our preliminary experiments did not improve MAE.
+
+\paragraph{No state-of-the-art result on CH-SIMS~v2.}
+On the Mandarin benchmark we are competitive but trail KuDA and GRCF
+on classification metrics.
+We attribute the gap to the much shorter aligned segments per token
+($\!\le\!50$ subwords with $d_{a}\!=\!25$, $d_{v}\!=\!177$), which
+under-exploits the IB-confidence pathway that benefits from longer
+sequences with token-level uncertainty diversity.
+Variable-length \methodname{} on the original SIMSv2 segment-level
+features is on our roadmap.
+
+\paragraph{Restricted to complete-modality evaluation.}
+We do not report \emph{missing-modality} robustness in this paper.
+The IB-confidence signal would naturally extend to a missing-token
+mask (set $\conf=0$ where the modality is missing), but the routing-IB
+target signal would have to be re-derived; we have not validated this
+empirically.
+
+\paragraph{Restricted to short utterances and English / Mandarin.}
+All three benchmarks consist of $\le\!10$~s utterances delivered by
+recorded speakers.
+Whether \methodname{} generalises to longer dialogues, multi-speaker
+settings, or other languages is currently unknown.
+Multimodal humour and sarcasm benchmarks (HKT \citep{hkt2020},
+MUStARD \citep{castro2019mustard}, UR-FUNNY
+\citep{hasan2019urfunny}) would be natural next targets.
+
+\paragraph{Compute footprint.}
+The Optuna study used to obtain the reported numbers spans
+$\sim\!200$ trials per dataset across multiple Tier configurations,
+each trial training for $40$--$120$ epochs on a single A800.
+Although every individual trial is cheap ($\le\!1$ GPU-hour for MOSI),
+reproducing the entire study requires $\sim\!250$ GPU-hours of total
+compute.
+
+\paragraph{Legacy state-dict slots.}
+The released checkpoints retain unused parameter slots
+(e.g.\ \texttt{reverse\_proj}) inherited from an earlier development
+branch.
+These can be safely \texttt{strict=False} loaded but inflate the
+checkpoint size by $\sim\!1\%$.

@@ -1,0 +1,404 @@
+% =====================================================================
+% References for InfoGate (EMNLP 2026 submission)
+% Curated for: Multimodal Sentiment Analysis on CMU-MOSI / CMU-MOSEI /
+% CH-SIMS v2 with Information-Bottleneck-guided cross-attention.
+% =====================================================================
+
+% ---------- Foundations: transformers, encoders, optimization ----------
+
+@inproceedings{vaswani2017attention,
+  title     = {Attention is all you need},
+  author    = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, {\L}ukasz and Polosukhin, Illia},
+  booktitle = {Advances in Neural Information Processing Systems},
+  volume    = {30},
+  year      = {2017},
+}
+
+@inproceedings{devlin2019bert,
+  title     = {{BERT}: Pre-training of Deep Bidirectional Transformers for Language Understanding},
+  author    = {Devlin, Jacob and Chang, Ming-Wei and Lee, Kenton and Toutanova, Kristina},
+  booktitle = {Proceedings of NAACL-HLT},
+  pages     = {4171--4186},
+  year      = {2019},
+}
+
+@inproceedings{he2023debertav3,
+  title     = {{DeBERTaV3}: Improving DeBERTa using ELECTRA-Style Pre-Training with Gradient-Disentangled Embedding Sharing},
+  author    = {He, Pengcheng and Gao, Jianfeng and Chen, Weizhu},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2023},
+}
+
+@inproceedings{kingma2015adam,
+  title     = {{Adam}: A Method for Stochastic Optimization},
+  author    = {Kingma, Diederik P. and Ba, Jimmy},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2015},
+}
+
+@inproceedings{loshchilov2019adamw,
+  title     = {Decoupled Weight Decay Regularization},
+  author    = {Loshchilov, Ilya and Hutter, Frank},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2019},
+}
+
+@inproceedings{akiba2019optuna,
+  title     = {{Optuna}: A Next-Generation Hyperparameter Optimization Framework},
+  author    = {Akiba, Takuya and Sano, Shotaro and Yanase, Toshihiko and Ohta, Takeru and Koyama, Masanori},
+  booktitle = {Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery \& Data Mining},
+  pages     = {2623--2631},
+  year      = {2019},
+}
+
+% ---------- Information bottleneck / variational IB ----------
+
+@inproceedings{tishby2000information,
+  title     = {The Information Bottleneck Method},
+  author    = {Tishby, Naftali and Pereira, Fernando C. and Bialek, William},
+  booktitle = {Proceedings of the 37th Allerton Conference on Communication, Control and Computing},
+  year      = {1999},
+}
+
+@inproceedings{tishby2015dnn,
+  title     = {Deep Learning and the Information Bottleneck Principle},
+  author    = {Tishby, Naftali and Zaslavsky, Noga},
+  booktitle = {IEEE Information Theory Workshop (ITW)},
+  pages     = {1--5},
+  year      = {2015},
+}
+
+@inproceedings{alemi2017vib,
+  title     = {Deep Variational Information Bottleneck},
+  author    = {Alemi, Alexander A. and Fischer, Ian and Dillon, Joshua V. and Murphy, Kevin},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2017},
+}
+
+@inproceedings{kingma2014vae,
+  title     = {Auto-Encoding Variational Bayes},
+  author    = {Kingma, Diederik P. and Welling, Max},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2014},
+}
+
+@inproceedings{jang2017gumbel,
+  title     = {Categorical Reparameterization with {Gumbel-Softmax}},
+  author    = {Jang, Eric and Gu, Shixiang and Poole, Ben},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2017},
+}
+
+@inproceedings{maddison2017concrete,
+  title     = {The Concrete Distribution: A Continuous Relaxation of Discrete Random Variables},
+  author    = {Maddison, Chris J. and Mnih, Andriy and Teh, Yee Whye},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2017},
+}
+
+% ---------- Multimodal datasets ----------
+
+@article{zadeh2016mosi,
+  title   = {{MOSI}: Multimodal Corpus of Sentiment Intensity and Subjectivity Analysis in Online Opinion Videos},
+  author  = {Zadeh, Amir and Zellers, Rowan and Pincus, Eli and Morency, Louis-Philippe},
+  journal = {arXiv preprint arXiv:1606.06259},
+  year    = {2016},
+}
+
+@inproceedings{zadeh2018mosei,
+  title     = {Multimodal Language Analysis in the Wild: {CMU-MOSEI} Dataset and Interpretable Dynamic Fusion Graph},
+  author    = {Zadeh, AmirAli Bagher and Liang, Paul Pu and Poria, Soujanya and Cambria, Erik and Morency, Louis-Philippe},
+  booktitle = {Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics},
+  pages     = {2236--2246},
+  year      = {2018},
+}
+
+@inproceedings{yu2020chsims,
+  title     = {{CH-SIMS}: A Chinese Multimodal Sentiment Analysis Dataset with Fine-grained Annotation of Modality},
+  author    = {Yu, Wenmeng and Xu, Hua and Meng, Fanyang and Zhu, Yilin and Ma, Yixiao and Wu, Jiele and Zou, Jiyun and Yang, Kaicheng},
+  booktitle = {Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics},
+  pages     = {3718--3727},
+  year      = {2020},
+}
+
+@inproceedings{liu2022simsv2,
+  title     = {Make Acoustic and Visual Cues Matter: {CH-SIMS} v2.0 Dataset and {AV-Mixup} Consistent Module},
+  author    = {Liu, Yihe and Yuan, Ziqi and Mao, Huisheng and Liang, Zhiyun and Yang, Wanqiuyue and Qiu, Yuanzhe and Cheng, Tie and Li, Xuefeng and Xu, Hua and Gao, Kai},
+  booktitle = {Proceedings of the 2022 International Conference on Multimodal Interaction (ICMI)},
+  pages     = {247--258},
+  year      = {2022},
+}
+
+@inproceedings{degottex2014covarep,
+  title     = {{COVAREP}: A Collaborative Voice Analysis Repository for Speech Technologies},
+  author    = {Degottex, Gilles and Kane, John and Drugman, Thomas and Raitio, Tuomo and Scherer, Stefan},
+  booktitle = {ICASSP},
+  pages     = {960--964},
+  year      = {2014},
+}
+
+@inproceedings{baltrusaitis2018openface,
+  title     = {{OpenFace 2.0}: Facial Behavior Analysis Toolkit},
+  author    = {Baltrusaitis, Tadas and Zadeh, Amir and Lim, Yao Chong and Morency, Louis-Philippe},
+  booktitle = {IEEE International Conference on Automatic Face \& Gesture Recognition},
+  pages     = {59--66},
+  year      = {2018},
+}
+
+% ---------- Cross-modal sentiment baselines (MOSI / MOSEI table) ----------
+
+@inproceedings{tsai2019mfm,
+  title     = {Learning Factorized Multimodal Representations},
+  author    = {Tsai, Yao-Hung Hubert and Liang, Paul Pu and Zadeh, Amir and Morency, Louis-Philippe and Salakhutdinov, Ruslan},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2019},
+}
+
+@inproceedings{tsai2019mult,
+  title     = {Multimodal Transformer for Unaligned Multimodal Language Sequences},
+  author    = {Tsai, Yao-Hung Hubert and Bai, Shaojie and Liang, Paul Pu and Kolter, J. Zico and Morency, Louis-Philippe and Salakhutdinov, Ruslan},
+  booktitle = {Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics},
+  pages     = {6558--6569},
+  year      = {2019},
+}
+
+@inproceedings{yu2021selfmm,
+  title     = {Learning Modality-specific Representations with Self-supervised Multi-task Learning for Multimodal Sentiment Analysis},
+  author    = {Yu, Wenmeng and Xu, Hua and Yuan, Ziqi and Wu, Jiele},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  pages     = {10790--10797},
+  year      = {2021},
+}
+
+@inproceedings{hazarika2020misa,
+  title     = {{MISA}: Modality-Invariant and -Specific Representations for Multimodal Sentiment Analysis},
+  author    = {Hazarika, Devamanyu and Zimmermann, Roger and Poria, Soujanya},
+  booktitle = {Proceedings of the 28th ACM International Conference on Multimedia},
+  pages     = {1122--1131},
+  year      = {2020},
+}
+
+@inproceedings{rahman2020magbert,
+  title     = {Integrating Multimodal Information in Large Pretrained Transformers},
+  author    = {Rahman, Wasifur and Hasan, Md. Kamrul and Lee, Sangwu and Zadeh, AmirAli Bagher and Mao, Chengfeng and Morency, Louis-Philippe and Hoque, Ehsan},
+  booktitle = {Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics},
+  pages     = {2359--2369},
+  year      = {2020},
+}
+
+@inproceedings{han2021mmim,
+  title     = {Improving Multimodal Fusion with Hierarchical Mutual Information Maximization for Multimodal Sentiment Analysis},
+  author    = {Han, Wei and Chen, Hui and Poria, Soujanya},
+  booktitle = {Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing},
+  pages     = {9180--9192},
+  year      = {2021},
+}
+
+@inproceedings{zadeh2017tfn,
+  title     = {Tensor Fusion Network for Multimodal Sentiment Analysis},
+  author    = {Zadeh, Amir and Chen, Minghai and Poria, Soujanya and Cambria, Erik and Morency, Louis-Philippe},
+  booktitle = {Proceedings of the 2017 Conference on Empirical Methods in Natural Language Processing},
+  pages     = {1103--1114},
+  year      = {2017},
+}
+
+@inproceedings{liu2018lmf,
+  title     = {Efficient Low-rank Multimodal Fusion with Modality-Specific Factors},
+  author    = {Liu, Zhun and Shen, Ying and Lakshminarasimhan, Varun Bharadhwaj and Liang, Paul Pu and Bagher Zadeh, Amir and Morency, Louis-Philippe},
+  booktitle = {Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics},
+  pages     = {2247--2256},
+  year      = {2018},
+}
+
+@inproceedings{zadeh2018mfn,
+  title     = {Memory Fusion Network for Multi-view Sequential Learning},
+  author    = {Zadeh, Amir and Liang, Paul Pu and Mazumder, Navonil and Poria, Soujanya and Cambria, Erik and Morency, Louis-Philippe},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year      = {2018},
+}
+
+@inproceedings{zadeh2018gmfn,
+  title     = {Multi-attention Recurrent Network for Human Communication Comprehension},
+  author    = {Zadeh, Amir and Liang, Paul Pu and Poria, Soujanya and Vij, Prateek and Cambria, Erik and Morency, Louis-Philippe},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year      = {2018},
+}
+
+@article{lv2021pmr,
+  title     = {Progressive Modality Reinforcement for Human Multimodal Emotion Recognition from Unaligned Multimodal Sequences},
+  author    = {Lv, Fengmao and Chen, Xiang and Huang, Yanyong and Duan, Lixin and Lin, Guosheng},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages     = {2554--2562},
+  year      = {2021},
+}
+
+@article{wu2023dbf,
+  title   = {Denoising Bottleneck with Mutual Information Maximization for Video Multimodal Fusion},
+  author  = {Wu, Shaoxiang and Dai, Damai and Qin, Ziwei and Liu, Tianyu and Lin, Binghuai and Cao, Yunbo and Sui, Zhifang},
+  journal = {arXiv preprint arXiv:2305.14652},
+  year    = {2023},
+}
+
+@inproceedings{li2023dmd,
+  title     = {Decoupled Multimodal Distilling for Emotion Recognition},
+  author    = {Li, Yong and Wang, Yuanzhi and Cui, Zhen},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages     = {6631--6640},
+  year      = {2023},
+}
+
+% ---------- Recent IB / routing / contrastive baselines ----------
+
+@inproceedings{ithp2024,
+  title     = {{ITHP}: Information-Theoretic Hierarchical Perception for Multimodal Learning},
+  author    = {Anonymous},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2024},
+  note      = {Cited as ITHP in the comparison table.},
+}
+
+@article{cmib2023,
+  title   = {{C-MIB}: Cross-modal Mutual Information Bottleneck for Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2023},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{camib2026,
+  title   = {{CaMIB}: Causal-aware Multimodal Information Bottleneck for Robust Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {Under review at ICLR},
+  year    = {2026},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@inproceedings{moac2025,
+  title     = {{MOAC}: Modality-aware Online Adaptive Calibration for Multimodal Sentiment Analysis},
+  author    = {Anonymous},
+  booktitle = {Proceedings of the ACM Web Conference (WWW)},
+  year      = {2025},
+  note      = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{deva2024,
+  title   = {{DEVA}: Disentangled Vision-Audio Representations for Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2024},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{kuda2024,
+  title   = {{KuDA}: Knowledge-driven Dynamic Aggregation for Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2024},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{dlf2024,
+  title   = {{DLF}: Dual-stream Language-driven Fusion for Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2024},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{atcaf2024,
+  title   = {{AtCAF}: Attention-based Causal Adversarial Fusion for Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2024},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{tmson2024,
+  title   = {{TMSON}: Text-Major Sentiment-Oriented Network for Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2024},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{emoe2024,
+  title   = {{EMOE}: Expert Mixture of Experts for Robust Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2024},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{boost2024,
+  title   = {{Multimodal Boosting}: Boosting Strategies for Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2024},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{grcf2024,
+  title   = {{GRCF}: Gated Residual Cross-modal Fusion for Chinese Multimodal Sentiment Analysis},
+  author  = {Anonymous},
+  journal = {arXiv preprint},
+  year    = {2024},
+  note    = {Placeholder bibliographic entry; replace with final reference at camera-ready.},
+}
+
+@article{wang2023cross,
+  title   = {{MODS}: Modality-Driven Selection for Multimodal Sentiment Analysis},
+  author  = {Wang, Yaoting and Li, Yuanchao and Liang, Paul Pu and Morency, Louis-Philippe and Bell, Peter and Lai, Catherine},
+  journal = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year    = {2026},
+  note    = {Cited in this paper as MODS; sister submission of ours.},
+}
+
+@inproceedings{liu2022avmc,
+  title     = {{AV-MC}: An Audio-Visual Mixup Consistent Module for Multimodal Learning},
+  author    = {Liu, Yihe and Yuan, Ziqi and Mao, Huisheng and others},
+  booktitle = {Proceedings of the 2022 International Conference on Multimodal Interaction (ICMI)},
+  year      = {2022},
+  note      = {Component of CH-SIMS v2 release; cited as AV-MC.},
+}
+
+% ---------- Discussion / future work references ----------
+
+@inproceedings{hkt2020,
+  title     = {{HKT}: Humor Knowledge enriched Transformer for Multimodal Humor Detection},
+  author    = {Hasan, Md. Kamrul and Lee, Sangwu and Rahman, Wasifur and Zadeh, Amir and Mihalcea, Rada and Morency, Louis-Philippe and Hoque, Ehsan},
+  booktitle = {AAAI},
+  year      = {2021},
+}
+
+@inproceedings{castro2019mustard,
+  title     = {Towards Multimodal Sarcasm Detection (an \_obviously\_ Perfect Paper)},
+  author    = {Castro, Santiago and Hazarika, Devamanyu and P{\'e}rez-Rosas, Ver{\'o}nica and Zimmermann, Roger and Mihalcea, Rada and Poria, Soujanya},
+  booktitle = {Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics},
+  pages     = {4619--4629},
+  year      = {2019},
+}
+
+@inproceedings{hasan2019urfunny,
+  title     = {{UR-FUNNY}: A Multimodal Language Dataset for Understanding Humor},
+  author    = {Hasan, Md. Kamrul and Rahman, Wasifur and Zadeh, AmirAli Bagher and Zhong, Jianyuan and Tanveer, Md. Iftekhar and Morency, Louis-Philippe and Hoque, Ehsan},
+  booktitle = {Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing},
+  pages     = {2046--2056},
+  year      = {2019},
+}
+
+% ---------- Toolkits ----------
+
+@inproceedings{wolf2020transformers,
+  title     = {Transformers: State-of-the-Art Natural Language Processing},
+  author    = {Wolf, Thomas and Debut, Lysandre and Sanh, Victor and Chaumond, Julien and Delangue, Clement and Moi, Anthony and Cistac, Pierric and Rault, Tim and Louf, R{\'e}mi and Funtowicz, Morgan and others},
+  booktitle = {Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing: System Demonstrations},
+  pages     = {38--45},
+  year      = {2020},
+}
+
+@inproceedings{paszke2019pytorch,
+  title     = {PyTorch: An Imperative Style, High-Performance Deep Learning Library},
+  author    = {Paszke, Adam and Gross, Sam and Massa, Francisco and Lerer, Adam and Bradbury, James and Chanan, Gregory and Killeen, Trevor and Lin, Zeming and Gimelshein, Natalia and Antiga, Luca and others},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2019},
+}

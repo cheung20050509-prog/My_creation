@@ -1,0 +1,111 @@
+\begin{figure*}[t]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+    node distance=4mm and 7mm,
+    every node/.style={font=\small},
+    box/.style={draw, rounded corners=2pt, align=center, minimum height=8mm, inner sep=3pt, fill=white},
+    smallbox/.style={draw, rounded corners=2pt, align=center, minimum height=6mm, inner sep=2pt, font=\footnotesize, fill=white},
+    arrow/.style={-Stealth, thick},
+    dashedarrow/.style={-Stealth, thick, dashed},
+    confarrow/.style={-Stealth, thick, dotted, draw=black!60},
+    grouplabel/.style={font=\bfseries\footnotesize, align=center}
+  ]
+
+  % --- Inputs (left) ---
+  \node[box] (xt) {Text $X^{t}$};
+  \node[box, below=of xt] (xa) {Acoustic $X^{a}$};
+  \node[box, below=of xa] (xv) {Visual $X^{v}$};
+
+  % --- DeBERTa for text ---
+  \node[smallbox, right=of xt] (dberta) {DeBERTa-v3};
+
+  % --- Projections ---
+  \node[smallbox, right=of dberta] (pt) {Proj$^{t}$};
+  \node[smallbox, right=of xa] (pa) {Proj$^{a}$};
+  \node[smallbox, right=of xv] (pv) {Proj$^{v}$};
+
+  % --- IB encoders ---
+  \node[box, right=of pt] (ibt) {IBE$^{t}$};
+  \node[box, right=of pa] (iba) {IBE$^{a}$};
+  \node[box, right=of pv] (ibv) {IBE$^{v}$};
+
+  % --- Bottleneck + confidence labels ---
+  \node[smallbox, right=of ibt, fill=blue!8] (bt) {$\bn^{t},\,\conf^{t}$};
+  \node[smallbox, right=of iba, fill=blue!8] (ba) {$\bn^{a},\,\conf^{a}$};
+  \node[smallbox, right=of ibv, fill=blue!8] (bv) {$\bn^{v},\,\conf^{v}$};
+
+  % --- MSelector ---
+  \node[box, right=12mm of ba, fill=orange!10] (msel) {MSelector\\(Gumbel-softmax)};
+
+  % --- Routing block ---
+  \node[box, right=of msel, minimum width=22mm] (route) {Soft route\\$\bn^{p},\bn^{a_{1}},\bn^{a_{2}}$};
+
+  % --- InfoGate stack ---
+  \node[box, right=of route, minimum width=30mm, minimum height=18mm, fill=green!8] (ig) {InfoGate $\times N$\\IB-guided CA\\+ alignment\\+ adaptive gate};
+
+  % --- Head ---
+  \node[box, right=of ig] (head) {Pool + LN\\+ Dropout\\+ Linear};
+  \node[box, right=of head] (yhat) {$\hat{y}$};
+
+  % --- Arrows: inputs to projections ---
+  \draw[arrow] (xt) -- (dberta);
+  \draw[arrow] (dberta) -- (pt);
+  \draw[arrow] (xa) -- (pa);
+  \draw[arrow] (xv) -- (pv);
+
+  % --- Projections to IB encoders ---
+  \draw[arrow] (pt) -- (ibt);
+  \draw[arrow] (pa) -- (iba);
+  \draw[arrow] (pv) -- (ibv);
+
+  % --- IB to bottleneck/confidence ---
+  \draw[arrow] (ibt) -- (bt);
+  \draw[arrow] (iba) -- (ba);
+  \draw[arrow] (ibv) -- (bv);
+
+  % --- Bottlenecks into MSelector ---
+  \draw[arrow] (bt.east) -- ++(4mm,0) |- (msel.west);
+  \draw[arrow] (ba.east) -- (msel.west);
+  \draw[arrow] (bv.east) -- ++(4mm,0) |- (msel.west);
+
+  % --- MSelector to route ---
+  \draw[arrow] (msel) -- (route);
+
+  % --- Bottlenecks/confidence into route block (data path) ---
+  \draw[arrow, dashed] (bt.east) -- ++(2mm,0) -| ([xshift=-3mm]route.north);
+  \draw[arrow, dashed] (ba.east) -- ++(2mm,0) -- (route.west);
+  \draw[arrow, dashed] (bv.east) -- ++(2mm,0) -| ([xshift=3mm]route.south);
+
+  % --- Routing to InfoGate stack ---
+  \draw[arrow] (route) -- (ig);
+
+  % --- InfoGate to head ---
+  \draw[arrow] (ig) -- (head);
+  \draw[arrow] (head) -- (yhat);
+
+  % --- Loss labels (below) ---
+  \node[grouplabel, below=12mm of bv.south west, anchor=west, text=blue!50!black] (libtib) {$\Lvtib$, $\Lvlib$ (per-modality IB)};
+  \node[grouplabel, right=15mm of libtib, text=orange!60!black] (lrib) {$\Lvrib$ (stage 2)};
+  \node[grouplabel, right=8mm of lrib, text=green!50!black] (lk) {Token-/sample-/global-level\\IB modulation};
+  \node[grouplabel, right=10mm of lk, text=red!60!black] (ltask) {$\Lvtask=|\hat y-y|+w_{\mathrm{mse}}(\hat y-y)^{2}$};
+
+  % --- Connection from each IB encoder block (training-only loss) ---
+  \draw[confarrow, blue!50!black] (ibt.south) to[bend right=10] (libtib.north);
+  \draw[confarrow, blue!50!black] (iba.south) to[bend right=10] (libtib.north);
+  \draw[confarrow, blue!50!black] (ibv.south) to[bend right=20] (libtib.north);
+  \draw[confarrow, orange!60!black] (msel.south) to[bend left=10] (lrib.north);
+  \draw[confarrow, green!50!black] (ig.south) -- (lk.north);
+  \draw[confarrow, red!60!black] (yhat.south) to[bend left=10] (ltask.north east);
+
+\end{tikzpicture}%
+}
+\caption{Overview of \methodname{}. Each modality is projected, encoded by
+a variational IB encoder that exposes a per-token confidence
+$\conf^{m}=\sigmoid(-\log\sigma^{2,m})$, and routed by a Gumbel-softmax
+modality selector. The InfoGate stack (\S\ref{sec:method:ibca}--\ref{sec:method:gate})
+uses the same confidence signal at three different scales (token, sample,
+global) to modulate cross-attention, alignment-aware injection and
+adaptive gating before a primary-only regression head.}
+\label{fig:overview}
+\end{figure*}

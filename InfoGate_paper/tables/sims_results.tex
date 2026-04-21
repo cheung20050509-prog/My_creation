@@ -1,0 +1,33 @@
+\begin{table}[t]
+\centering
+\caption{Comparison with recent SOTA on \textsc{CH-SIMS~v2}.
+Best per column is in \textbf{bold}, second-best is
+\underline{underlined}.}
+\label{tab:main_simsv2}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|cccccc}
+\toprule
+Method & Acc-5$\uparrow$ & Acc-3$\uparrow$ & Acc-2$\uparrow$ & F1$\uparrow$ & MAE$\downarrow$ & Corr$\uparrow$ \\
+\midrule
+EF-LSTM                              & 53.7 & \underline{73.5} & 80.1 & 80.0 & 0.309 & 0.700 \\
+LF-DNN                               & 51.8 & 71.2 & 77.8 & 77.9 & 0.322 & 0.668 \\
+TFN~\citep{zadeh2017tfn}             & 53.3 & 70.9 & 78.1 & 78.1 & 0.322 & 0.662 \\
+LMF~\citep{liu2018lmf}               & 51.6 & 70.0 & 77.8 & 77.8 & 0.327 & 0.651 \\
+MFN~\citep{zadeh2018mfn}             & \underline{55.4} & 72.7 & 79.4 & 79.4 & \underline{0.301} & 0.712 \\
+Graph-MFN~\citep{zadeh2018gmfn}      & 48.9 & 68.6 & 76.6 & 76.6 & 0.334 & 0.644 \\
+MISA~\citep{hazarika2020misa}        & 47.5 & 68.9 & 78.2 & 78.3 & 0.342 & 0.671 \\
+MAG-BERT~\citep{rahman2020magbert}   & 49.2 & 70.6 & 77.1 & 77.1 & 0.346 & 0.641 \\
+Self-MM~\citep{yu2021selfmm}         & 53.5 & 72.7 & 78.7 & 78.6 & 0.315 & 0.691 \\
+MMIM~\citep{han2021mmim}             & 50.5 & 70.4 & 77.8 & 77.8 & 0.339 & 0.641 \\
+AV-MC~\citep{liu2022avmc}            & 52.1 & 73.2 & 80.6 & 80.7 & 0.301 & 0.721 \\
+KuDA$^{\dagger}$~\citep{kuda2024}    & 53.1 & \textbf{74.3} & 80.2 & 80.1 & \underline{0.289}\,$^{\ddagger}$ & \textbf{0.741} \\
+GRCF~\citep{grcf2024}                & 54.4 & \textbf{74.3} & \textbf{81.7} & \textbf{81.6} & 0.305 & 0.691 \\
+\midrule
+\textbf{\methodname{} (Ours)}        & 50.7 & 71.2 & 78.0 & 78.0 & 0.314 & 0.687 \\
+\bottomrule
+\end{tabular}}
+
+\smallskip
+\footnotesize{$^{\ddagger}$~KuDA reports a single best run; we report
+the dev-MAE-selected checkpoint of \methodname{}.}
+\end{table}

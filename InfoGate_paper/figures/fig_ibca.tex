@@ -1,0 +1,65 @@
+\begin{figure}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tikzpicture}[
+    node distance=3mm and 6mm,
+    every node/.style={font=\footnotesize},
+    box/.style={draw, rounded corners=2pt, align=center, minimum height=6mm, inner sep=2pt, fill=white},
+    op/.style={draw, circle, inner sep=0pt, minimum size=4mm, fill=white},
+    arrow/.style={-Stealth},
+    confarrow/.style={-Stealth, dashed, draw=blue!60!black, thick}
+  ]
+  % primary
+  \node[box] (bp) {primary\\$\bn^{p}$};
+  % auxiliary
+  \node[box, below=8mm of bp] (ba) {auxiliary\\$\bn^{a}$};
+  % confidence
+  \node[box, below=3mm of ba, fill=blue!8] (ca) {$\conf^{a}=\sigmoid(-\log\sigma^{2,a})$};
+
+  % Q K V
+  \node[box, right=of bp] (Q) {$Q=W_{Q}\bn^{p}$};
+  \node[box, right=of ba] (K) {$K=W_{K}\bn^{a}$};
+  \node[box, below=of K] (V) {$V=W_{V}\bn^{a}$};
+
+  % score
+  \node[box, right=12mm of Q, minimum width=24mm] (S) {$\matr{S} = \tfrac{QK^{\top}}{\sqrt{d_{h}}}\;{+}\;\gamma\log(\bar c^{a}+\varepsilon)$};
+
+  % gate value
+  \node[box, right=12mm of V, minimum width=24mm] (Vg) {$V_{\!\text{eff}} = V\odot\bar c^{a}$};
+
+  % softmax + matmul
+  \node[box, right=of S, fill=green!10] (sm) {$\softmax$};
+  \node[box, right=of Vg, fill=green!10] (mm) {$\cdot$};
+
+  % output
+  \node[box, right=8mm of sm] (out) {output\\$W_{O}\,\mathrm{Attn}$};
+
+  % --- arrows ---
+  \draw[arrow] (bp) -- (Q);
+  \draw[arrow] (ba) -- (K);
+  \draw[arrow] (ba.east) -| ([xshift=-3mm]V.west) |- (V);
+
+  \draw[arrow] (Q) -- (S);
+  \draw[arrow] (K.east) -- ++(3mm,0) |- (S.west);
+
+  \draw[arrow] (V) -- (Vg);
+
+  % conf -> score bias and conf -> value gate
+  \draw[confarrow] (ca.east) -| ([xshift=-3mm]S.south) -- (S.south);
+  \draw[confarrow] (ca.east) -- ++(8mm,0) |- (Vg.south);
+
+  \draw[arrow] (S) -- (sm);
+  \draw[arrow] (Vg) -- (mm);
+  \draw[arrow] (sm.east) -- ++(2mm,0) |- (mm.north);
+  \draw[arrow] (mm.east) -- (out.west);
+
+\end{tikzpicture}%
+}
+\caption{IB-Guided Cross-Attention for one head. Per-token confidence
+$\conf^{a}$ from the IB encoder of the auxiliary modality is used in two
+places: (i)~as a log-bias on attention scores (suppressing uncertain
+keys) and (ii)~as a multiplicative gate on values
+(suppressing uncertain contributions). Both effects are
+back-propagatable through $\log\sigma^{2,a}$.}
+\label{fig:ibca}
+\end{figure}

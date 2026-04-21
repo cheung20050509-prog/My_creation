@@ -1,0 +1,224 @@
+\subsection{Overview}
+\label{sec:method:overview}
+
+Let an utterance be represented by three temporally aligned token sequences
+$X^{t}\in\mathbb{R}^{T\times d_{t}}$ (text, last hidden states of
+DeBERTa-v3-base \citep{he2023debertav3}),
+$X^{a}\in\mathbb{R}^{T\times d_{a}}$ (acoustic, COVAREP
+\citep{degottex2014covarep}) and
+$X^{v}\in\mathbb{R}^{T\times d_{v}}$ (visual, OpenFace 2.0
+\citep{baltrusaitis2018openface}).
+The goal is to predict a continuous sentiment score $y\in\mathbb{R}$.
+
+\methodname{} is built around a single design principle: the
+\emph{IB-derived per-token confidence}
+\(\conf=\sigmoid(-\log\sigma^{2})\in[0,1]^{T\times d_{B}}\) is a universal
+control signal that can modulate fusion at three different scales
+(Figure~\ref{fig:overview}):
+\textbf{(i) token level} -- biasing cross-attention scores and gating values
+(\S\ref{sec:method:ibca});
+\textbf{(ii) sample level} -- modulating the magnitude of cross-modal injection
+by the cosine similarity of the bottleneck representations
+(\S\ref{sec:method:align});
+\textbf{(iii) global level} -- supervising a Gumbel--softmax modality selector
+through a stage-2 routing-IB loss (\S\ref{sec:method:mselector}).
+
+\input{figures/fig_overview}
+
+\subsection{Per-Modality Projection and IB Encoder}
+\label{sec:method:ib}
+
+Each modality is first projected into a shared $d_{u}$-dimensional space
+with $\mathrm{Proj}^{m}(X^{m})$ realised as a linear layer plus ReLU
+(text), or LayerNorm-Linear-ReLU (acoustic / visual; the LayerNorm
+stabilises the very different feature statistics of the raw COVAREP /
+OpenFace streams).
+Each projected sequence $F^{m}\in\mathbb{R}^{T\times d_{u}}$ is then fed to
+a variational IB encoder $\mathrm{IBE}^{m}$ that returns mean
+$\mu^{m}$ and log-variance $\log\sigma^{2,m}$, from which a stochastic
+bottleneck representation is sampled with the standard reparameterization
+trick \citep{kingma2014vae,alemi2017vib}:
+\begin{align}
+  (\mu^{m},\log\sigma^{2,m}) &= \mathrm{IBE}^{m}(F^{m}), \\
+  \bn^{m} &= \mu^{m} + \boldsymbol{\epsilon}\odot\exp(\tfrac{1}{2}\log\sigma^{2,m}),
+\end{align}
+with $\boldsymbol{\epsilon}\!\sim\!\mathcal{N}(0,\matr{I})$ during training and
+$\bn^{m}=\mu^{m}$ at evaluation.
+The IB principle \citep{tishby2000information,tishby2015dnn,alemi2017vib}
+encourages the bottleneck to retain only task-relevant information,
+making $\log\sigma^{2,m}$ a natural proxy for per-token uncertainty.
+We therefore define a per-token, per-dimension \emph{confidence map}
+\begin{equation}
+  \conf^{m} \;=\; \sigmoid\!\big(-\log\sigma^{2,m}\big)\;\in\;[0,1]^{T\times d_{B}},
+  \label{eq:conf}
+\end{equation}
+which is reused at every later modulation stage.
+
+To make the bottleneck informative we attach an intra-modal decoder
+$\mathrm{Dec}^{m}$ for each modality and minimise the
+token-level IB objective
+\begin{equation}
+  \Lvtib \;=\; \sum_{m\in\{t,a,v\}} \KL\big(\mu^{m},\sigma^{2,m}\big) \;+\; \beta_{\mathrm{ib}}\,\mathrm{MSE}\!\big(\mathrm{Dec}^{m}(\bn^{m}),F^{m}\big),
+  \label{eq:tib}
+\end{equation}
+where $\KL(\mu,\sigma^{2}) = -\tfrac{1}{2}\sum_{i}\big(1+\log\sigma_{i}^{2}-\mu_{i}^{2}-\sigma_{i}^{2}\big)$
+is the closed-form KL against $\mathcal{N}(0,\matr{I})$, masked over valid
+tokens.
+A label-level IB term anchors the bottleneck to the sentiment label
+through a per-modality linear head $\mathrm{LP}^{m}$:
+\begin{equation}
+  \Lvlib \;=\; \tfrac{1}{3}\sum_{m}\Big[\KL(\mu^{m}_{\bar{t}},\sigma^{2,m}_{\bar{t}}) + \beta_{\mathrm{ib}}\,|\mathrm{LP}^{m}(\bn^{m}_{\bar{t}})-y|\Big],
+  \label{eq:lib}
+\end{equation}
+where $\bar{t}$ denotes mean-pooling over valid tokens.
+
+\subsection{IB-Guided Cross-Attention}
+\label{sec:method:ibca}
+
+Cross-attention from auxiliary modality $a$ to primary modality $p$ is
+the standard scaled dot-product mechanism with two confidence-driven
+modifications.
+For each head, queries are projected from $\bn^{p}$ and keys/values from
+$\bn^{a}$ as $Q,K,V$.
+Let $\bar{c}^{a}\in\mathbb{R}^{T}$ be the mean of $\conf^{a}$ over the
+bottleneck dimension.
+We modify the attention as
+\begin{align}
+  \matr{S} &= \tfrac{1}{\sqrt{d_{h}}}QK^{\top} + \gamma\,\log(\bar{c}^{a}+\varepsilon),
+  \label{eq:scorebias}\\
+  \matr{V}_{\!\text{eff}} &= V\,\odot\,\bar{c}^{a},
+  \label{eq:valuegate}\\
+  \mathrm{Attn}(Q,K,V,\conf^{a}) &= \softmax(\matr{S}+\matr{M})\matr{V}_{\!\text{eff}},
+\end{align}
+where $\gamma$ is a learnable scalar (initialised to $1$),
+$\varepsilon\!=\!10^{-6}$ and $\matr{M}$ is the standard padding mask.
+The score bias~\eqref{eq:scorebias} discourages attention from being
+placed on uncertain key positions, and the value gate~\eqref{eq:valuegate}
+shrinks the contribution of those positions even when the softmax
+nevertheless attends to them.
+Figure~\ref{fig:ibca} visualises the data path.
+This design is fully back-propagatable through $\log\sigma^{2,a}$, so the
+IB encoder learns to suppress its own outputs whenever they are not
+useful for the downstream prediction.
+
+\input{figures/fig_ibca}
+
+\subsection{Alignment-Modulated Injection}
+\label{sec:method:align}
+
+Auxiliary tokens may be uninformative not only in absolute terms
+(captured by $\conf^{a}$) but also \emph{relative} to the primary
+modality -- e.g.\ a smiling face during a sarcastic verbal utterance.
+We model this with a sample-level alignment scalar
+\begin{equation}
+  \alpha^{p,a}_{i} \;=\; \max\!\Big(0.3,\;\tfrac{1}{2}\big(\cos(\bar{\bn}^{p}_{i},\bar{\bn}^{a}_{i})+1\big)\Big)\in[0.3,1],
+\end{equation}
+where $\bar{\bn}^{m}_{i}$ is the masked-mean of $\bn^{m}$ for sample
+$i$.
+The lower bound at $0.3$ prevents the auxiliary path from being closed
+entirely, which we found to destabilise training when the bottleneck
+representations have not yet converged.
+$\alpha^{p,a}_{i}$ multiplies the gated cross-attention output before it
+is added to the primary stream (\S\ref{sec:method:gate}), giving a
+sample-adaptive injection weight that contracts to $0.3$ when the two
+modalities disagree.
+
+\subsection{Adaptive Information Gate}
+\label{sec:method:gate}
+
+The vanilla way to mix a cross-attention output with the primary stream
+is a residual addition.
+We instead learn a per-sample, per-dimension gate
+\begin{equation}
+  \matr{g}^{a} = \sigmoid\!\big(\matr{W}_{2}\,\mathrm{ReLU}(\matr{W}_{1}[\bn^{p}\,\Vert\,\mathrm{CA}^{a}])\big),
+  \label{eq:adagate}
+\end{equation}
+where $\mathrm{CA}^{a}$ is the IB-guided cross-attention output for
+auxiliary $a$ and $[\cdot\Vert\cdot]$ denotes concatenation along the
+feature axis.
+The fused primary representation in one InfoGate layer is then
+\begin{equation}
+  \bn^{p} \leftarrow \bn^{p}+\mathrm{SA}^{p}+\sum_{a\in\{a_{1},a_{2}\}}\!\!\alpha^{p,a}\,\big(\matr{g}^{a}\odot\mathrm{CA}^{a}\big),
+  \label{eq:layer_update}
+\end{equation}
+followed by LayerNorm and a position-wise feed-forward block.
+Stacking $N$ such layers yields the InfoGate fusion stack; in all but
+the last layer we additionally back-propagate primary information into
+the two auxiliary streams to maintain residual alignment.
+
+\subsection{Modality Selector and Routing-IB Loss}
+\label{sec:method:mselector}
+
+For each sample we want to choose which of the three modalities should
+play the role of the primary stream.
+Modality Selector (MSelector) computes a single score per modality with
+adaptive attention pooling
+\begin{equation}
+  h^{m} \;=\; \sum_{t=1}^{T}\softmax_{t}\!\big(\matr{w}^{m\top}\bn^{m}/\sqrt{d_{B}}\big)\,\bn^{m}_{t},
+\end{equation}
+followed by a 2-layer MLP that produces logits
+$\boldsymbol{\ell}=\mathrm{MLP}([h^{a};h^{t};h^{v}])\in\mathbb{R}^{3}$.
+At training time we draw a hard one-hot vector with a Gumbel--softmax
+\citep{jang2017gumbel,maddison2017concrete}
+$\matr{o}=\mathrm{GumbelSoftmax}(\boldsymbol{\ell},\tau)$, kept
+differentiable through the straight-through estimator, while the soft
+weights $\matr{w}=\softmax(\boldsymbol{\ell}/\tau)$ scale the auxiliary
+streams; $\tau$ is annealed linearly from $\tau_{\text{start}}$ to
+$\tau_{\text{end}}$ over training.
+At inference we use $\arg\max(\boldsymbol{\ell})$.
+
+To prevent MSelector from collapsing onto a fixed text-centric prior
+that simply mimics MAG-BERT \citep{rahman2020magbert} or
+Self-MM \citep{yu2021selfmm}, we add a stage-2 routing-IB loss that
+supervises the soft weights with a per-sample modality-quality target.
+Specifically, we use the per-modality label-prediction errors as a
+teacher signal
+\begin{equation}
+  \matr{q}_{i} = \softmax\!\big(-|\mathrm{LP}^{m}(\bn^{m}_{\bar{t}})-y_{i}|/\tau_{q}\big),
+\end{equation}
+and minimise the per-sample KL divergence on the subset of samples for
+which the modalities actually differ in quality
+($\mathrm{range}(\text{errors}) > 0.5$):
+\begin{equation}
+  \Lvrib \;=\; \mathbb{E}_{i\in\mathcal{D}}\,\KL(\matr{w}_{i}\,\Vert\,\matr{q}_{i}) \;+\; \lambda_{\!b}\,\big(\log 3 - H(\bar{\matr{w}})\big),
+  \label{eq:rib}
+\end{equation}
+where $\bar{\matr{w}}$ is the batch-mean weight vector and the second
+term is a mild entropy regulariser ($\lambda_{\!b}\!=\!0.0$ in our final
+configurations).
+$\Lvrib$ is only computed in stage 2 (after $\mathrm{stage1\_epochs}$
+warm-up) so that the per-modality label predictors $\mathrm{LP}^{m}$ are
+already meaningful before they are used as teachers.
+
+\subsection{Training Objective}
+\label{sec:method:loss}
+
+Putting it all together, \methodname{} optimises
+\begin{equation}
+  \mathcal{L} \;=\; \Lvtask \;+\; \alpha_{\mathrm{ib}}\,(\Lvtib+\Lvlib) \;+\; \lambda_{\!\mathrm{rib}}\cdot \mathbb{1}_{[\text{stage}=2]}\,\Lvrib,
+  \label{eq:total}
+\end{equation}
+with the regression task loss
+\begin{equation}
+  \Lvtask \;=\; |\hat y-y| + w_{\!\mathrm{mse}}\,(\hat y-y)^{2},
+  \label{eq:task}
+\end{equation}
+where $\hat y$ is the scalar output of a LayerNorm--Dropout--Linear head
+applied to the adaptively pooled primary bottleneck.
+The weight $w_{\!\mathrm{mse}}$ explicitly trades MAE for Acc-2 / F1
+classification quality (\S\ref{sec:exp:results}); we report two
+configurations on \textsc{CMU-MOSI} that sit at different points of this
+trade-off.
+A two-stage schedule defines $\text{stage}=1$ if the current epoch is
+below $\mathrm{stage1\_epochs}$ and $\text{stage}=2$ thereafter; only
+stage 2 activates the routing supervision in
+Equation~\eqref{eq:rib}.
+
+We use AdamW \citep{loshchilov2019adamw,kingma2015adam} with two
+parameter groups (a small learning rate for DeBERTa, a 10--40$\times$
+larger one for the InfoGate parameters), linear warm-up over a
+$\mathrm{warmup\_proportion}$ fraction of total steps, and an
+exponential moving average of the model weights for evaluation after
+$\mathrm{ema\_start\_epoch}$.
+Hyper-parameter search uses Optuna \citep{akiba2019optuna}
+(\S\ref{sec:exp:setup}).

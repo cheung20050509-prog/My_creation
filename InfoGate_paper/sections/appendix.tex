@@ -1,0 +1,94 @@
+\section{Hyper-parameters of the Reported Configurations}
+\label{appx:hparams}
+
+Table~\ref{tab:hparams} lists the hyper-parameters of all three
+checkpoints whose test metrics are reported in
+Tables~\ref{tab:main_mosi_mosei}--\ref{tab:main_simsv2}.
+All other architecture knobs (e.g.\ $d_{u}\!=\!256$, $\mathrm{ib\_hidden}\!=\!256$,
+$\mathrm{num\_heads}\!=\!4$, $\mathrm{ema\_start\_epoch}\!=\!5$) are
+identical across configurations.
+
+\begin{table}[h]
+\centering
+\caption{Best hyper-parameters per dataset (dev-MAE-selected).
+$w_{\text{mse}}$ is the trade-off knob discussed in
+\S\ref{sec:analysis:tradeoff}.}
+\label{tab:hparams}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+hyper-parameter & MOSI MAE & MOSI Acc & MOSEI & SIMSv2 \\
+                & (trial 125) & (trial 69) & (trial 37) & (v3 t.~104) \\
+\midrule
+$w_{\text{mse}}$           & 1.249  & 2.867  & 1.658  & 1.562  \\
+$\beta_{\text{ib}}$        & 34.36  & 40.98  & 5.45   & 30.57  \\
+$\alpha_{\text{ib}}$       & 0.0086 & 0.0047 & 0.0021 & 0.0038 \\
+DeBERTa~/~BERT lr          & 1.63e-5 & 1.79e-5 & 4.11e-5 & 3.39e-5 \\
+InfoGate lr                & 6.33e-4 & 2.54e-4 & 1.82e-3 & 1.59e-4 \\
+$d_{B}$                    & 96     & 96     & 96     & 128    \\
+$N$ (\#layers)             & 5      & 5      & 4      & 3      \\
+batch~$\times$~accum.\     & 32$\times$1 & 32$\times$1 & 4$\times$8 & 64$\times$1 \\
+total epochs               & 107    & 111    & 40     & 67     \\
+$\mathrm{stage1\_epochs}$  & 14     & 19     & 6      & 12     \\
+warm-up proportion         & 0.136  & 0.119  & 0.197  & 0.135  \\
+weight decay               & 6.4e-4 & 1.3e-3 & 9.1e-2 & 8.6e-3 \\
+EMA decay                  & 0.995  & 0.995  & 0.999  & 0.9995 \\
+dropout                    & 0.299  & 0.361  & 0.316  & 0.058  \\
+selection metric           & MAE    & MAE    & MAE    & MAE    \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\section{Oracle vs. Dev-Selected Test Metrics on MOSI}
+\label{appx:oracle}
+
+For full transparency we additionally report what the test metrics
+would have been if we had picked the best epoch on the test set
+itself (``Oracle'') for the Acc-2 / F1 podium configuration of
+\S\ref{sec:exp:results}.
+Numbers are produced from the same training run as the dev-selected
+checkpoint and serve only as an upper bound on what early-stopping by
+test set would yield.
+
+\begin{table}[h]
+\centering
+\caption{Dev-selected vs.\ oracle test metrics for the MOSI Acc-tuned
+trial (msew35\_s2 trial 69).}
+\label{tab:oracle}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+selection rule & MAE$\downarrow$ & Acc-2$\uparrow$ & F1$\uparrow$ & Corr$\uparrow$ & Acc-7$\uparrow$ \\
+\midrule
+dev MAE (epoch 41)            & 0.5957 & 88.85 & 88.83 & 0.859 & 48.91 \\
+oracle best test MAE (ep.\ 35) & \textbf{0.5930} & 88.55 & 88.53 & \textbf{0.861} & 49.05 \\
+oracle best test Acc-2 (ep.\ 42) & 0.5968 & \textbf{89.01} & \textbf{88.98} & 0.858 & 49.05 \\
+oracle best test Acc-7 (ep.\ 40) & 0.5951 & 88.85 & 88.83 & 0.859 & \textbf{49.34} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\section{Reproduction}
+\label{appx:repro}
+
+Pre-trained checkpoints, Optuna SQLite databases, the JSON-exported
+best configurations of every study, and the \texttt{multi\_seed\_verify.sh}
+launcher used to obtain the ablation rows of
+Table~\ref{tab:ablation} are released in the supplementary material.
+A typical reproduction command for the MOSI MAE-tuned configuration is
+{\small
+\begin{verbatim}
+python train.py --dataset mosi \
+  --train_batch_size 32 --gradient_accumulation_step 1 \
+  --n_epochs 107 --stage1_epochs 14 \
+  --learning_rate 1.6325e-5 \
+  --ig_learning_rate 6.327e-4 \
+  --beta_ib 34.359 --alpha_ib 0.008570 \
+  --num_infogate_layers 5 --bottleneck_dim 96 \
+  --mse_weight 1.249 --dropout_prob 0.299 \
+  --warmup_proportion 0.136 \
+  --weight_decay 0.000640 \
+  --ema_decay 0.995 --selection_metric mae --seed 128
+\end{verbatim}
+}
+We use Python 3.10, PyTorch 2.9 and Optuna 4.8.

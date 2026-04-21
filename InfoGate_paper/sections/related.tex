@@ -1,0 +1,53 @@
+\paragraph{Multimodal sentiment fusion.}
+Early work on \textsc{CMU-MOSI} and \textsc{CMU-MOSEI} aligned
+modality-specific recurrent encoders through tensor / outer-product
+fusion (TFN \citep{zadeh2017tfn}, LMF \citep{liu2018lmf}, MFN
+\citep{zadeh2018mfn}, Graph-MFN \citep{zadeh2018gmfn}).
+The transformer era replaced these with cross-modal attention
+\citep{tsai2019mult} and BERT-grounded fusion (MAG-BERT
+\citep{rahman2020magbert}, MISA \citep{hazarika2020misa}, Self-MM
+\citep{yu2021selfmm}, MMIM \citep{han2021mmim}).
+A second line of work disentangles modality-shared and
+modality-specific subspaces (MFM \citep{tsai2019mfm}, DMD
+\citep{li2023dmd}, EMOE \citep{emoe2024}); a third focuses on
+cross-modal alignment through contrastive or denoising objectives
+\citep{wu2023dbf,boost2024}.
+
+\paragraph{Information bottleneck for multimodal learning.}
+The IB principle \citep{tishby2000information,tishby2015dnn} compresses
+input $X$ into a bottleneck $B$ by minimising $I(X;B)$ while maximising
+$I(B;Y)$.
+Its variational form (VIB) \citep{alemi2017vib,kingma2014vae} makes the
+objective tractable for deep networks.
+ITHP \citep{ithp2024} introduces a hierarchical IB chain for
+multimodal perception, while CyIN cyclically translates between
+modality bottlenecks; CaMIB \citep{camib2026} adds causal-aware
+ingredients to the same recipe.
+C-MIB \citep{cmib2023} and DLF \citep{dlf2024} regularise cross-modal
+mutual information.
+\methodname{} differs from this family in two ways.
+First, while existing IB methods use $\log\sigma^{2}$ only inside the
+KL term of the VIB objective, we expose it as a \emph{first-class
+modulation signal} for downstream attention and gating.
+Second, IB methods that perform translation
+(CyIN, ITHP) require auxiliary cross-modal decoders even at inference;
+\methodname{} does not perform any cross-modal translation and
+therefore has a strictly smaller inference-time graph.
+
+\paragraph{Routing and dynamic primary selection.}
+MODS \citep{wang2023cross} is the closest predecessor.
+It introduces a Modality Selector that uses Gumbel-softmax to pick a
+per-sample primary modality, and an equal-weight cross-attention
+fusion (PCCA).
+\methodname{} reuses the MSelector backbone, but adds the IB-guided
+modulation of \S\ref{sec:method:ibca}--\ref{sec:method:gate}, and
+supervises the selector in stage 2 with a routing-IB loss that uses
+the per-modality task error rather than a fixed text prior.
+DEVA \citep{deva2024}, KuDA \citep{kuda2024}, MOAC \citep{moac2025}
+and TMSON \citep{tmson2024} are concurrent dynamic-routing or
+adaptive-fusion methods compared in Table~\ref{tab:main_mosi_mosei};
+none of them couples routing to a per-token IB confidence.
+Adaptive Information Gates (Eq.~\ref{eq:adagate}) are also reminiscent
+of the gated fusion in MAG-BERT and DBF \citep{wu2023dbf}, but
+condition on the IB-compressed bottleneck rather than on raw
+features.

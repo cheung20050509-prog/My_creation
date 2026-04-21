@@ -1,0 +1,19 @@
+All experiments use the publicly released versions of \textsc{CMU-MOSI}
+\citep{zadeh2016mosi}, \textsc{CMU-MOSEI} \citep{zadeh2018mosei} and
+\textsc{CH-SIMS}~v2 \citep{liu2022simsv2}.
+The audio and visual feature extraction toolkits (COVAREP
+\citep{degottex2014covarep}, OpenFace 2.0
+\citep{baltrusaitis2018openface}) are likewise public.
+We did not collect any new human data and did not perform any
+identification of speakers beyond what is already encoded in the
+benchmark splits.
+\methodname{} predicts a continuous sentiment score; it is not designed
+or validated for any clinical, legal, hiring, or surveillance
+application, and we discourage its use in such settings without
+substantial additional evaluation, particularly with respect to
+demographic fairness and out-of-distribution robustness.
+The pre-trained backbones used by \methodname{}
+(DeBERTa-v3-base \citep{he2023debertav3}, BERT-base-Chinese
+\citep{devlin2019bert}) inherit any biases present in their training
+corpora; downstream sentiment scores should therefore be interpreted
+with care.

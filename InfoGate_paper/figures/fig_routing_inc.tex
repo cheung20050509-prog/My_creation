@@ -1,0 +1,14 @@
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig_routing.pdf}
+\caption{\methodname{} routing on \textsc{CMU-MOSI} test (dev-MAE
+podium, trial 69).
+(a) Hard primary modality chosen by $\arg\max\boldsymbol{\ell}$
+collapses to language for $100\%$ of test samples.
+(b) The soft routing weights nevertheless redistribute toward acoustic
+and visual on low-intensity (near-neutral) utterances; at high
+intensity ($|y|\!\ge\!2$), language saturates at $0.96$.
+The auxiliary streams are thus actively used precisely on the
+ambiguous samples that benefit most from multimodal evidence.}
+\label{fig:routing}
+\end{figure}

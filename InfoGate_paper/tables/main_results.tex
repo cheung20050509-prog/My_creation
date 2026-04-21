@@ -1,0 +1,43 @@
+\begin{table*}[t]
+\centering
+\caption{Comparison with recent state-of-the-art on \textsc{CMU-MOSI} and
+\textsc{CMU-MOSEI}. Best per column is in \textbf{bold}, second-best is
+\underline{underlined}. ``$^{\dagger}$'' indicates concurrent
+submissions. \methodname{} (MAE-tuned) is the dev-MAE-selected
+configuration; \methodname{} (Acc-tuned) is the dev-MAE-selected
+configuration with $w_{\mathrm{mse}}\!=\!2.87$.}
+\label{tab:main_mosi_mosei}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{l|ccccc|ccccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{5}{c|}{\textsc{CMU-MOSI}} & \multicolumn{5}{c}{\textsc{CMU-MOSEI}} \\
+ & Acc-7$\uparrow$ & Acc-2$\uparrow$ & F1$\uparrow$ & MAE$\downarrow$ & Corr$\uparrow$
+ & Acc-7$\uparrow$ & Acc-2$\uparrow$ & F1$\uparrow$ & MAE$\downarrow$ & Corr$\uparrow$ \\
+\midrule
+MFM~\citep{tsai2019mfm}                & 33.3 & 80.0 & 80.1 & 0.948 & 0.664 & 50.8 & 83.4 & 83.4 & 0.580 & 0.722 \\
+Self-MM~\citep{yu2021selfmm}           & 45.8 & 84.9 & 84.8 & 0.731 & 0.785 & 53.0 & 85.2 & 85.2 & 0.540 & 0.763 \\
+AtCAF$^{\dagger}$~\citep{atcaf2024}    & 46.5 & 88.6 & 88.5 & 0.650 & 0.831 & \underline{55.9} & 87.0 & 86.8 & 0.508 & 0.785 \\
+DLF$^{\dagger}$~\citep{dlf2024}        & 47.1 & 85.1 & 85.0 & 0.731 & 0.781 & 53.9 & 85.4 & 85.3 & 0.536 & 0.764 \\
+KuDA$^{\dagger}$~\citep{kuda2024}      & 47.1 & 86.4 & 86.5 & 0.705 & 0.795 & 52.9 & 86.5 & 86.6 & 0.529 & 0.776 \\
+DEVA$^{\dagger}$~\citep{deva2024}      & 46.3 & 86.3 & 86.3 & 0.730 & 0.787 & 52.3 & 86.1 & 86.2 & 0.541 & 0.769 \\
+C-MIB~\citep{cmib2023}                 & 47.7 & 87.8 & 87.8 & 0.662 & 0.835 & 52.7 & 86.9 & 86.8 & 0.542 & 0.784 \\
+ITHP~\citep{ithp2024}                  & 47.7 & 88.5 & 88.5 & 0.663 & 0.856 & 52.2 & 87.1 & 87.1 & 0.550 & 0.792 \\
+Multimodal Boosting~\citep{boost2024}  & 49.1 & 88.5 & 88.4 & 0.634 & 0.855 & 54.0 & 86.5 & 86.5 & 0.523 & 0.779 \\
+CaMIB$^{\dagger}$~\citep{camib2026}    & 48.0 & \textbf{89.8} & \textbf{89.8} & 0.616 & 0.857 & 53.5 & 87.3 & 87.2 & 0.517 & 0.788 \\
+DMD~\citep{li2023dmd}                  & 44.9 & 84.3 & 84.3 & 0.726 & 0.788 & 52.8 & 84.6 & 84.6 & 0.538 & 0.768 \\
+EMOE~\citep{emoe2024}                  & 45.2 & 84.8 & 84.8 & 0.723 & 0.790 & 52.5 & 85.0 & 85.0 & 0.542 & 0.760 \\
+TMSON$^{\dagger}$~\citep{tmson2024}    & 47.4 & 87.2 & 87.2 & 0.687 & 0.809 & \underline{55.6} & 86.4 & 86.2 & 0.526 & 0.766 \\
+MOAC$^{\dagger}$~\citep{moac2025}      & \underline{48.6} & 89.0 & 89.0 & \underline{0.605} & \underline{0.857} & 54.3 & \underline{87.6} & \underline{87.6} & \underline{0.512} & \underline{0.793} \\
+\midrule
+\textbf{\methodname{} (MAE-tuned)}     & \textbf{49.2} & 87.8 & 87.8 & \textbf{0.5923} & \textbf{0.860} & \textbf{56.8} & \textbf{87.6} & \underline{87.5} & \textbf{0.4941} & \textbf{0.799} \\
+\textbf{\methodname{} (Acc-tuned)}     & 48.9 & \underline{88.9} & \underline{88.8} & 0.5957 & 0.859 & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}}
+
+\smallskip
+\footnotesize{The two \methodname{} rows differ only in
+$w_{\mathrm{mse}}$ ($1.25$ vs.\ $2.87$); see Appendix~\ref{appx:hparams}
+for the complete configurations. \methodname{}-MAE wins MAE, Corr and
+Acc-7 on both datasets and ties MOAC on MOSEI Acc-2; CaMIB still leads
+on MOSI Acc-2 / F1 by $\approx\!1$ point.}
+\end{table*}

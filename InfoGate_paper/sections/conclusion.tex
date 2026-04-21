@@ -1,0 +1,18 @@
+We presented \methodname{}, a multimodal sentiment analysis model that
+unifies token-level cross-attention reweighting, sample-level
+cross-modal injection control and global-level primary-modality
+selection under a single back-propagatable signal: the per-token
+information-bottleneck confidence $\sigmoid(-\log\sigma^{2})$.
+Trained end-to-end with a task loss, token- and label-IB losses, and
+a stage-2 routing-IB loss, \methodname{} sets new MAE / Corr / Acc-7
+records on \textsc{CMU-MOSI} and \textsc{CMU-MOSEI} and remains
+competitive with the recent state-of-the-art on the harder Mandarin
+\textsc{CH-SIMS}~v2 benchmark.
+A single hyper-parameter, the MSE weight in the task loss, lets us
+slide continuously between an MAE-optimised and an Acc-2/F1-optimised
+operating point, giving practitioners explicit control over the
+classification-vs-regression trade-off.
+We hope that the IB-confidence-as-modulation principle introduced in
+this paper will encourage further work on uncertainty-driven
+multimodal fusion, especially in scenarios where modalities can be
+noisy, missing, or actively contradictory.

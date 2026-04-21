@@ -1,0 +1,91 @@
+\documentclass[11pt]{article}
+
+% Switch to "final" for camera-ready, "preprint" for non-anonymous arXiv.
+\usepackage[review]{acl}
+
+% ---- Standard ACL preamble ----
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{graphicx}
+
+% ---- Math / tables / graphics extras used in this paper ----
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,fit,backgrounds,shapes.geometric}
+
+\usepackage{url}
+
+% ---- Convenient macros ----
+\newcommand{\methodname}{InfoGate}
+\newcommand{\Lvtask}{\mathcal{L}_{\text{task}}}
+\newcommand{\Lvtib}{\mathcal{L}_{\text{tib}}}
+\newcommand{\Lvlib}{\mathcal{L}_{\text{lib}}}
+\newcommand{\Lvrib}{\mathcal{L}_{\text{rib}}}
+\newcommand{\KL}{\mathrm{KL}}
+\newcommand{\softmax}{\mathrm{softmax}}
+\newcommand{\sigmoid}{\sigma}
+\newcommand{\conf}{\mathbf{c}}
+\newcommand{\bn}{\mathbf{B}}
+\newcommand{\matr}[1]{\mathbf{#1}}
+
+\title{\methodname: Information-Bottleneck-Guided Adaptive\\
+       Cross-Attention for Multimodal Sentiment Analysis}
+
+\author{Anonymous EMNLP submission \\
+  \texttt{infogate.author@example.org} \\
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+\input{sections/intro}
+
+\section{Related Work}
+\label{sec:related}
+\input{sections/related}
+
+\section{Method}
+\label{sec:method}
+\input{sections/method}
+
+\section{Experiments}
+\label{sec:exp}
+\input{sections/experiments}
+
+\section{Analysis}
+\label{sec:analysis}
+\input{sections/analysis}
+
+\section{Conclusion}
+\label{sec:conclusion}
+\input{sections/conclusion}
+
+\section*{Limitations}
+\input{sections/limitations}
+
+\section*{Ethics Statement}
+\input{sections/ethics}
+
+% --------------------------------------------------------------------
+% bibliographystyle is set by acl.sty (acl_natbib.bst)
+\bibliography{refs}
+% --------------------------------------------------------------------
+
+\appendix
+\input{sections/appendix}
+
+\end{document}

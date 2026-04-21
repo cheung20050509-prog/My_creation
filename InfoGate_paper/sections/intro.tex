@@ -1,0 +1,85 @@
+Multimodal Sentiment Analysis
+\citep{zadeh2016mosi,zadeh2018mosei,liu2022simsv2}
+predicts the sentiment intensity of an utterance from three loosely
+aligned streams: language, acoustic prosody and facial dynamics.
+The dominant design pattern is to use a strong text encoder
+(BERT-style) as the primary backbone and inject acoustic / visual
+context through cross-modal attention or low-rank fusion
+\citep{rahman2020magbert,tsai2019mult,yu2021selfmm,han2021mmim}.
+Recent work adds an information-bottleneck (IB) regulariser to compress
+each modality into a task-relevant subspace
+\citep{ithp2024,wu2023dbf,cmib2023,camib2026}, which improves the
+state-of-the-art MAE on \textsc{CMU-MOSI} and \textsc{CMU-MOSEI}.
+
+Three weaknesses persist across this line of work:
+\textbf{(W1)} Cross-modal attention treats every auxiliary token as
+equally informative.
+A whispered \textit{``yeah''} and a screamed \textit{``yeah''} have
+identical text content but very different acoustic information; current
+key/value gating does not see this distinction.
+\textbf{(W2)} The injection strength of auxiliary tokens into the
+primary stream is fixed regardless of \emph{cross-modal consistency}.
+A smiling face during a sarcastic verbal utterance contradicts the
+language signal, but is added to the primary representation with the
+same weight as a corroborating face.
+\textbf{(W3)} Most architectures pre-commit to a fixed primary
+modality, usually text.
+Recent dynamic-routing approaches such as MODS \citep{wang2023cross}
+introduce a learned modality selector, but the selector is trained from
+the task gradient alone and tends to collapse onto the easy text-only
+prior.
+
+We argue that all three weaknesses share a single root cause: the
+absence of a calibrated, sample-wise notion of \emph{information
+quality} that can be propagated through the fusion pipeline.
+We provide one.
+The variational IB encoder used by ITHP and CyIN already produces a
+per-token log-variance $\log\sigma^{2,m}$, and we observe that the
+corresponding confidence
+$\conf^{m}=\sigmoid(-\log\sigma^{2,m})$
+is a natural, end-to-end-learnable measure of how task-relevant a token
+is.
+We use it once to modulate \emph{everything} downstream.
+
+Concretely, our model \methodname{} (Figure~\ref{fig:overview}) uses
+$\conf^{m}$ at three different scales:
+\begin{itemize}
+\itemsep0.1em
+\item \textbf{Token level} -- IB-Guided Cross-Attention biases scores
+  by $\gamma\log\bar c^{a}$ and gates values by $\bar c^{a}$, so noisy
+  auxiliary positions are simultaneously down-weighted in attention and
+  in contribution (\S\ref{sec:method:ibca}).
+\item \textbf{Sample level} -- Alignment-Modulated Injection scales
+  each cross-attention output by the cosine similarity of the primary
+  and auxiliary bottleneck representations, lower-bounded at $0.3$;
+  the injection therefore contracts when modalities disagree
+  (\S\ref{sec:method:align}).
+\item \textbf{Global level} -- a Gumbel-softmax modality selector
+  picks one of the three modalities as the primary stream per sample,
+  supervised in stage 2 by a routing-IB loss whose teacher signal is
+  the per-modality task error in the bottleneck space
+  (\S\ref{sec:method:mselector}).
+\end{itemize}
+This single mechanism resolves \textbf{W1--W3} simultaneously and is
+fully differentiable through a single $\log\sigma^{2}$ pathway.
+
+Our contributions are: (i)~the \emph{IB-confidence-as-modulation}
+principle that unifies token, sample and global filtering through one
+back-propagatable signal; (ii)~the IB-Guided Cross-Attention
+mechanism with score bias and value gate; (iii)~the
+Alignment-Modulated Injection rule for sample-level cross-modal
+consistency control; (iv)~a stage-2 routing-IB loss that supervises
+the modality selector with per-modality task error; and
+(v)~state-of-the-art results on \textsc{CMU-MOSI} (MAE 0.5923) and
+\textsc{CMU-MOSEI} (MAE 0.4941) under careful Optuna search, with a
+competitive trade-off on \textsc{CH-SIMS}~v2.
+The paper is organised as follows.
+\S\ref{sec:related} reviews multimodal sentiment fusion and IB-based
+methods.
+\S\ref{sec:method} formalises \methodname{}.
+\S\ref{sec:exp} reports the main results, ablations and
+hyper-parameter search.
+\S\ref{sec:analysis} analyses routing behaviour and the
+MAE-vs-accuracy trade-off.
+\S\ref{sec:conclusion} concludes; limitations and ethics statements
+follow.

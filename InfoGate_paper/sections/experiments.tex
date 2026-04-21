@@ -1,0 +1,120 @@
+\subsection{Datasets and Evaluation}
+\label{sec:exp:setup}
+
+We evaluate \methodname{} on three standard MSA benchmarks.
+\textbf{CMU-MOSI} \citep{zadeh2016mosi} contains $1{,}281$~/~$229$~/~$685$
+English monologue utterances (train~/~dev~/~test) annotated with
+sentiment intensity in $[-3,3]$.
+\textbf{CMU-MOSEI} \citep{zadeh2018mosei} extends MOSI to $16{,}265$~/~$1{,}869$~/~$4{,}643$
+utterances drawn from $1{,}000$ YouTube speakers.
+\textbf{CH-SIMS~v2} \citep{liu2022simsv2} contains $2{,}722$~/~$647$~/~$1{,}034$
+Mandarin video clips with sentiment intensity in $[-1,1]$, designed to
+make acoustic and visual cues genuinely informative.
+For all three datasets we use the official feature releases: COVAREP
+\citep{degottex2014covarep} for audio and OpenFace~2.0
+\citep{baltrusaitis2018openface} for vision, with input dimensions
+$(d_{a},d_{v})=(74,47)$ for MOSI, $(74,35)$ for MOSEI and $(25,177)$ for
+SIMSv2.
+We report Acc-2 (positive vs.\ negative), F1, MAE, Pearson Corr.\ and
+the multi-class accuracies that are conventional for each benchmark
+(Acc-7 for MOSI/MOSEI; Acc-3 / Acc-5 for SIMSv2).
+For MOSI/MOSEI we use the ``negative vs.\ non-negative''
+binary protocol, which excludes neutral samples, following
+\citet{tsai2019mult,yu2021selfmm}.
+
+\subsection{Implementation Details}
+\label{sec:exp:impl}
+
+We use DeBERTa-v3-base \citep{he2023debertav3} as the text backbone for
+MOSI/MOSEI and BERT-base-Chinese \citep{devlin2019bert} for SIMSv2.
+Each modality is projected to a unified $d_{u}\!=\!256$ space
+(\S\ref{sec:method:ib}), and the IB encoder hidden width is also $256$.
+We fix the bottleneck width to $d_{B}\!=\!96$ for MOSI / MOSEI and
+$d_{B}\!=\!128$ for SIMSv2 after Optuna search.
+The InfoGate stack uses $4$ heads and $N\!\in\!\{3,4,5\}$ layers
+(per-dataset best, see Appendix~\ref{appx:hparams}).
+We optimise with AdamW \citep{loshchilov2019adamw} using two parameter
+groups: a small learning rate ($\sim\!10^{-5}$) for DeBERTa~/~BERT and a
+larger one ($\sim\!10^{-4}$) for InfoGate parameters; both are scheduled
+with linear warm-up over a fraction
+$\mathrm{warmup\_proportion}\in[0.05,0.2]$ of total steps.
+An exponential moving average (EMA) of model weights is taken from the
+$5$-th epoch onward and used for evaluation.
+The two-stage schedule activates $\Lvrib$ from epoch
+$\mathrm{stage1\_epochs}$ onward, where $\mathrm{stage1\_epochs}$ is
+itself a tunable hyper-parameter.
+
+\paragraph{Hyper-parameter search.}
+We use the Optuna framework \citep{akiba2019optuna} with a two-stage
+search per dataset: a stage-1 \emph{random} sampler explores the global
+space (Tier-1 = $9$ knobs: batch / accumulation, $n_{\text{epochs}}$,
+DeBERTa LR, InfoGate LR, $\beta_{\text{ib}}$,
+$N$, $d_{B}$, $w_{\text{mse}}$, dropout); a stage-2 TPE sampler
+\emph{locally} re-samples around the top-$8$ stage-1 trials and adds
+Tier-2 ($\alpha_{\text{ib}}$, $\mathrm{stage1\_epochs}$,
+$\mathrm{warmup\_proportion}$, weight decay, $\mathrm{ema\_decay}$) and,
+optionally, Tier-3 (selector temperatures, Gumbel $\tau$ schedule, head
+count, $d_{u}$, $\mathrm{ema\_start\_epoch}$).
+For each dataset we ran $35$--$200$ trials per study, selected the best
+checkpoint by dev-MAE with a tie-break on Acc-2~/~F1~/~Acc-$k$~/~Corr,
+and finally report the test metrics of the selected checkpoint.
+
+\subsection{Main Results}
+\label{sec:exp:results}
+
+Tables~\ref{tab:main_mosi_mosei} and~\ref{tab:main_simsv2} compare
+\methodname{} with $14$ recent baselines on MOSI~/~MOSEI and $13$ baselines
+on CH-SIMS~v2; baseline numbers are taken from the corresponding
+papers.
+Two \methodname{} configurations are reported on MOSI: the
+\textbf{MAE-tuned} configuration that minimises dev-MAE (our default),
+and an \textbf{Acc-tuned} configuration found by the same search with
+$w_{\text{mse}}\!=\!2.87$ (vs.\ $1.25$ for MAE-tuned), exposing the
+classification-vs.-regression trade-off discussed in
+\S\ref{sec:method:loss}.
+On the two English benchmarks \methodname{} sets a new state-of-the-art
+on every regression metric: MAE drops from $0.605$ (MOAC) to $0.5923$
+on MOSI ($-2.8\%$) and from $0.508$ (AtCAF) to $0.4941$ on MOSEI
+($-2.7\%$); Pearson Corr.\ reaches $0.860$ on MOSI and $0.799$ on
+MOSEI, surpassing CaMIB and MOAC.
+Acc-7 on MOSEI improves from $55.9$ (AtCAF) to $56.8$.
+The Acc-tuned MOSI configuration of \methodname{} reaches $88.85\%$
+Acc-2 / $88.83\%$ F1, only $1$ point below CaMIB's $89.8\%$ while
+keeping a $0.034$ gap to the MAE leader, illustrating that a single
+hyper-parameter ($w_{\text{mse}}$) can move \methodname{} continuously
+between the two operating points.
+
+On the harder Mandarin \textsc{CH-SIMS~v2} benchmark
+(Table~\ref{tab:main_simsv2}), \methodname{} is competitive but not
+state-of-the-art: KuDA leads on MAE ($0.289$) and Corr ($0.741$), and
+GRCF leads on Acc-2~/~F1 ($81.7\,/\,81.6$).
+We reach $0.3138$ MAE and $0.687$ Corr, comparable to MFN and
+Self-MM but $4{-}5$ points below GRCF on classification.
+We hypothesise that the much shorter temporal window per token in
+SIMSv2 ($d_{a}=25$, $d_{v}=177$, sequence length capped at 50)
+under-exploits the IB confidence pathway, which benefits from longer
+sequences with diverse uncertainty patterns; we revisit this in
+\S\ref{sec:analysis} and as a limitation in the corresponding section.
+
+\input{tables/main_results}
+
+\input{tables/sims_results}
+
+\subsection{Ablation}
+\label{sec:exp:ablation}
+
+We ablate the four IB-driven mechanisms of \methodname{} on
+\textsc{CMU-MOSI} (MAE-tuned configuration); each row removes a single
+component while keeping all others identical.
+Table~\ref{tab:ablation} confirms that every mechanism contributes:
+removing the routing-IB loss ($\Lvrib$) causes the largest
+\emph{absolute} MAE increase (+0.013), while disabling the
+alignment-modulated injection (\S\ref{sec:method:align}) drops Acc-7 by
+$1.5$ points, supporting the claim that alignment failure is a key
+failure mode for cross-modal injection.
+The IB-Guided cross-attention (score bias + value gate) accounts for
+$+0.012$ MAE; replacing it by vanilla scaled dot-product attention is
+equivalent to disabling the IB-confidence link entirely on the
+attention side.
+
+\input{tables/ablation}
