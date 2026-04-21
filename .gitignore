@@ -20,3 +20,6 @@ venv/
 # LaTeX/paper build artifacts (keep sources tracked; ignore regenerated outputs)
 
 paper_files/*.aux
+
+# Podium logs are intentionally tracked (small text, keep alongside snapshot.json)
+!saved_hparams/podium/**/*.log

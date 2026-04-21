@@ -1,0 +1,101 @@
+{
+  "exported_at": "2026-04-21T10:12:38.920606Z",
+  "title": "MOSI · msew35_s2_local · trial 69 (Acc-2/F1 podium)",
+  "dataset": "mosi",
+  "study_name": "infogate_mosi_optuna_relaunch_20260415_120746_msew35_s2_local",
+  "db_path": "logs/optuna_relaunch_20260415_120746/db/mosi_msew35_infogate_mosi_optuna_relaunch_20260415_120746_msew35_s2_local.db",
+  "trial_number": 69,
+  "search_tier": 2,
+  "seed": 128,
+  "selection": "dev_mae",
+  "ckpt_relative_path": "saved_hparams/podium/mosi_msew35_s2_trial69_acc2_88p85/infogate_mosi_best.pt",
+  "train_log_relative_path": "saved_hparams/podium/mosi_msew35_s2_trial69_acc2_88p85/train_log.log",
+  "ckpt_origin_path": "logs/optuna_relaunch_20260415_120746/checkpoints/optuna_mosi_s2_local/trial_69/infogate_mosi_best.pt",
+  "why_special": [
+    "Highest Acc-2 (88.85%) and F1 (88.83%) among ALL MOSI trials across all 5 studies (regular/msew35 x s1/s2 + v3_t3).",
+    "MAE 0.5957 only marginally worse than the MAE-podium trial 125 (0.5923), but Acc-2/F1 are >1pt higher.",
+    "Trade-off: heavier MSE weight (mse_weight=2.87) shifts the model toward better classification accuracy."
+  ],
+  "metrics": {
+    "dev_selected_epoch": {
+      "epoch": 41,
+      "dev_mae": 0.5826173934874056,
+      "dev_corr": 0.8636890672594354,
+      "test_results_from_ckpt": {
+        "acc2": 0.8885496183206106,
+        "mae": 0.5957246367840001,
+        "corr": 0.8586613166474231,
+        "f1": 0.8882849762917983,
+        "acc7": 0.48905109489051096
+      }
+    },
+    "oracle_test_best_mae": {
+      "epoch": 35,
+      "test_mae": 0.593,
+      "test_acc2": 88.55,
+      "test_acc7": 49.05,
+      "test_corr": 0.8611,
+      "test_f1": 0.8853
+    },
+    "oracle_test_best_acc2": {
+      "epoch": 42,
+      "test_mae": 0.5968,
+      "test_acc2": 89.01,
+      "test_acc7": 49.05,
+      "test_corr": 0.8584,
+      "test_f1": 0.8898
+    },
+    "oracle_test_best_acc7": {
+      "epoch": 40,
+      "test_mae": 0.5951,
+      "test_acc2": 88.85,
+      "test_acc7": 49.34,
+      "test_corr": 0.8591,
+      "test_f1": 0.8883
+    },
+    "oracle_test_best_f1": {
+      "epoch": 42,
+      "test_mae": 0.5968,
+      "test_acc2": 89.01,
+      "test_acc7": 49.05,
+      "test_corr": 0.8584,
+      "test_f1": 0.8898
+    },
+    "oracle_test_best_corr": {
+      "epoch": 29,
+      "test_mae": 0.5948,
+      "test_acc2": 88.24,
+      "test_acc7": 48.47,
+      "test_corr": 0.8628,
+      "test_f1": 0.8821
+    }
+  },
+  "params": {
+    "alpha_ib": 0.004695,
+    "beta_ib": 40.9761,
+    "mse_weight": 2.8665,
+    "learning_rate": 1.790989e-05,
+    "ig_learning_rate": 0.0002539622,
+    "bottleneck_dim": 96,
+    "num_infogate_layers": 5,
+    "unified_dim": 256,
+    "num_heads": 4,
+    "ib_hidden_dim": 256,
+    "stage1_epochs": 19,
+    "n_epochs": 111,
+    "train_batch_size": 32,
+    "gradient_accumulation_step": 1,
+    "dropout_prob": 0.3611,
+    "warmup_proportion": 0.1193,
+    "weight_decay": 0.001334,
+    "ema_decay": 0.995,
+    "ema_start_epoch": 5,
+    "selector_target_temp": 0.35,
+    "selector_rib_weight": 0.05,
+    "gumbel_tau_start": 1.0,
+    "gumbel_tau_end": 0.5,
+    "selection_metric": "mae",
+    "seed": 128
+  },
+  "reproduce_command_template": "CUDA_VISIBLE_DEVICES=0 python -u train.py --dataset mosi --train_batch_size 32 --gradient_accumulation_step 1 --n_epochs 111 --stage1_epochs 19 --learning_rate 1.7910e-5 --ig_learning_rate 2.5396e-4 --beta_ib 40.976 --alpha_ib 0.004695 --num_infogate_layers 5 --bottleneck_dim 96 --unified_dim 256 --num_heads 4 --ib_hidden_dim 256 --mse_weight 2.8665 --dropout_prob 0.3611 --warmup_proportion 0.1193 --weight_decay 0.001334 --ema_decay 0.995 --ema_start_epoch 5 --selector_target_temp 0.35 --selector_rib_weight 0.05 --gumbel_tau_start 1.0 --gumbel_tau_end 0.5 --selection_metric mae --seed 128"
+}

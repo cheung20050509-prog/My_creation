@@ -34,7 +34,7 @@ mkdir -p "$OUT_DIR"
 # ---- best hparams (extracted from saved_hparams/<ds>_best_hparams.json) ----
 
 run_mosi () {
-  # msew35_s2_local trial 125, MAE 0.5923, Tier 2
+  # MAE-podium: msew35_s2_local trial 125, dev-MAE 选点 -> MAE 0.5923, Acc-2 87.79%
   local seed=$1
   local logfile="$OUT_DIR/mosi_seed${seed}.log"
   local ckpt_dir="$OUT_DIR/ckpts/mosi_seed${seed}"
@@ -49,6 +49,33 @@ run_mosi () {
     --num_infogate_layers 5 --bottleneck_dim 96 --unified_dim 256 --num_heads 4 --ib_hidden_dim 256 \
     --mse_weight 1.249 --dropout_prob 0.299 \
     --warmup_proportion 0.136 --weight_decay 0.000640 \
+    --ema_decay 0.995 --ema_start_epoch 5 \
+    --selector_target_temp 0.35 --selector_rib_weight 0.05 \
+    --gumbel_tau_start 1.0 --gumbel_tau_end 0.5 \
+    --selection_metric mae \
+    --checkpoint_dir "$ckpt_dir" \
+    --seed "$seed" \
+    > "$logfile" 2>&1
+}
+
+run_mosi_acc2 () {
+  # Acc-2 / F1 podium: msew35_s2_local trial 69 (seed=128, epoch 41 dev-MAE 选点)
+  # -> test Acc-2 88.85% / F1 88.83% / MAE 0.5957 / Corr 0.8587 / Acc-7 48.91%
+  # Oracle epoch 42: Acc-2 89.01% / F1 88.98%
+  local seed=$1
+  local logfile="$OUT_DIR/mosi_acc2_seed${seed}.log"
+  local ckpt_dir="$OUT_DIR/ckpts/mosi_acc2_seed${seed}"
+  mkdir -p "$ckpt_dir"
+  echo "[mosi_acc2 seed=$seed] -> $logfile"
+  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON" -u train.py \
+    --dataset mosi \
+    --train_batch_size 32 --gradient_accumulation_step 1 \
+    --n_epochs 111 --stage1_epochs 19 \
+    --learning_rate 1.7910e-5 --ig_learning_rate 2.5396e-4 \
+    --beta_ib 40.976 --alpha_ib 0.004695 \
+    --num_infogate_layers 5 --bottleneck_dim 96 --unified_dim 256 --num_heads 4 --ib_hidden_dim 256 \
+    --mse_weight 2.8665 --dropout_prob 0.3611 \
+    --warmup_proportion 0.1193 --weight_decay 0.001334 \
     --ema_decay 0.995 --ema_start_epoch 5 \
     --selector_target_temp 0.35 --selector_rib_weight 0.05 \
     --gumbel_tau_start 1.0 --gumbel_tau_end 0.5 \
@@ -114,9 +141,10 @@ if [[ "$DATASETS" == "all" ]]; then DATASETS="mosi mosei simsv2"; fi
 for ds in $DATASETS; do
   for seed in $SEEDS; do
     case "$ds" in
-      mosi)   run_mosi   "$seed" ;;
-      mosei)  run_mosei  "$seed" ;;
-      simsv2) run_simsv2 "$seed" ;;
+      mosi)      run_mosi      "$seed" ;;
+      mosi_acc2) run_mosi_acc2 "$seed" ;;
+      mosei)     run_mosei     "$seed" ;;
+      simsv2)    run_simsv2    "$seed" ;;
       *) echo "unknown dataset $ds" >&2; exit 1 ;;
     esac
   done

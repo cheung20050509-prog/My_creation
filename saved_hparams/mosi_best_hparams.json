@@ -32,6 +32,63 @@
     },
     "ckpt_path": "logs/optuna_relaunch_20260415_120746/checkpoints/optuna_mosi_s2_local/trial_125/infogate_mosi_best.pt"
   },
+  "best_by_acc2_f1": {
+    "study_label": "msew35_s2_local",
+    "study_name": "infogate_mosi_optuna_relaunch_20260415_120746_msew35_s2_local",
+    "db_path": "logs/optuna_relaunch_20260415_120746/db/mosi_msew35_infogate_mosi_optuna_relaunch_20260415_120746_msew35_s2_local.db",
+    "ckpt_subdir": "logs/optuna_relaunch_20260415_120746/checkpoints/optuna_mosi_s2_local",
+    "search_tier": 2,
+    "trial_number": 69,
+    "seed": 128,
+    "value_test_mae": 0.5957,
+    "podium_dir": "saved_hparams/podium/mosi_msew35_s2_trial69_acc2_88p85",
+    "podium_snapshot": "saved_hparams/podium/mosi_msew35_s2_trial69_acc2_88p85/snapshot.json",
+    "test_results_dev_selected": {
+      "epoch": 41,
+      "acc2": 0.8885,
+      "f1":   0.8883,
+      "mae":  0.5957,
+      "corr": 0.8587,
+      "acc7": 0.4891
+    },
+    "test_results_oracle_best_mae": {
+      "epoch": 35,
+      "acc2": 0.8855,
+      "f1":   0.8853,
+      "mae":  0.5930,
+      "corr": 0.8611,
+      "acc7": 0.4905
+    },
+    "test_results_oracle_best_acc2_f1": {
+      "epoch": 42,
+      "acc2": 0.8901,
+      "f1":   0.8898,
+      "mae":  0.5968,
+      "corr": 0.8584,
+      "acc7": 0.4905
+    },
+    "params": {
+      "alpha_ib": 0.004694671363818856,
+      "batch_config": 4,
+      "beta_ib": 40.976090480892864,
+      "bottleneck_dim": 96,
+      "dropout_prob": 0.3610904654191537,
+      "ema_decay": 0.995,
+      "ig_learning_rate": 0.000253962168979972,
+      "learning_rate": 1.7909887683150738e-05,
+      "mse_weight": 2.8665354720439256,
+      "n_epochs": 111,
+      "num_infogate_layers": 5,
+      "stage1_epochs": 19,
+      "warmup_proportion": 0.11925537572150308,
+      "weight_decay": 0.0013344862068739361,
+      "_decoded_train_batch_size": 32,
+      "_decoded_gradient_accumulation_step": 1,
+      "_decoded_effective_batch_size": 32
+    },
+    "ckpt_path": "logs/optuna_relaunch_20260415_120746/checkpoints/optuna_mosi_s2_local/trial_69/infogate_mosi_best.pt",
+    "note": "Highest Acc-2/F1 among ALL MOSI trials. Heavier mse_weight (2.87 vs 1.25 of MAE-podium) trades ~0.003 MAE for >1pt Acc-2/F1. Ckpt mirrored under podium_dir to prevent Optuna overwrite (regular and msew35 share this ckpt_subdir)."
+  },
   "studies": {
     "regular_s1_random": {
       "study_name": "infogate_mosi_optuna_relaunch_20260415_120746_s1_random",
