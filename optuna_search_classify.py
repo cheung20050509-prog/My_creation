@@ -107,6 +107,15 @@ DATASET_LOG_FLOAT_OVERRIDES = {
         "beta_ib":          (4.0, 16.0),
         "alpha_ib":         (3e-4, 5e-2),  # was (1e-3, 5e-2); top trials hit 1.7-2.6e-3
     },
+    # UR-FUNNY v2 — applied to a NEW study that cannot inherit the prior v1's
+    # categorical space. Edits are driven by the top-15 (of 66 COMPLETE) on
+    # the v1 study `infogate_ur_funny_..._20260422_104708` (best Acc 0.7586):
+    #   * alpha_ib lower edge: 9/15 top trials vs global (1e-3, 5e-2) -> extend down
+    #   * ig_learning_rate: a few hit upper edge; push up slightly to 3e-3
+    "ur_funny": {
+        "alpha_ib":         (3e-4, 5e-2),  # was (1e-3, 5e-2); top trials cluster near 1e-3
+        "ig_learning_rate": (5e-5, 3e-3),  # was (5e-5, 2e-3); mild headroom above 2e-3
+    },
 }
 DATASET_LINEAR_FLOAT_OVERRIDES = {
     "mustard": {
@@ -114,9 +123,19 @@ DATASET_LINEAR_FLOAT_OVERRIDES = {
         "selector_target_temp": (0.60, 0.95),  # was 0.60-0.90; top trials hit 0.84-0.87
         "selector_rib_weight":  (0.01, 0.20),  # was global 0.01-0.15; top trials hit 0.09-0.15
     },
+    # UR-FUNNY v2 — see comment above:
+    #   * dropout_prob: 8/15 top trials near 0.4 upper bound -> extend to 0.50
+    #   * selector_target_temp: 12/15 near 0.90 upper bound -> extend to 0.95
+    "ur_funny": {
+        "dropout_prob":         (0.05, 0.50),  # was (0.05, 0.40)
+        "selector_target_temp": (0.30, 0.95),  # was (0.30, 0.90)
+    },
 }
 DATASET_INT_OVERRIDES = {
     "mustard": {"stage1_epochs": (8, 15)},
+    # UR-FUNNY v2 — top-15 stage1_epochs median=4, max=8; narrow upper bound
+    # so TPE doesn't waste budget on 10-15 range that consistently underperforms.
+    "ur_funny": {"stage1_epochs": (3, 10)},
 }
 DATASET_CATEGORICAL_OVERRIDES = {
     # Optuna requires CategoricalDistribution choices to be IDENTICAL across
@@ -128,6 +147,17 @@ DATASET_CATEGORICAL_OVERRIDES = {
         "batch_config":   [0, 1, 2, 4],     # drops (16, 2) per s2_local
         "bottleneck_dim": [128, 192],
         "ema_decay":      [0.99, 0.995, 0.999],
+    },
+    # UR-FUNNY v2 — NEW study only. Top-15 distributions drove each drop:
+    #   * ema_decay: ALL top-15 picked 0.999 -> freeze the family to [0.999]
+    #   * bottleneck_dim: top-15 was 96 x 11, 128 x 4 -> keep [96, 128] (drop 64, 192)
+    #   * num_infogate_layers: top-15 was 5 x 9, 2 x 4, 4 x 2 -> keep [2, 4, 5] (drop 3)
+    #   * batch_config kept full [0..4] — idx 1 is rare in top-15 but kept to avoid
+    #     false pruning of (16,2) eff=32 which shares effective-batch with idx 3.
+    "ur_funny": {
+        "ema_decay":           [0.999],
+        "bottleneck_dim":      [96, 128],
+        "num_infogate_layers": [2, 4, 5],
     },
 }
 
