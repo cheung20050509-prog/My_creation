@@ -80,17 +80,6 @@ class IBDecoder(nn.Module):
         return self.decoder(B)
 
 
-class ResidualAutoencoder(nn.Module):
-    """RA(x) = Dec(Enc(x)) + x  (from CyIN / MMIN)."""
-    def __init__(self, in_dim, hidden_dim):
-        super().__init__()
-        self.enc = nn.Linear(in_dim, hidden_dim)
-        self.dec = nn.Linear(hidden_dim, in_dim)
-
-    def forward(self, x):
-        return self.dec(F.relu(self.enc(x))) + x
-
-
 class PositionwiseFFN(nn.Module):
     def __init__(self, hidden_dim, ffn_dim=None, dropout=0.1):
         super().__init__()

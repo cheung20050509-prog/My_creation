@@ -400,25 +400,6 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
     return total_loss / n, sum_task / n, sum_ib / n, detail
 
 
-def eval_epoch(model, loader, stage=2):
-    model.eval()
-    total_loss, steps = 0.0, 0
-    with torch.no_grad():
-        for batch in tqdm(loader, desc="Val"):
-            batch = tuple(t.to(DEVICE) for t in batch)
-            input_ids, visual, acoustic, label_ids = batch
-            visual = visual.squeeze(1)
-            acoustic = acoustic.squeeze(1)
-
-            logits, _, _, _ = model(input_ids, visual, acoustic, stage=stage)
-            pred_flat = logits.view(-1)
-            label_flat = label_ids.view(-1)
-            loss = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
-            total_loss += loss.item()
-            steps += 1
-    return total_loss / max(steps, 1)
-
-
 def test_epoch(model, loader, stage=2, desc="Test"):
     model.eval()
     preds, labels, all_w = [], [], []

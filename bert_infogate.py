@@ -3,8 +3,6 @@ InfoGate + BERT integration module.
 Uses BERT as the text encoder; prediction is handled by InfoGate's internal MLP head.
 """
 
-import os
-
 from transformers import (
     BertPreTrainedModel, BertModel,
 )
