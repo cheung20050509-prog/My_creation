@@ -14,13 +14,23 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PYTHON="${PYTHON:-/home/anaconda/envs/ITHP/bin/python}"
-if [[ ! -x "$PYTHON" ]]; then
-  PYTHON="${PYTHON:-python3}"
+# Pick the first executable Python interpreter we can find. Override with PYTHON=...
+if [[ -z "${PYTHON:-}" ]]; then
+  for cand in \
+      /root/autodl-tmp/anaconda3/envs/ITHP5090/bin/python \
+      /home/anaconda/envs/ITHP/bin/python \
+      "$(command -v python3 || true)" \
+      "$(command -v python || true)"; do
+    if [[ -n "$cand" && -x "$cand" ]]; then PYTHON="$cand"; break; fi
+  done
+fi
+if [[ -z "${PYTHON:-}" || ! -x "$PYTHON" ]]; then
+  echo "ERROR: cannot find a Python interpreter; set PYTHON=..." >&2
+  exit 1
 fi
 
-GPU_MUSTARD="${GPU_MUSTARD:-1}"
-GPU_URFUNNY="${GPU_URFUNNY:-2}"
+GPU_MUSTARD="${GPU_MUSTARD:-0}"
+GPU_URFUNNY="${GPU_URFUNNY:-1}"
 PARALLEL="${PARALLEL:-1}"
 ONLY="${ONLY:-both}"     # both | mustard | ur_funny
 

@@ -90,6 +90,69 @@ CATEGORICAL_SPACE = {
     "ema_start_epoch":     [3, 5, 8, 10],
 }
 
+# Per-dataset overrides — applied after global bounds. Used to tighten the
+# search space once a study has converged in a sub-region. Keys mirror the
+# four bounds dicts above; missing entries fall back to the global bounds.
+#
+# MUSTARD overrides — extended after analysing the 7 trials that hit
+# obj=0.7941 (54/68 dev). Those trials clustered against the LOWER bounds of
+# learning_rate / ig_learning_rate / alpha_ib and the UPPER bounds of
+# selector_target_temp / selector_rib_weight. We push those edges out so TPE
+# can keep searching past the previous walls. (Beta_ib stays narrowed because
+# top trials sit comfortably inside 6-9 with no edge contact.)
+DATASET_LOG_FLOAT_OVERRIDES = {
+    "mustard": {
+        "learning_rate":    (2e-6, 5e-5),  # was (5e-6, 5e-5); top trials hit 5.1-6.6e-6
+        "ig_learning_rate": (2e-5, 2e-3),  # was (5e-5, 2e-3); top trials hit 5.9-8.7e-5
+        "beta_ib":          (4.0, 16.0),
+        "alpha_ib":         (3e-4, 5e-2),  # was (1e-3, 5e-2); top trials hit 1.7-2.6e-3
+    },
+}
+DATASET_LINEAR_FLOAT_OVERRIDES = {
+    "mustard": {
+        "warmup_proportion":    (0.10, 0.25),
+        "selector_target_temp": (0.60, 0.95),  # was 0.60-0.90; top trials hit 0.84-0.87
+        "selector_rib_weight":  (0.01, 0.20),  # was global 0.01-0.15; top trials hit 0.09-0.15
+    },
+}
+DATASET_INT_OVERRIDES = {
+    "mustard": {"stage1_epochs": (8, 15)},
+}
+DATASET_CATEGORICAL_OVERRIDES = {
+    # Optuna requires CategoricalDistribution choices to be IDENTICAL across
+    # all trials in the same study. The values below for MUSTARD must match
+    # the existing s2_local study exactly (which was narrowed by the s1->s2
+    # local-space step). If you need a wider/different categorical set,
+    # create a NEW study instead of resuming an old one.
+    "mustard": {
+        "batch_config":   [0, 1, 2, 4],     # drops (16, 2) per s2_local
+        "bottleneck_dim": [128, 192],
+        "ema_decay":      [0.99, 0.995, 0.999],
+    },
+}
+
+
+def get_log_float_bounds(name, dataset):
+    return DATASET_LOG_FLOAT_OVERRIDES.get(dataset, {}).get(
+        name, LOG_FLOAT_BOUNDS[name])
+
+
+def get_linear_float_bounds(name, dataset):
+    return DATASET_LINEAR_FLOAT_OVERRIDES.get(dataset, {}).get(
+        name, LINEAR_FLOAT_BOUNDS[name])
+
+
+def get_int_bounds(name, dataset):
+    return DATASET_INT_OVERRIDES.get(dataset, {}).get(
+        name, INT_BOUNDS[name])
+
+
+def get_categorical_choices(name, dataset):
+    overrides = DATASET_CATEGORICAL_OVERRIDES.get(dataset, {})
+    if name in overrides:
+        return overrides[name]
+    return CATEGORICAL_SPACE[name]
+
 DEFAULTS = {
     "seed": 42,
     "learning_rate": 2e-5,
@@ -255,8 +318,10 @@ def suggest_categorical_param(trial, name, choices, local_space=None):
 def suggest_tier1(trial, dataset, n_epochs_max=None, n_epochs_min=None,
                   local_space=None):
     candidates = BATCH_CANDIDATES[dataset]
+    batch_choices = DATASET_CATEGORICAL_OVERRIDES.get(dataset, {}).get(
+        "batch_config", list(range(len(candidates))))
     batch_idx = suggest_categorical_param(
-        trial, "batch_config", list(range(len(candidates))), local_space)
+        trial, "batch_config", batch_choices, local_space)
     bs, accum = candidates[batch_idx]
     ep_lo, ep_hi = DATASET_EPOCH_RANGE[dataset]
     if n_epochs_min is not None:
@@ -273,61 +338,75 @@ def suggest_tier1(trial, dataset, n_epochs_max=None, n_epochs_min=None,
         "n_epochs": trial.suggest_int("n_epochs", ep_lo, ep_hi),
         "seed": DEFAULTS["seed"],
         "learning_rate": suggest_float_param(
-            trial, "learning_rate", LOG_FLOAT_BOUNDS["learning_rate"], log=True,
+            trial, "learning_rate",
+            get_log_float_bounds("learning_rate", dataset), log=True,
             local_space=local_space),
         "ig_learning_rate": suggest_float_param(
-            trial, "ig_learning_rate", LOG_FLOAT_BOUNDS["ig_learning_rate"],
+            trial, "ig_learning_rate",
+            get_log_float_bounds("ig_learning_rate", dataset),
             log=True, local_space=local_space),
         "beta_ib": suggest_float_param(
-            trial, "beta_ib", LOG_FLOAT_BOUNDS["beta_ib"], log=True,
+            trial, "beta_ib",
+            get_log_float_bounds("beta_ib", dataset), log=True,
             local_space=local_space),
         "num_infogate_layers": suggest_categorical_param(
             trial, "num_infogate_layers",
-            CATEGORICAL_SPACE["num_infogate_layers"], local_space),
+            get_categorical_choices("num_infogate_layers", dataset),
+            local_space),
         "bottleneck_dim": suggest_categorical_param(
-            trial, "bottleneck_dim", CATEGORICAL_SPACE["bottleneck_dim"],
+            trial, "bottleneck_dim",
+            get_categorical_choices("bottleneck_dim", dataset),
             local_space),
         "dropout_prob": suggest_float_param(
-            trial, "dropout_prob", LINEAR_FLOAT_BOUNDS["dropout_prob"],
+            trial, "dropout_prob",
+            get_linear_float_bounds("dropout_prob", dataset),
             local_space=local_space),
     }
 
 
-def suggest_tier2(trial, local_space=None):
+def suggest_tier2(trial, dataset, local_space=None):
     return {
         "alpha_ib": suggest_float_param(
-            trial, "alpha_ib", LOG_FLOAT_BOUNDS["alpha_ib"], log=True,
+            trial, "alpha_ib",
+            get_log_float_bounds("alpha_ib", dataset), log=True,
             local_space=local_space),
         "stage1_epochs": suggest_int_param(
-            trial, "stage1_epochs", INT_BOUNDS["stage1_epochs"], local_space),
+            trial, "stage1_epochs",
+            get_int_bounds("stage1_epochs", dataset), local_space),
         "warmup_proportion": suggest_float_param(
-            trial, "warmup_proportion", LINEAR_FLOAT_BOUNDS["warmup_proportion"],
+            trial, "warmup_proportion",
+            get_linear_float_bounds("warmup_proportion", dataset),
             local_space=local_space),
         "weight_decay": suggest_float_param(
-            trial, "weight_decay", LOG_FLOAT_BOUNDS["weight_decay"], log=True,
+            trial, "weight_decay",
+            get_log_float_bounds("weight_decay", dataset), log=True,
             local_space=local_space),
         "ema_decay": suggest_categorical_param(
-            trial, "ema_decay", CATEGORICAL_SPACE["ema_decay"], local_space),
+            trial, "ema_decay",
+            get_categorical_choices("ema_decay", dataset), local_space),
         "selector_target_temp": suggest_float_param(
             trial, "selector_target_temp",
-            LINEAR_FLOAT_BOUNDS["selector_target_temp"],
+            get_linear_float_bounds("selector_target_temp", dataset),
             local_space=local_space),
         "selector_rib_weight": suggest_float_param(
             trial, "selector_rib_weight",
-            LINEAR_FLOAT_BOUNDS["selector_rib_weight"],
+            get_linear_float_bounds("selector_rib_weight", dataset),
             local_space=local_space),
     }
 
 
-def suggest_tier3(trial, local_space=None):
+def suggest_tier3(trial, dataset, local_space=None):
     return {
         "num_heads": suggest_categorical_param(
-            trial, "num_heads", CATEGORICAL_SPACE["num_heads"], local_space),
+            trial, "num_heads",
+            get_categorical_choices("num_heads", dataset), local_space),
         "unified_dim": suggest_categorical_param(
-            trial, "unified_dim", CATEGORICAL_SPACE["unified_dim"],
+            trial, "unified_dim",
+            get_categorical_choices("unified_dim", dataset),
             local_space),
         "ema_start_epoch": suggest_categorical_param(
-            trial, "ema_start_epoch", CATEGORICAL_SPACE["ema_start_epoch"],
+            trial, "ema_start_epoch",
+            get_categorical_choices("ema_start_epoch", dataset),
             local_space),
     }
 
@@ -338,9 +417,9 @@ def build_search_params(trial, tier, dataset, n_epochs_max=None,
     params.update(suggest_tier1(
         trial, dataset, n_epochs_max, n_epochs_min, local_space=local_space))
     if tier >= 2:
-        params.update(suggest_tier2(trial, local_space=local_space))
+        params.update(suggest_tier2(trial, dataset, local_space=local_space))
     if tier >= 3:
-        params.update(suggest_tier3(trial, local_space=local_space))
+        params.update(suggest_tier3(trial, dataset, local_space=local_space))
     return params
 
 

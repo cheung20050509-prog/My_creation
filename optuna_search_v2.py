@@ -241,7 +241,17 @@ def parse_best_results(log_path):
 
 
 def parse_best_dev_metrics(log_path, dataset="mosi",
-                           selection_metric="acc2_composite"):
+                           selection_metric="acc2_composite",
+                           stage1_epochs=0):
+    """Return (current_epoch, best_dev_metrics).
+
+    Dev lines emitted during stage 1 warmup (1-based epoch <= stage1_epochs)
+    are IGNORED when tracking the best dev score. This aligns with train.py
+    where `select_start = args.stage1_epochs` — the final reported "Best
+    Results" there also only considers stage-2 epochs. Using a stage-1-
+    inclusive best would both (a) pollute `trial.report()` with warmup noise
+    and (b) cause aggressive prunes when the stage-2 runway is still short.
+    """
     if not os.path.exists(log_path):
         return 0, None
     current_epoch = 0
@@ -257,6 +267,11 @@ def parse_best_dev_metrics(log_path, dataset="mosi",
             # Try simsv2 format first (more specific), then fallback
             dm_s = DEV_LINE_SIMSV2_RE.match(line)
             dm = DEV_LINE_RE.match(line) if dm_s is None else None
+            # Skip stage-1 warmup dev lines. EPOCH_LINE_RE yields the 1-based
+            # epoch index printed by train.py; stage 2 begins when
+            # `current_epoch > stage1_epochs`.
+            if (dm_s or dm) and current_epoch <= int(stage1_epochs):
+                continue
             if dm_s:
                 acc2, acc5, acc3, mae, corr, f1 = (float(x) for x in dm_s.groups())
                 acc2 /= 100.0
@@ -284,44 +299,65 @@ def parse_best_dev_metrics(log_path, dataset="mosi",
 
 
 # ══════════════════════════════════════════════════════════════
-# Per-dataset pruning (OR logic: prune only if BOTH fail)
+# Per-dataset pruning — thresholds are in *stage 2* epochs.
+# `epoch` is the 1-based epoch reported in train.py's log; `stage1_epochs`
+# is the number of warmup epochs sampled by the trial. We NEVER prune
+# during stage 1 and give stage 2 at least 10 epochs of grace before
+# the first check — previously the first gate fired at s2_ep == 5, which
+# the user flagged as too eager (a slow-burning LR/β_ib combo needs a
+# longer stage-2 runway before its dev metric becomes diagnostic).
+# AND logic: a trial is pruned only when BOTH acc2 AND mae fail.
 # ══════════════════════════════════════════════════════════════
 
-def should_prune_mosi(epoch, metrics):
+def _s2_epoch(epoch, stage1_epochs):
+    """Epochs completed inside stage 2 (>=0). 0 while still in stage 1."""
+    return max(0, int(epoch) - int(stage1_epochs))
+
+
+def should_prune_mosi(epoch, metrics, stage1_epochs):
     if metrics is None:
         return False
+    s2 = _s2_epoch(epoch, stage1_epochs)
+    if s2 < 10:
+        return False
     acc2, mae = metrics["Acc2"], metrics["MAE"]
-    if epoch >= 50:
+    if s2 >= 40:
         return acc2 < 0.84 and mae > 0.66
-    if epoch >= 30:
+    if s2 >= 20:
         return acc2 < 0.80 and mae > 0.70
-    if epoch >= 15:
+    if s2 >= 10:
         return acc2 < 0.72 and mae > 0.85
     return False
 
 
-def should_prune_mosei(epoch, metrics):
+def should_prune_mosei(epoch, metrics, stage1_epochs):
     if metrics is None:
         return False
+    s2 = _s2_epoch(epoch, stage1_epochs)
+    if s2 < 15:
+        return False
     acc2, mae = metrics["Acc2"], metrics["MAE"]
-    if epoch >= 60:
+    if s2 >= 50:
         return acc2 < 0.76 and mae > 0.70
-    if epoch >= 40:
+    if s2 >= 30:
         return acc2 < 0.70 and mae > 0.80
-    if epoch >= 25:
+    if s2 >= 15:
         return acc2 < 0.55 and mae > 0.95
     return False
 
 
-def should_prune_simsv2(epoch, metrics):
+def should_prune_simsv2(epoch, metrics, stage1_epochs):
     if metrics is None:
         return False
+    s2 = _s2_epoch(epoch, stage1_epochs)
+    if s2 < 10:
+        return False
     acc2, mae = metrics["Acc2"], metrics["MAE"]
-    if epoch >= 40:
+    if s2 >= 30:
         return acc2 < 0.72 and mae > 0.55
-    if epoch >= 20:
+    if s2 >= 20:
         return acc2 < 0.68 and mae > 0.58
-    if epoch >= 10:
+    if s2 >= 10:
         return acc2 < 0.62 and mae > 0.65
     return False
 
@@ -669,6 +705,19 @@ def create_study_for_cli(cli):
             sampler=sampler,
             load_if_exists=True,
         )
+        # ── resume-safety: samplers are stateless w.r.t. the DB, so after a
+        # process restart `RandomSampler(seed=S)` / `TPESampler(seed=S)` would
+        # redraw the same first-N parameter vectors. Shift the seed by the
+        # number of trials already persisted so the sequence continues where
+        # it left off instead of recreating earlier trials.
+        existing = len(study.trials)
+        if existing > 0:
+            shifted = (int(sampler_seed) + int(existing)) & 0x7FFFFFFF
+            if sampler_name == "random":
+                study.sampler = RandomSampler(seed=shifted)
+            else:
+                study.sampler = TPESampler(n_startup_trials=n_startup, seed=shifted)
+            mode_label += f" [resume: seed+{existing}]"
         return study, mode_label
 
     mo_sampler = BoTorchSampler(n_startup_trials=n_startup)
@@ -697,9 +746,29 @@ def optimize_with_cleanup(study, cli, ckpt_base):
             else:
                 cleanup_checkpoints_multi(study, ckpt_base)
 
+    # Resume semantics: cli.n_trials is the TARGET total number of finished
+    # trials for this study (COMPLETE + PRUNED + FAIL). When we restart a
+    # driver against an existing DB we should only top up the remaining budget
+    # instead of running cli.n_trials fresh trials on top of what's already
+    # there. RUNNING trials at restart time are counted too (they were
+    # attempts; if they're dead orphans they'll resolve as FAIL quickly).
+    finished_states = (
+        optuna.trial.TrialState.COMPLETE,
+        optuna.trial.TrialState.PRUNED,
+        optuna.trial.TrialState.FAIL,
+        optuna.trial.TrialState.RUNNING,
+    )
+    existing = sum(1 for t in study.trials if t.state in finished_states)
+    remaining = max(0, int(cli.n_trials) - existing)
+    if remaining <= 0:
+        print(f"[resume] study '{cli.study_name}' already has {existing} trials "
+              f">= target {cli.n_trials}; skipping optimize().")
+        return
+    print(f"[resume] study '{cli.study_name}': {existing} existing trials; "
+          f"running {remaining} more to reach target {cli.n_trials}.")
     study.optimize(
         lambda trial: objective(trial, cli),
-        n_trials=cli.n_trials,
+        n_trials=remaining,
         callbacks=[after_trial],
     )
 
@@ -1018,13 +1087,16 @@ def objective(trial, cli):
         proc = subprocess.Popen(
             cmd, stdout=log_f, stderr=subprocess.STDOUT, env=env)
 
+    s1_ep = int(params.get("stage1_epochs", DEFAULTS["stage1_epochs"]))
+    last_reported_epoch = -1
     try:
         while proc.poll() is None:
             time.sleep(15)
             epoch, best_dev = parse_best_dev_metrics(
-                log_path, dataset=ds, selection_metric=cli.selection_metric)
+                log_path, dataset=ds, selection_metric=cli.selection_metric,
+                stage1_epochs=s1_ep)
 
-            if best_dev is not None:
+            if best_dev is not None and epoch > last_reported_epoch:
                 sel_kw = dict(acc2=best_dev["Acc2"], mae=best_dev["MAE"],
                               corr=best_dev["Corr"], f1=best_dev["F1"])
                 if "Acc7" in best_dev:
@@ -1036,12 +1108,14 @@ def objective(trial, cli):
                 selection_value = compute_selection_score(cli.selection_metric, **sel_kw)
                 if not cli.multi_objective:
                     trial.report(selection_value, epoch)
+                last_reported_epoch = epoch
 
-            if PRUNE_FN[ds](epoch, best_dev):
+            if PRUNE_FN[ds](epoch, best_dev, s1_ep):
                 a2 = best_dev["Acc2"] if best_dev else 0
                 m = best_dev["MAE"] if best_dev else 9
-                print(f"  Trial {trial.number} PRUNED ep{epoch}: "
-                      f"Acc2={a2*100:.1f}% MAE={m:.4f}")
+                s2 = max(0, epoch - s1_ep)
+                print(f"  Trial {trial.number} PRUNED ep{epoch} (s2_ep={s2}, "
+                      f"stage1_epochs={s1_ep}): Acc2={a2*100:.1f}% MAE={m:.4f}")
                 proc.send_signal(signal.SIGTERM)
                 proc.wait(timeout=10)
                 raise optuna.TrialPruned()
@@ -1142,10 +1216,18 @@ def main():
                          "seeds in the new study before sampling begins.")
     pa.add_argument("--enqueue_top_k", type=int, default=10,
                     help="Number of top trials per source DB to enqueue.")
+    pa.add_argument("--no_dataset_overrides", action="store_true",
+                    help="Skip apply_dataset_bounds_overrides(); use the FULL global "
+                         "search space. Use for cold restarts that should NOT inherit "
+                         "narrowing derived from prior-GPU runs.")
     cli = pa.parse_args()
 
     ds = cli.dataset
-    apply_dataset_bounds_overrides(ds)
+    if not cli.no_dataset_overrides:
+        apply_dataset_bounds_overrides(ds)
+    else:
+        print(f"[bounds] --no_dataset_overrides set; using full global search space "
+              f"for {ds}.")
     if cli.study_name is None:
         if not cli.multi_objective:
             cli.study_name = f"infogate_{ds}_v6_tpe_mae"
