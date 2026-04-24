@@ -215,10 +215,7 @@ def load_model_from_ckpt(ckpt_path, dataset_name):
         args.num_infogate_layers = 3
         args.dropout_prob = 0.1
         args.beta_ib = 32
-        args.gamma_cyc = 1.0
         args.alpha_ib = 0.01
-        args.cra_layers = 8
-        args.cra_dims = [64, 32, 16]
 
     model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
         MODEL_DIR, multimodal_config=args, num_labels=1)

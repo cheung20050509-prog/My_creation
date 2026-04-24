@@ -95,9 +95,6 @@ def apply_architecture_from_checkpoint(cli_args, ckpt_path):
         "selector_rib_weight",
         "gumbel_tau_start",
         "gumbel_tau_end",
-        "gamma_cyc",
-        "cra_layers",
-        "cra_dims",
     )
     applied = []
     for k in keys:

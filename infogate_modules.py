@@ -2,12 +2,11 @@
 InfoGate: Information Bottleneck-Guided Adaptive Cross-Attention
 for Robust Multimodal Fusion
 
-Addresses five limitations of PCCA (MODS, AAAI 2026):
+Addresses four limitations of PCCA (MODS, AAAI 2026):
 L1. Unfiltered cross-attention         -> IB bottleneck filtering
 L2. Equal-weight auxiliary fusion       -> Adaptive information gates
 L3. No uncertainty awareness            -> Confidence-modulated attention
 L4. No cross-modal consistency          -> Cyclic IB + translation losses
-L5. No missing modality robustness      -> CRA translators
 """
 
 import torch

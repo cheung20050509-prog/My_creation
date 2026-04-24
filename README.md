@@ -11,8 +11,8 @@ pipeline but simplifies runtime behavior:
 - the older missing-modality evaluation path is not exposed here
 - the streamlined forward path is easier to retrain, test, and compare
 
-The code still keeps the bottleneck-based regularization pieces, including CRA translators,
-but `test.py` evaluates the standard complete-modality setting.
+The code still keeps the bottleneck-based regularization pieces (token-level IB
+plus label-level IB), and `test.py` evaluates the standard complete-modality setting.
 
 ## Overview
 
@@ -142,7 +142,6 @@ Defaults in `train.sh`:
 - `bottleneck_dim=128`
 - `num_infogate_layers=3`
 - `beta_ib=16`
-- `gamma_cyc=1.0`
 - `alpha_ib=0.005`
 - `dropout_prob=0.25`
 - `seed=42`
@@ -168,10 +167,8 @@ python train.py \
     --num_heads 4 \
     --num_infogate_layers 3 \
     --beta_ib 16 \
-    --gamma_cyc 1.0 \
     --alpha_ib 0.005 \
     --mse_weight 0.5 \
-    --cra_layers 8 \
     --dropout_prob 0.25 \
     --weight_decay 0.01 \
     --ema_decay 0.999 \
