@@ -90,6 +90,52 @@ and whose best checkpoints were written to:
 - `checkpoints_completeonly_20260402/infogate_mosi_best.pt`
 - `checkpoints_completeonly_20260402/infogate_mosei_best.pt`
 
+## Literature baselines (SOTA comparison)
+
+The tables below mirror `baseline_table.tex` (compiled into the paper). **†** marks
+numbers cited from the respective papers as in that table. The **InfoGate (Ours)**
+row is left as placeholders (`—`) until you paste final PRISM/InfoGate numbers.
+
+### CMU-MOSI and CMU-MOSEI
+
+| Baseline | MOSI Acc7↑ | MOSI Acc2↑ | MOSI F1↑ | MOSI MAE↓ | MOSI Corr↑ | MOSEI Acc7↑ | MOSEI Acc2↑ | MOSEI F1↑ | MOSEI MAE↓ | MOSEI Corr↑ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| MFM | 33.3 | 80.0 | 80.1 | 0.948 | 0.664 | 50.8 | 83.4 | 83.4 | 0.580 | 0.722 |
+| Self-MM | 45.8 | 84.9 | 84.8 | 0.731 | 0.785 | 53.0 | 85.2 | 85.2 | 0.540 | 0.763 |
+| AtCAF† | 46.5 | 88.6 | 88.5 | 0.650 | 0.831 | 55.9 | 87.0 | 86.8 | 0.508 | 0.785 |
+| DLF† | 47.1 | 85.1 | 85.0 | 0.731 | 0.781 | 53.9 | 85.4 | 85.3 | 0.536 | 0.764 |
+| KuDA† | 47.1 | 86.4 | 86.5 | 0.705 | 0.795 | 52.9 | 86.5 | 86.6 | 0.529 | 0.776 |
+| DEVA† | 46.3 | 86.3 | 86.3 | 0.730 | 0.787 | 52.3 | 86.1 | 86.2 | 0.541 | 0.769 |
+| C-MIB | 47.7 | 87.8 | 87.8 | 0.662 | 0.835 | 52.7 | 86.9 | 86.8 | 0.542 | 0.784 |
+| ITHP | 47.7 | 88.5 | 88.5 | 0.663 | 0.856 | 52.2 | 87.1 | 87.1 | 0.550 | 0.792 |
+| Multimodal Boosting | 49.1 | 88.5 | 88.4 | 0.634 | 0.855 | 54.0 | 86.5 | 86.5 | 0.523 | 0.779 |
+| CaMIB† | 48.0 | 89.8 | **89.8** | 0.616 | 0.857 | 53.5 | 87.3 | 87.2 | 0.517 | 0.788 |
+| DMD | 44.9 | 84.3 | 84.3 | 0.726 | 0.788 | 52.8 | 84.6 | 84.6 | 0.538 | 0.768 |
+| EMOE | 45.2 | 84.8 | 84.8 | 0.723 | 0.790 | 52.5 | 85.0 | 85.0 | 0.542 | 0.760 |
+| TMSON† | 47.4 | 87.2 | 87.2 | 0.687 | 0.809 | 55.6 | 86.4 | 86.2 | 0.526 | 0.766 |
+| MOAC† | 48.6 | 89.0 | 89.0 | **0.605** | **0.857** | 54.3 | **87.6** | **87.6** | 0.512 | **0.793** |
+| **InfoGate (Ours)** | — | — | — | — | — | — | — | — | — | — |
+
+### CH-SIMS v2
+
+| Baseline | Acc5↑ | Acc3↑ | Acc2↑ | F1↑ | MAE↓ | Corr↑ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| EF-LSTM | 53.7 | 73.5 | 80.1 | 80.0 | 0.309 | 0.700 |
+| LF-DNN | 51.8 | 71.2 | 77.8 | 77.9 | 0.322 | 0.668 |
+| TFN | 53.3 | 70.9 | 78.1 | 78.1 | 0.322 | 0.662 |
+| LMF | 51.6 | 70.0 | 77.8 | 77.8 | 0.327 | 0.651 |
+| MFN | **55.4** | 72.7 | 79.4 | 79.4 | 0.301 | 0.712 |
+| Graph-MFN | 48.9 | 68.6 | 76.6 | 76.6 | 0.334 | 0.644 |
+| MISA | 47.5 | 68.9 | 78.2 | 78.3 | 0.342 | 0.671 |
+| MAG-BERT | 49.2 | 70.6 | 77.1 | 77.1 | 0.346 | 0.641 |
+| Self-MM | 53.5 | 72.7 | 78.7 | 78.6 | 0.315 | 0.691 |
+| MMIM | 50.5 | 70.4 | 77.8 | 77.8 | 0.339 | 0.641 |
+| AV-MC | 52.1 | 73.2 | 80.6 | 80.7 | 0.301 | 0.721 |
+| KuDA† | 53.1 | **74.3** | 80.2 | 80.1 | **0.289** | **0.741** |
+| **InfoGate (Ours)** | — | — | — | — | — | — |
+
+**Bold** in baseline rows matches the LaTeX table emphasis in `baseline_table.tex` (best-in-column style marks).
+
 ## Repository Layout
 
 ```text
