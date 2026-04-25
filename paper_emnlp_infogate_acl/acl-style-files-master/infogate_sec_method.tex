@@ -1,0 +1,270 @@
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Problem Statement}
+\label{sec:method-prob}
+The multimodal sentiment analysis (MSA) task predicts a continuous or discrete
+sentiment target from three modalities---language ($t$), acoustic ($a$), and
+visual ($v$)---extracted from short video clips.
+Given a training set $\{(X^{(i)}_t,X^{(i)}_a,X^{(i)}_v,y^{(i)})\}_{i=1}^{N}$
+with labels $y^{(i)}\in[-3,3]$ on CMU-MOSI and CMU-MOSEI and dataset-specific
+ranges on CH-SIMS v2, we map every modality to a common hidden size $d$ and
+denote the unified unimodal sequence features as
+$F_m \in \mathbb{R}^{B \times T \times d}$ with token mask
+$M_m \in \{0,1\}^{B \times T}$ for $m \in \{t, a, v\}$.
+Our goal is to learn a predictor
+$f_{\theta}:\ (X_t, X_a, X_v) \mapsto \hat{y}$ with parameters $\theta$ by
+minimizing the empirical risk $\tfrac{1}{N}\sum_i \mathcal{L}^{(i)}$, where
+$\mathcal{L}^{(i)}$ is specified in \S\ref{sec:method-loss}.
+At inference, routing uses the argmax over selector logits (no Gumbel noise).
+
+\subsection{Framework Overview}
+\label{sec:method-overview}
+The overall architecture of \textbf{PRISM} is illustrated in
+Figure~\ref{fig:arch} and summarized in Algorithm~\ref{alg:forward}.
+First, each modality is passed through a lightweight projection followed by
+an IB encoder that outputs a bottleneck representation $B_m$ together with a
+per-token confidence signal $C_m$ derived from the bottleneck variance.
+The three bottleneck sequences are then fed into a Primary Modality Selector
+(\textbf{MSelector}) to determine a per-sample primary modality $p$ and two
+secondary modalities $a_1,a_2$, together with their routed bottlenecks and
+confidences $(B_p, C_p)$, $(B_{a_1}, C_{a_1})$ and $(B_{a_2}, C_{a_2})$.
+After primary modality selection, the three streams are progressively processed
+by a stack of \textbf{InfoGate layers} that carry out confidence-biased
+cross-modal attention and adaptive gating centered on the primary modality,
+yielding an enhanced primary bottleneck $B_p^{\mathrm{out}}$.
+Finally, $B_p^{\mathrm{out}}$ is aggregated by a masked pooling operation and
+passed through a multilayer perceptron (MLP) head to obtain the sentiment
+prediction $\hat{y}$.
+
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}[
+    font=\scriptsize,
+    box/.style={draw, rounded corners, align=center, inner sep=2pt, minimum width=1.15cm},
+    arr/.style={-{Latex[length=1.5mm]}, thick}
+  ]
+    \node[box] (t) {Text\\DeBERTa};
+    \node[box, right=0.35cm of t] (a) {Audio\\proj};
+    \node[box, right=0.35cm of a] (v) {Vision\\proj};
+    \node[box, below=0.45cm of t, xshift=1.1cm] (ib) {IB enc.\\$B_m,C_m$};
+    \node[box, below=0.45cm of ib] (ms) {MSelector\\Gumbel};
+    \node[box, below=0.45cm of ms] (ig) {InfoGate\\layers};
+    \node[box, below=0.45cm of ig] (hd) {Primary pool\\+ head};
+    \draw[arr] (t) -- (ib);
+    \draw[arr] (a) -- (ib);
+    \draw[arr] (v) -- (ib);
+    \draw[arr] (ib) -- (ms);
+    \draw[arr] (ms) -- (ig);
+    \draw[arr] (ig) -- (hd);
+  \end{tikzpicture}
+  \caption{The overall architecture of the proposed PRISM framework:
+    per-modality IB bottlenecks, dynamic primary modality selection,
+    confidence-aware cross-modal fusion via stacked InfoGate layers, and
+    primary-only prediction.}
+  \label{fig:arch}
+\end{figure}
+
+\begin{algorithm}[t]
+  \caption{PRISM forward pass on a single batch.}
+  \label{alg:forward}
+  \begin{algorithmic}[1]
+    \STATE Project inputs to $F_t,F_a,F_v$ and encode IB latents
+      $(B_m,\mu_m,\log v_m,C_m)$ for $m\in\{t,a,v\}$.
+    \STATE Compute per-modality IB objective
+      $\mathcal{L}_{\mathrm{vib}}$ and pooled label-supervised term
+      $\mathcal{L}_{\mathrm{pib}}$.
+    \STATE Obtain routing weights and hard choice
+      $(w,y)\leftarrow \mathrm{MSelector}(B_t,B_a,B_v)$ via Gumbel--Softmax.
+    \STATE Route $(B_p,C_p,B_{a_1},C_{a_1},B_{a_2},C_{a_2})$ from
+      $(B_m,C_m,w,y)$ with straight-through gradients.
+    \STATE $B_p^{\mathrm{out}} \leftarrow
+      \mathrm{InfoGateStack}(B_p,C_p,B_{a_1},C_{a_1},B_{a_2},C_{a_2})$.
+    \STATE $\hat{y} \leftarrow \mathrm{Head}(\mathrm{Pool}(B_p^{\mathrm{out}}))$.
+    \IF{stage $= 2$}
+      \STATE Compute routing supervision
+        $\mathcal{L}_{\mathrm{route}}$ from per-modality prediction errors.
+    \ENDIF
+    \RETURN $\hat{y}$,
+      $\mathcal{L}_{\mathrm{vib}}+\mathcal{L}_{\mathrm{pib}}$,
+      $\mathcal{L}_{\mathrm{route}}$.
+  \end{algorithmic}
+\end{algorithm}
+
+\subsection{Unimodal Projections and Variational IB Encoders}
+\label{sec:method-ibenc}
+Learned linear layers first project text, acoustic, and visual inputs to the
+unified feature tensors $F_m \in \mathbb{R}^{B \times T \times d}$.
+Each $F_m$ is then passed through an IB encoder, realized as a small MLP whose
+output head predicts a Gaussian mean and log-variance
+$\mu_m, \log v_m \in \mathbb{R}^{B \times T \times d_b}$, where $d_b$ is the
+bottleneck width. Using the reparameterization trick, we draw
+\begin{equation}
+  B_m = \mu_m + \epsilon \odot \exp\!\bigl(\tfrac{1}{2}\log v_m\bigr),
+  \qquad
+  \epsilon \sim \mathcal{N}(0, I),
+\end{equation}
+during training and set $B_m = \mu_m$ at inference.
+From the same variance, we derive a per-token confidence map
+\begin{equation}
+  C_m = \sigma\!\bigl(-\log v_m\bigr) \in (0, 1)^{B \times T \times d_b},
+\end{equation}
+so that high-variance positions receive low confidence and are naturally
+attenuated in subsequent fusion.
+
+\paragraph{Variational IB objective.}
+To encourage each bottleneck to discard modality-specific nuisance while
+retaining information needed to reconstruct the upstream feature, we introduce
+modality-specific decoders $g_m$ that map bottlenecks back to the unified
+space and minimize
+\begin{equation}
+  \mathcal{L}_{\mathrm{vib}}
+  = \sum_{m}
+    \mathbb{E}\!\left[
+      \mathrm{KL}\!\bigl(q(B_m\mid F_m)\,\|\,\mathcal{N}(0,I)\bigr)
+      + \beta_{\mathrm{IB}}\,\bigl\|g_m(B_m) - F_m\bigr\|_2^2
+    \right],
+\end{equation}
+where the KL and reconstruction terms are averaged over valid tokens via the
+modality mask $M_m$, and $\beta_{\mathrm{IB}}$ trades compression against
+fidelity.
+
+\paragraph{Pooled label-supervised IB prediction.}
+To inject high-level semantic supervision into each bottleneck, we further
+attach per-modality linear probes $\psi_m$ on the masked-mean pooled
+bottleneck $\bar{B}_m$. Let $e_m = |\psi_m(\bar{B}_m) - y|$ denote the
+per-modality prediction error (or BCE loss in the classification case).
+We aggregate the probe losses and pooled-KL terms into
+\begin{equation}
+  \mathcal{L}_{\mathrm{pib}}
+  = \frac{1}{|\mathcal{M}|}\sum_{m \in \mathcal{M}}
+    \Bigl(e_m + \beta_{\mathrm{IB}}\,\mathrm{KL}\!\bigl(q(\bar{B}_m)\,\|\,\mathcal{N}(0,I)\bigr)\Bigr),
+\end{equation}
+with $\mathcal{M} = \{t, a, v\}$. The per-modality errors $e_m$ are also reused
+as routing targets in \S\ref{sec:method-rib}.
+
+\subsection{Dynamic Primary Modality Selection}
+\label{sec:method-msel}
+The sample-wise primary modality is determined by an adaptive MSelector
+module, similar in role to the dynamic selector in MODS
+\citep{mods2026align} but operating on IB bottleneck sequences rather than raw
+features.
+For each modality, a scalar projection followed by softmax attention over
+time aggregates $B_m$ into a one-dimensional vector
+$h_m \in \mathbb{R}^{d_b}$:
+\begin{equation}
+  a_m = \mathrm{softmax}\!\left(\frac{B_m W_m}{\sqrt{d_b}}\right)^{\!\top},
+  \quad
+  h_m = a_m B_m,
+  \quad m \in \{t, a, v\}.
+\end{equation}
+A shallow MLP then maps $\mathrm{concat}(h_t, h_a, h_v)$ to routing logits
+$z \in \mathbb{R}^3$. During training we use Gumbel--Softmax with the
+straight-through trick \citep{jang2017gumbel} to obtain a hard one-hot primary
+choice together with a soft routing weight:
+\begin{equation}
+  y = \mathrm{GumbelSoftmax}\!\bigl(z,\tau_{\mathrm{gumbel}},\mathrm{hard}\bigr),
+  \qquad
+  w = \mathrm{softmax}\!\bigl(z / \tau_{\mathrm{gumbel}}\bigr),
+\end{equation}
+with temperature $\tau_{\mathrm{gumbel}}$ annealed linearly across epochs.
+The primary bottleneck is assembled as a straight-through mixture
+$B_p = \sum_m y_m B_m$, while the two secondary bottlenecks
+$B_{a_1}, B_{a_2}$ are the remaining modalities weighted by their soft routing
+scores. Their associated confidence maps $C_p, C_{a_1}, C_{a_2}$ are routed
+identically, so downstream attention sees confidence that is consistent with
+the selected primary.
+
+\subsection{Information-Bottleneck-Guided Fusion}
+\label{sec:method-layer}
+Stacked InfoGate layers refine the primary stream using the routed secondary
+streams, playing a role analogous to the primary-modality-centric fusion
+blocks in MODS but replacing plain cross-attention with IB-guided attention
+\citep{alemi2017deep}.
+
+\paragraph{IB-guided attention.}
+For a multi-head attention block, let $Q$, $K$, $V$ be the standard linear
+projections, so that the raw scaled-dot-product scores are
+$S = (Q K^{\top})/\sqrt{d/h}$. We inject the per-token confidence of the key
+sequence as an additive log-confidence bias on the attention logits and as a
+multiplicative gate on the values:
+\begin{equation}
+  \tilde{S}_{i,j}
+    = S_{i,j} + \gamma \cdot \log\!\bigl(\bar{c}_j + \epsilon\bigr),
+  \qquad
+  \tilde{V}_j = V_j \odot \bar{c}_j,
+\end{equation}
+where $\gamma$ is a learnable scalar and $\bar{c}_j$ is the confidence of
+position $j$ averaged over the bottleneck channel dimension.
+High-confidence keys therefore receive larger logits and contribute values
+closer to their original magnitudes, while low-confidence (high-variance)
+keys are softly suppressed in both the attention distribution and the value
+aggregation.
+
+\paragraph{Layer mechanics.}
+Each InfoGate layer performs three operations in parallel on the primary
+bottleneck: (i) IB-guided cross-attention from primary queries to each of the
+two secondary modalities, with their confidence as above; (ii) IB-guided
+self-attention within the primary stream; and (iii) cosine-similarity
+alignment factors that modulate an adaptive gate
+$g = \sigma\bigl(W\,[\mathrm{LN}(B_p)\,\|\,\mathrm{CA}(B_p)]\bigr)$ on the
+cross-attention outputs. The three contributions are summed with a residual
+connection and followed by a position-wise feed-forward block. All but the
+last layer also update the two secondary streams via a symmetric reverse
+cross-attention so that auxiliary tokens absorb primary context; the final
+layer retains only the primary output $B_p^{\mathrm{out}}$, which is the
+representation passed to the prediction head.
+
+\subsection{Routing Supervision}
+\label{sec:method-rib}
+Stage~1 of training lets the selector drift freely so that the IB encoders can
+warm up. In stage~2 we add a routing supervision term that aligns the soft
+routing weights $w$ with per-modality prediction errors from the label-level
+probes. Specifically, for each modality we convert the error $e_m$ into a
+soft target
+\begin{equation}
+  t_m \propto \exp\!\bigl(-e_m / \tau_{\mathrm{sel}}\bigr),
+  \qquad
+  \sum_{m} t_m = 1,
+\end{equation}
+and define the routing loss as a masked KL divergence
+\begin{equation}
+  \mathcal{L}_{\mathrm{route}}
+    = \mathbb{I}[\,\Delta_e \ge \tau_{\mathrm{gap}}\,]\cdot
+      \mathrm{KL}\bigl(w\,\|\,t\bigr)
+    + \lambda_{\mathrm{ent}}\,\mathcal{H}(w),
+\end{equation}
+where $\Delta_e$ is the spread of per-modality errors in the batch and
+$\tau_{\mathrm{gap}}$ is a gap threshold that prevents the KL term from
+firing when all modalities already fit the label comparably. The optional
+entropy regularizer $\mathcal{H}(w)$, weighted by $\lambda_{\mathrm{ent}}$,
+discourages the selector from collapsing to a single static modality.
+
+\subsection{Training Objective Optimization}
+\label{sec:method-loss}
+The sentiment prediction is obtained as
+$\hat{y} = \mathrm{Head}(\mathrm{LN}(\mathrm{Pool}(B_p^{\mathrm{out}})))$
+with a masked-mean pooling operator and a linear regression head.
+We adopt a hybrid task loss that combines mean absolute error with a
+mean-squared-error regularizer,
+\begin{equation}
+  \mathcal{L}_{\mathrm{task}}
+    = |\hat{y} - y| + \rho_{\mathrm{mse}}\,(\hat{y} - y)^2,
+\end{equation}
+where $\rho_{\mathrm{mse}}$ weights the MSE component.
+The overall training objective unifies the task loss, the variational and
+pooled IB objectives, and the stage-two routing supervision:
+\begin{equation}
+  \mathcal{L}
+    = \mathcal{L}_{\mathrm{task}}
+    + \alpha_{\mathrm{IB}}\!\left(\mathcal{L}_{\mathrm{vib}}
+        + \mathcal{L}_{\mathrm{pib}}\right)
+    + \lambda_{\mathrm{route}}\,\mathcal{L}_{\mathrm{route}},
+\end{equation}
+with $\mathcal{L}_{\mathrm{route}} \equiv 0$ in stage~1 and activated in
+stage~2.
+Compared with symmetric MulT-style stacks \citep{tsai2019multimodal}, the
+design of PRISM \emph{asymmetrizes} the fusion: only the primary stream
+carries the final prediction, and keys with high IB uncertainty are
+down-weighted, while the per-layer cost stays in the same
+$\mathcal{O}(L \cdot T^2 d)$ regime as a standard Transformer block.

@@ -1,0 +1,29 @@
+\textbf{Scope.}
+We evaluate complete-modality inputs only; robustness to missing or corrupted
+modalities is future work.
+
+\textbf{Statistical power.}
+Table~\ref{tab:lit} reports single-seed optima; variance across seeds and GPUs is
+not yet fully characterized.
+
+\textbf{Baselines.}
+Literature aggregates may use slightly different splits or preprocessing; head-to-
+head comparisons under a unified codebase are incomplete.
+
+\textbf{Reproducibility.}
+Large encoders and long Optuna sweeps are compute-intensive; we will release
+random seeds, exact CLI, and database URIs upon acceptance.
+
+\textbf{Hyperparameter interaction.}
+Many knobs (Gumbel schedule, EMA start, IB weights, selector temperature) interact
+non-linearly; our Optuna studies partially explore this space but cannot claim
+global optimality.
+
+\textbf{Language coverage.}
+Experiments focus on English MOSI/MOSEI and Chinese CH-SIMS v2; other languages
+and cultural display norms are unstudied.
+
+\textbf{Oracle metrics.}
+Training logs optionally record ``oracle'' test-MAE epochs for debugging; these
+are \emph{not} used for model selection and should not be quoted as primary
+scores.

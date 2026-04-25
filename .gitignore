@@ -20,3 +20,12 @@ venv/
 # LaTeX/paper build artifacts (keep sources tracked; ignore regenerated outputs)
 
 paper_files/*.aux
+
+# EMNLP / ACL draft (paper_emnlp_infogate_acl): track *.tex *.bib *.sty etc.; ignore builds
+paper_emnlp_infogate_acl/acl-style-files-master/*.aux
+paper_emnlp_infogate_acl/acl-style-files-master/*.log
+paper_emnlp_infogate_acl/acl-style-files-master/*.out
+paper_emnlp_infogate_acl/acl-style-files-master/*.bbl
+paper_emnlp_infogate_acl/acl-style-files-master/*.blg
+paper_emnlp_infogate_acl/acl-style-files-master/*.pdf
+paper_emnlp_infogate_acl/acl-style-files-master/*.synctex.gz
