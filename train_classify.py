@@ -20,10 +20,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from transformers import get_linear_schedule_with_warmup, DebertaV2Tokenizer
+from transformers import get_linear_schedule_with_warmup, AlbertTokenizer
 from torch.optim import AdamW
 
-from deberta_infogate import InfoGate_DeBertaForSequenceClassification
+from albert_infogate import InfoGate_AlbertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
 from data_humor import build_humor_loaders
@@ -39,7 +39,8 @@ from selection_utils import (
 # ============================================================
 parser = argparse.ArgumentParser(description="InfoGate Binary Classification Training")
 parser.add_argument("--model", type=str,
-                    default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base"))
+                    default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "albert-base-v2"),
+                    help="Path to ALBERT weights (HKT-aligned MHD/MSD setup).")
 parser.add_argument("--dataset", type=str, choices=["ur_funny", "mustard"], default="ur_funny")
 parser.add_argument("--max_seq_length", type=int, default=64,
                     help="HKT default: 64 for humor, 77 for sarcasm.")
@@ -99,6 +100,7 @@ global_configs.set_dataset_config(args.dataset)
 ACOUSTIC_DIM = global_configs.ACOUSTIC_DIM
 VISUAL_DIM = global_configs.VISUAL_DIM
 TEXT_DIM = global_configs.TEXT_DIM
+HCF_DIM = global_configs.HCF_DIM
 
 
 # ============================================================
@@ -106,7 +108,7 @@ TEXT_DIM = global_configs.TEXT_DIM
 # ============================================================
 
 def setup_data():
-    tokenizer = DebertaV2Tokenizer.from_pretrained(args.model)
+    tokenizer = AlbertTokenizer.from_pretrained(args.model)
     return build_humor_loaders(
         dataset=args.dataset,
         tokenizer=tokenizer,
@@ -118,6 +120,8 @@ def setup_data():
         test_batch_size=args.test_batch_size,
         gradient_accumulation_step=args.gradient_accumulation_step,
         n_epochs=args.n_epochs,
+        hcf_dim=HCF_DIM,
+        slice_hkt=True,
     )
 
 
@@ -137,9 +141,9 @@ def set_seed(seed):
 
 
 def build_model(n_opt):
-    model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
+    model = InfoGate_AlbertForSequenceClassification.from_pretrained(
         args.model, multimodal_config=args, num_labels=1)
-    backbone_prefix = "dberta.model."
+    backbone_prefix = "albert.model."
     model.to(DEVICE)
 
     no_decay = {"bias", "LayerNorm.bias", "LayerNorm.weight"}
@@ -228,21 +232,38 @@ def task_loss(logits, labels):
         logits.view(-1), labels.view(-1).float())
 
 
+def _unpack_batch(batch, use_hcf):
+    """Unpack a humor-dataset batch. Layout depends on ``use_hcf``:
+        use_hcf=False:  (input_ids, visual, acoustic, label)
+        use_hcf=True:   (input_ids, visual, acoustic, hcf, label)
+    Returns: input_ids, visual, acoustic, hcf (or None), label_ids
+    """
+    if use_hcf:
+        input_ids, visual, acoustic, hcf, label_ids = batch
+        visual = visual.squeeze(1)
+        acoustic = acoustic.squeeze(1)
+        hcf = hcf.squeeze(1)
+        return input_ids, visual, acoustic, hcf, label_ids
+    input_ids, visual, acoustic, label_ids = batch
+    visual = visual.squeeze(1)
+    acoustic = acoustic.squeeze(1)
+    return input_ids, visual, acoustic, None, label_ids
+
+
 def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
     model.train()
     total_loss, steps = 0.0, 0
     sum_task, sum_ib = 0.0, 0.0
     sum_detail = {}
+    use_hcf = HCF_DIM > 0
 
     train_pbar = tqdm(loader, desc=f"Train (stage {stage})")
     for step, batch in enumerate(train_pbar):
         batch = tuple(t.to(DEVICE) for t in batch)
-        input_ids, visual, acoustic, label_ids = batch
-        visual = visual.squeeze(1)
-        acoustic = acoustic.squeeze(1)
+        input_ids, visual, acoustic, hcf, label_ids = _unpack_batch(batch, use_hcf)
 
         logits, ib_loss, loss_dict, _ = model(
-            input_ids, visual, acoustic, labels=label_ids, stage=stage)
+            input_ids, visual, acoustic, hcf=hcf, labels=label_ids, stage=stage)
 
         pred_flat = logits.view(-1)
         label_flat = label_ids.view(-1)
@@ -284,14 +305,13 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
 def test_epoch(model, loader, stage=2, desc="Test"):
     model.eval()
     preds, labels = [], []
+    use_hcf = HCF_DIM > 0
     with torch.no_grad():
         for batch in tqdm(loader, desc=desc):
             batch = tuple(t.to(DEVICE) for t in batch)
-            input_ids, visual, acoustic, label_ids = batch
-            visual = visual.squeeze(1)
-            acoustic = acoustic.squeeze(1)
+            input_ids, visual, acoustic, hcf, label_ids = _unpack_batch(batch, use_hcf)
 
-            logits, _, _, _ = model(input_ids, visual, acoustic, stage=stage)
+            logits, _, _, _ = model(input_ids, visual, acoustic, hcf=hcf, stage=stage)
             preds.extend(logits.view(-1).cpu().numpy().tolist())
             labels.extend(label_ids.view(-1).cpu().numpy().tolist())
 
@@ -387,7 +407,7 @@ def main():
         tau_e = getattr(args, 'gumbel_tau_end', 0.5)
         tau = tau_s + (tau_e - tau_s) * epoch / max(args.n_epochs - 1, 1)
         m = model.module if hasattr(model, 'module') else model
-        ig = m.dberta.infogate
+        ig = m.albert.infogate
         ig.mselector.gumbel_tau = tau
 
         eval_with_ema = epoch >= args.ema_start_epoch
@@ -403,30 +423,49 @@ def main():
         detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items()
                                 if k.startswith('L_'))
         print(f"  Detail  {detail_str}")
-        diag_keys = ['w_acoustic', 'w_language', 'w_visual',
-                     'target_acoustic', 'target_language', 'target_visual',
-                     'primary_a', 'primary_l', 'primary_v',
-                     'err_acoustic', 'err_language', 'err_visual',
-                     'conf_t', 'conf_a', 'conf_v', 'fusion_conf',
+        diag_keys = ['w_acoustic', 'w_language', 'w_visual', 'w_hcf',
+                     'target_acoustic', 'target_language', 'target_visual', 'target_hcf',
+                     'primary_a', 'primary_l', 'primary_v', 'primary_h',
+                     'err_acoustic', 'err_language', 'err_visual', 'err_hcf',
+                     'conf_t', 'conf_a', 'conf_v', 'conf_h', 'fusion_conf',
                      'routing_entropy', 'pred_mean', 'pred_std']
         diag_vals = {k: tr_detail[k] for k in diag_keys if k in tr_detail}
         if diag_vals:
-            w_str = (f"w=[a:{diag_vals.get('w_acoustic',0):.3f} "
-                     f"l:{diag_vals.get('w_language',0):.3f} "
-                     f"v:{diag_vals.get('w_visual',0):.3f}]")
-            tgt_str = (f"target=[a:{diag_vals.get('target_acoustic',0):.3f} "
-                       f"l:{diag_vals.get('target_language',0):.3f} "
-                       f"v:{diag_vals.get('target_visual',0):.3f}]")
-            p_str = (f"primary=[a:{diag_vals.get('primary_a',0):.2f} "
-                     f"l:{diag_vals.get('primary_l',0):.2f} "
-                     f"v:{diag_vals.get('primary_v',0):.2f}]")
-            err_str = (f"err=[a:{diag_vals.get('err_acoustic',0):.3f} "
-                       f"l:{diag_vals.get('err_language',0):.3f} "
-                       f"v:{diag_vals.get('err_visual',0):.3f}]")
-            c_str = (f"conf=[t:{diag_vals.get('conf_t',0):.3f} "
-                     f"a:{diag_vals.get('conf_a',0):.3f} "
-                     f"v:{diag_vals.get('conf_v',0):.3f} "
-                     f"fused:{diag_vals.get('fusion_conf',0):.3f}]")
+            w_parts = [f"a:{diag_vals.get('w_acoustic',0):.3f}",
+                       f"l:{diag_vals.get('w_language',0):.3f}",
+                       f"v:{diag_vals.get('w_visual',0):.3f}"]
+            if 'w_hcf' in diag_vals:
+                w_parts.append(f"h:{diag_vals['w_hcf']:.3f}")
+            w_str = f"w=[{' '.join(w_parts)}]"
+
+            tgt_parts = [f"a:{diag_vals.get('target_acoustic',0):.3f}",
+                         f"l:{diag_vals.get('target_language',0):.3f}",
+                         f"v:{diag_vals.get('target_visual',0):.3f}"]
+            if 'target_hcf' in diag_vals:
+                tgt_parts.append(f"h:{diag_vals['target_hcf']:.3f}")
+            tgt_str = f"target=[{' '.join(tgt_parts)}]"
+
+            p_parts = [f"a:{diag_vals.get('primary_a',0):.2f}",
+                       f"l:{diag_vals.get('primary_l',0):.2f}",
+                       f"v:{diag_vals.get('primary_v',0):.2f}"]
+            if 'primary_h' in diag_vals:
+                p_parts.append(f"h:{diag_vals['primary_h']:.2f}")
+            p_str = f"primary=[{' '.join(p_parts)}]"
+
+            err_parts = [f"a:{diag_vals.get('err_acoustic',0):.3f}",
+                         f"l:{diag_vals.get('err_language',0):.3f}",
+                         f"v:{diag_vals.get('err_visual',0):.3f}"]
+            if 'err_hcf' in diag_vals:
+                err_parts.append(f"h:{diag_vals['err_hcf']:.3f}")
+            err_str = f"err=[{' '.join(err_parts)}]"
+
+            c_parts = [f"t:{diag_vals.get('conf_t',0):.3f}",
+                       f"a:{diag_vals.get('conf_a',0):.3f}",
+                       f"v:{diag_vals.get('conf_v',0):.3f}"]
+            if 'conf_h' in diag_vals:
+                c_parts.append(f"h:{diag_vals['conf_h']:.3f}")
+            c_parts.append(f"fused:{diag_vals.get('fusion_conf',0):.3f}")
+            c_str = f"conf=[{' '.join(c_parts)}]"
             rib_str = f"route_H={diag_vals.get('routing_entropy',0):.3f}"
             pred_str = (f"pred_logit=[mean:{diag_vals.get('pred_mean',0):.3f} "
                         f"std:{diag_vals.get('pred_std',0):.3f}]")

@@ -9,6 +9,19 @@ Independent from `optuna_search_v2.py` (which targets MOSI/MOSEI/SIMSV2 +
   - MUSTARD: two-stage Random -> TPE-local (small dev set, cheap trials).
   - UR-FUNNY: single-stage TPE (expensive trials, ~1-1.5h each).
 
+HKT-aligned setup (as of the Albert+HCF migration):
+  - Text backbone: ALBERT-base-v2 (see `train_classify.py --model` default,
+    which points at `./albert-base-v2`).
+  - Modalities fed to InfoGate: text + acoustic(60) + visual(36) + HCF(4),
+    i.e. the 4-modality InfoGate with MSelector + IB encoders.
+  - HCF is routed as a 4th modality via `infogate_modules.InfoGate`
+    (`hcf_dim=4`); dimensions come from `global_configs.set_dataset_config`.
+
+Prior UR-FUNNY v1/v2 studies (DeBERTa + no-HCF + 81/91 dims) are **not
+comparable** to new studies produced by this driver. New default study names
+now carry an `_albert_hcf` suffix so resuming via `--enqueue_top_from` does
+not silently mix backbones.
+
 Artefact layout matches `optuna_search_v2.py`:
   logs/<RUN_TAG>/{db,train_logs,checkpoints} when --db sqlite lives under
   <root>/db/*.db (auto-detected) or pass --artefact_root explicitly.
@@ -995,7 +1008,9 @@ def main():
     ds = cli.dataset
     if cli.study_name is None:
         suffix = sanitize_name(cli.selection_metric)
-        cli.study_name = f"infogate_{ds}_classify_{suffix}"
+        # Default name now carries the HKT-aligned tag to prevent silent
+        # mixing with prior DeBERTa/no-HCF UR-FUNNY v1/v2 studies.
+        cli.study_name = f"infogate_{ds}_classify_albert_hcf_{suffix}"
 
     if cli.db is None:
         log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna_classify")

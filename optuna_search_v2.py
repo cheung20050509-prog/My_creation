@@ -65,8 +65,10 @@ LOG_FLOAT_BOUNDS = {
 }
 
 LINEAR_FLOAT_BOUNDS = {
-    "mse_weight": (0.0, 2.0),
-    "dropout_prob": (0.05, 0.4),
+    # Upper bounds widened slightly after 4090D_restart/phase1 MOSI best (trial 52)
+    # saturated dropout~0.40 and mse_weight~1.92 under the old [0,2] cap.
+    "mse_weight": (0.0, 2.25),
+    "dropout_prob": (0.05, 0.48),
     "warmup_proportion": (0.02, 0.25),
     "selector_target_temp": (0.1, 1.0),
     "selector_rib_weight": (0.01, 0.2),
@@ -113,12 +115,17 @@ def suggest_categorical_param(trial, name, choices, local_space=None):
 
 
 def suggest_tier1(trial, dataset="mosi", n_epochs_max=None, n_epochs_min=None,
-                  local_space=None):
+                  local_space=None, search_tier=1):
     candidates = BATCH_CANDIDATES[dataset]
     batch_idx = suggest_categorical_param(
         trial, "batch_config", list(range(len(candidates))), local_space)
     bs, accum = candidates[batch_idx]
     ep_lo, ep_hi = DATASET_EPOCH_RANGE[dataset]
+    # Tier>=2 MOSI: allow a few more epochs (stage-2 + extra IB knobs need runway);
+    # floor nudged up slightly since very short runs rarely compete on dev-MAE.
+    if dataset == "mosi" and int(search_tier) >= 2:
+        ep_lo = max(ep_lo, 88)
+        ep_hi = min(135, ep_hi + 5)
     if n_epochs_min is not None:
         ep_lo = n_epochs_min
     if n_epochs_max is not None:
@@ -202,7 +209,8 @@ def build_search_params(trial, tier, dataset="mosi", n_epochs_max=None, n_epochs
                         local_space=None):
     params = dict(DEFAULTS)
     params.update(suggest_tier1(
-        trial, dataset, n_epochs_max, n_epochs_min, local_space=local_space))
+        trial, dataset, n_epochs_max, n_epochs_min,
+        local_space=local_space, search_tier=tier))
     if tier >= 2:
         params.update(suggest_tier2(trial, local_space=local_space))
     if tier >= 3:
@@ -379,7 +387,7 @@ BATCH_CANDIDATES = {
 DATASET_EPOCH_RANGE = {
     "mosi":   (80, 130),
     "mosei":  (30, 50),
-    "simsv2": (45, 70),
+    "simsv2": (45, 85),
 }
 
 

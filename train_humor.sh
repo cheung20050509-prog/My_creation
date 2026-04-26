@@ -1,9 +1,16 @@
 #!/bin/bash
-# InfoGate Binary Classification Training: UR-FUNNY (humor)
+# InfoGate Binary Classification Training: UR-FUNNY (humor) / MUStARD (sarcasm)
+#
+# HKT-aligned setup (ALBERT + HCF + sliced A/V dims), mirrors the text-tower
+# and feature-slicing conventions from https://github.com/matalvepu/HKT :
+#   - text backbone: ALBERT-base-v2 (see ./albert-base-v2)
+#   - acoustic: 60 dims (pkl[:, 0:60]), visual: 36 dims (pkl[:, 55:91]), HCF: 4 dims
+#   - 4-modality InfoGate with MSelector routing
 cd "$(dirname "$0")"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 
 PYTHON="${PYTHON:-python}"
+MODEL="${MODEL:-./albert-base-v2}"
 DATASET=${1:-ur_funny}
 MAX_LEN=${2:-64}
 EPOCHS=${3:-50}
@@ -15,9 +22,11 @@ mkdir -p checkpoints logs
 
 LOGFILE="logs/train_${DATASET}${LOG_SUFFIX}.log"
 echo "Training InfoGate binary classifier on ${DATASET} for ${EPOCHS} epochs (stage1: ${STAGE1})"
+echo "Backbone: ${MODEL}"
 echo "Log: ${LOGFILE}"
 
 nohup "$PYTHON" -u train_classify.py \
+    --model "$MODEL" \
     --dataset "$DATASET" \
     --max_seq_length "$MAX_LEN" \
     --n_epochs "$EPOCHS" \

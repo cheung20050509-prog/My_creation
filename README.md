@@ -136,6 +136,48 @@ row is left as placeholders (`—`) until you paste final PRISM/InfoGate numbers
 
 **Bold** in baseline rows matches the LaTeX table emphasis in `baseline_table.tex` (best-in-column style marks).
 
+## HKT-aligned classification (UR-FUNNY / MUStARD)
+
+The MHD (UR-FUNNY humor) and MSD (MUStARD sarcasm) pipelines now follow the
+data / text-tower conventions from the HKT family
+([matalvepu/HKT](https://github.com/matalvepu/HKT)) and the classification
+setup described in MOAC (WWW 2025). Only the classification path is
+affected; the regression path (MOSI / MOSEI / CH-SIMS v2) remains on
+DeBERTa-v3 + 3-modality InfoGate.
+
+Changes versus the earlier classification setup:
+
+- **Text backbone**: `albert-base-v2` (see `./albert-base-v2/`). `train_classify.py`
+  and `test_classify.py` default `--model` to this directory.
+- **HKT feature slicing**: acoustic `[:, 0:60]`, visual `[:, 55:91]`
+  (`ACOUSTIC_DIM = 60`, `VISUAL_DIM = 36`). HCF has 4 dims.
+  See `global_configs.set_dataset_config("ur_funny" | "mustard")`.
+- **HCF as a 4th modality**: `data_humor.build_humor_loaders(..., hcf_dim=4)`
+  emits a 5-tensor batch `(input_ids, visual, acoustic, hcf, label)`.
+  `infogate_modules.InfoGate` with `hcf_dim > 0` routes HCF through its own
+  projector + IB encoder + a 4-way `MSelector` (slot order: `a, t, v, h`).
+- **Loss**: unchanged — BCE + InfoGate IB terms, two-stage curriculum, EMA
+  evaluation.
+
+Launch:
+
+```bash
+# Single run
+./train_humor.sh ur_funny 64 50 8 16
+./train_humor.sh mustard 77 40 10 8
+
+# Optuna (HKT-aligned). Default RUN_TAG now carries `_albert_hcf`.
+ONLY=ur_funny ./run_optuna_classify.sh
+ONLY=mustard  ./run_optuna_classify.sh
+./run_optuna_ur_funny_v2.sh        # UR-FUNNY-only, tightened space
+```
+
+Prior UR-FUNNY Optuna DBs (e.g. `optuna_classify_ur_funny_v2_20260422_*`,
+best Acc 0.7586) used DeBERTa + no HCF + 81/91 dims. Those study DBs are
+kept for history but are **not directly comparable** to the new
+`_albert_hcf` studies — start fresh rather than resuming with
+`--enqueue_top_from`.
+
 ## Repository Layout
 
 ```text

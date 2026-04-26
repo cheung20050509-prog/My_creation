@@ -5,6 +5,12 @@
 # Each run gets its own artefact dir:
 #   logs/<RUN_TAG>/{run,db,train_logs,checkpoints}
 #
+# HKT-aligned setup (ALBERT + HCF + sliced A/V dims). Study names are
+# auto-suffixed with ``_albert_hcf`` (see optuna_search_classify.py) so new
+# runs are not mixed with prior UR-FUNNY v1/v2 studies (DeBERTa, no HCF).
+# RUN_TAG defaults to ``optuna_classify_albert_hcf_<TS>`` to make the
+# convention visible on disk.
+#
 # Usage:
 #   ./run_optuna_classify.sh
 #   GPU_MUSTARD=1 GPU_URFUNNY=2 ./run_optuna_classify.sh
@@ -43,7 +49,7 @@ MUSTARD_S2_TRIALS="${MUSTARD_S2_TRIALS:-80}"
 MUSTARD_S2_TOP_K="${MUSTARD_S2_TOP_K:-8}"
 SELECTION_METRIC="${SELECTION_METRIC:-binary_acc}"
 
-RUN_TAG="${RUN_TAG:-optuna_classify_$(date +%Y%m%d_%H%M%S)}"
+RUN_TAG="${RUN_TAG:-optuna_classify_albert_hcf_$(date +%Y%m%d_%H%M%S)}"
 ROOT="$(pwd)"
 RUN_ROOT="$ROOT/logs/$RUN_TAG"
 mkdir -p "$RUN_ROOT/run" "$RUN_ROOT/db" "$RUN_ROOT/train_logs" "$RUN_ROOT/checkpoints"

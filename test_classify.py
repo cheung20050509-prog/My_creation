@@ -21,8 +21,8 @@ from sklearn.metrics import (
 import torch
 from tqdm import tqdm
 
-from transformers import DebertaV2Tokenizer
-from deberta_infogate import InfoGate_DeBertaForSequenceClassification
+from transformers import AlbertTokenizer
+from albert_infogate import InfoGate_AlbertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
 from data_humor import build_humor_loaders
@@ -33,7 +33,8 @@ from data_humor import build_humor_loaders
 # ============================================================
 parser = argparse.ArgumentParser(description="InfoGate Binary Classification Testing")
 parser.add_argument("--model", type=str,
-                    default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base"))
+                    default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "albert-base-v2"),
+                    help="Path to ALBERT weights (HKT-aligned MHD/MSD setup).")
 parser.add_argument("--dataset", type=str, choices=["ur_funny", "mustard"], default="ur_funny")
 parser.add_argument("--max_seq_length", type=int, default=64)
 parser.add_argument("--test_batch_size", type=int, default=128)
@@ -130,6 +131,7 @@ global_configs.set_dataset_config(args.dataset)
 ACOUSTIC_DIM = global_configs.ACOUSTIC_DIM
 VISUAL_DIM = global_configs.VISUAL_DIM
 TEXT_DIM = global_configs.TEXT_DIM
+HCF_DIM = global_configs.HCF_DIM
 
 
 # ============================================================
@@ -137,7 +139,7 @@ TEXT_DIM = global_configs.TEXT_DIM
 # ============================================================
 
 def get_test_dataloader():
-    tokenizer = DebertaV2Tokenizer.from_pretrained(args.model)
+    tokenizer = AlbertTokenizer.from_pretrained(args.model)
     # We only need the test loader; pass dummy values for the unused ones.
     _train_dl, _dev_dl, test_dl, _ = build_humor_loaders(
         dataset=args.dataset,
@@ -150,6 +152,8 @@ def get_test_dataloader():
         test_batch_size=args.test_batch_size,
         gradient_accumulation_step=1,
         n_epochs=1,
+        hcf_dim=HCF_DIM,
+        slice_hkt=True,
     )
     return test_dl
 
@@ -170,7 +174,7 @@ def set_seed(seed):
 
 
 def load_model(ckpt_path):
-    model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
+    model = InfoGate_AlbertForSequenceClassification.from_pretrained(
         args.model, multimodal_config=args, num_labels=1)
 
     if os.path.exists(ckpt_path):
@@ -197,14 +201,22 @@ def load_model(ckpt_path):
 
 def test_model(model, loader):
     preds, labels = [], []
+    use_hcf = HCF_DIM > 0
     with torch.no_grad():
         for batch in tqdm(loader, desc="Testing"):
             batch = tuple(t.to(DEVICE) for t in batch)
-            input_ids, visual, acoustic, label_ids = batch
-            visual = visual.squeeze(1)
-            acoustic = acoustic.squeeze(1)
+            if use_hcf:
+                input_ids, visual, acoustic, hcf, label_ids = batch
+                visual = visual.squeeze(1)
+                acoustic = acoustic.squeeze(1)
+                hcf = hcf.squeeze(1)
+            else:
+                input_ids, visual, acoustic, label_ids = batch
+                visual = visual.squeeze(1)
+                acoustic = acoustic.squeeze(1)
+                hcf = None
 
-            logits, _, _, _ = model(input_ids, visual, acoustic, stage=2)
+            logits, _, _, _ = model(input_ids, visual, acoustic, hcf=hcf, stage=2)
             preds.extend(logits.view(-1).cpu().numpy().tolist())
             labels.extend(label_ids.view(-1).cpu().numpy().tolist())
 

@@ -6,6 +6,7 @@ checkpoints/
 logs/
 *.log
 deberta-v3-base/
+albert-base-v2/
 bert-base-chinese/
 _arxiv_MODS/
 _arxiv_CyIN/

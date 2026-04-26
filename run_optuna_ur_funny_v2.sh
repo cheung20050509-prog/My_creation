@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# UR-FUNNY v2 — NEW study with tightened categorical space and extended
-# continuous bounds derived from the top-15 (of 66 COMPLETE) on the v1 study
-# `infogate_ur_funny_optuna_classify_ur_funny_20260422_104708` (best Acc 0.7586).
+# UR-FUNNY HKT-aligned — NEW study after the ALBERT + HCF migration.
+#
+# The legacy v1 / v2 UR-FUNNY studies (DeBERTa backbone, HCF dropped,
+# acoustic=81 / visual=91) are *not* comparable to this run because the
+# feature pipeline, text tower, and model head all changed. Start fresh.
 #
 # Overrides live in optuna_search_classify.py :: DATASET_*_OVERRIDES["ur_funny"].
 # See run_optuna_classify.sh for the base launcher; this wrapper hard-codes:
 #   - ONLY=ur_funny                 (never launch MUSTARD from this script)
-#   - RUN_TAG=optuna_classify_ur_funny_v2_<TS>
+#   - RUN_TAG=optuna_classify_ur_funny_albert_hcf_<TS>
 #   - SEARCH_TIER=2                 (match v1 tier to keep comparisons honest)
 #   - URFUNNY_TRIALS=80, N_STARTUP=20 (same budget shape as v1)
 #   - GPU_URFUNNY=0                 (UR-FUNNY slot on GPU0)
@@ -31,7 +33,7 @@ URFUNNY_TRIALS="${URFUNNY_TRIALS:-80}"
 SELECTION_METRIC="${SELECTION_METRIC:-binary_acc}"
 GPU_URFUNNY="${GPU_URFUNNY:-0}"
 
-RUN_TAG="${RUN_TAG:-optuna_classify_ur_funny_v2_$(date +%Y%m%d_%H%M%S)}"
+RUN_TAG="${RUN_TAG:-optuna_classify_ur_funny_albert_hcf_$(date +%Y%m%d_%H%M%S)}"
 ROOT="$(pwd)"
 RUN_ROOT="$ROOT/logs/$RUN_TAG"
 mkdir -p "$RUN_ROOT/run" "$RUN_ROOT/db" "$RUN_ROOT/train_logs" "$RUN_ROOT/checkpoints"

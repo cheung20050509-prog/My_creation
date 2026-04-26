@@ -77,6 +77,25 @@ launch_mosi () {
   local logfile="$PHASE_ROOT/run/mosi.log"
   local study="infogate_mosi_${PHASE}_4090d"
   local db; db="$(db_uri mosi)"
+  # Warm-start tier>=2 from the previous phase's two-stage MOSI DBs (S1+S2).
+  local enqueue_args=()
+  case "$PHASE" in
+    phase2)
+      # Pull warm-starts from tier-1 run (phase1), not from the current phase2 study name.
+      enqueue_args=(
+        --enqueue_top_from
+        "sqlite://${ROOT}/logs/optuna/4090D_restart/phase1/db/mosi_infogate_mosi_phase1_4090d_s1_random.db,sqlite://${ROOT}/logs/optuna/4090D_restart/phase1/db/mosi_infogate_mosi_phase1_4090d_s2_local.db"
+        --enqueue_top_k 12
+      )
+      ;;
+    phase3)
+      enqueue_args=(
+        --enqueue_top_from
+        "sqlite://${ROOT}/logs/optuna/4090D_restart/phase2/db/mosi_infogate_mosi_phase2_4090d_s1_random.db,sqlite://${ROOT}/logs/optuna/4090D_restart/phase2/db/mosi_infogate_mosi_phase2_4090d_s2_local.db"
+        --enqueue_top_k 12
+      )
+      ;;
+  esac
   echo "  [$(date -Iseconds)] mosi   -> GPU${gpu}  ${logfile}"
   # NB: use `>>` (append) so that a resume does not clobber the prior driver
   # summary; the DB is the source of truth but keeping a continuous driver
@@ -98,6 +117,8 @@ launch_mosi () {
     --no_dataset_overrides \
     --study_name "${study}" \
     --db "${db}" \
+    --artefact_root "${PHASE_ROOT}" \
+    "${enqueue_args[@]}" \
     >> "${logfile}" 2>&1 &
   echo "    PID=$!"
 }
