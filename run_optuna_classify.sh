@@ -2,8 +2,10 @@
 # Launch Optuna search for InfoGate binary classification:
 #   - MUSTARD on GPU $GPU_MUSTARD (two-stage random -> TPE-local)
 #   - UR-FUNNY on GPU $GPU_URFUNNY (single-stage TPE)
-# Each run gets its own artefact dir:
-#   logs/<RUN_TAG>/{run,db,train_logs,checkpoints}
+# Each run gets its own artefact dir under the same Optuna bundle as
+# regression (``logs/optuna/4090D_restart/phase*``)::
+#   logs/optuna/4090D_restart/classification/<RUN_TAG>/{run,db,train_logs,checkpoints}
+# Override the parent with CLASSIFY_ROOT=... if needed.
 #
 # HKT-aligned setup (ALBERT + HCF + sliced A/V dims). Study names are
 # auto-suffixed with ``_albert_hcf`` (see optuna_search_classify.py) so new
@@ -51,7 +53,8 @@ SELECTION_METRIC="${SELECTION_METRIC:-binary_acc}"
 
 RUN_TAG="${RUN_TAG:-optuna_classify_albert_hcf_$(date +%Y%m%d_%H%M%S)}"
 ROOT="$(pwd)"
-RUN_ROOT="$ROOT/logs/$RUN_TAG"
+CLASSIFY_ROOT="${CLASSIFY_ROOT:-$ROOT/logs/optuna/4090D_restart/classification}"
+RUN_ROOT="$CLASSIFY_ROOT/$RUN_TAG"
 mkdir -p "$RUN_ROOT/run" "$RUN_ROOT/db" "$RUN_ROOT/train_logs" "$RUN_ROOT/checkpoints"
 echo "$RUN_TAG" > "$RUN_ROOT/RUN_TAG.txt"
 

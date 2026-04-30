@@ -5,7 +5,8 @@ Independent from `optuna_search_v2.py` (which targets MOSI/MOSEI/SIMSV2 +
 
   - Drives `train_classify.py` (BCE + sigmoid) instead of `train.py`.
   - Selects on `binary_acc` (higher better); F1 used as secondary tiebreak.
-  - Drops regression-only knobs (`mse_weight`, `gumbel_tau_*`).
+  - Drops regression-only `mse_weight`. MSelector Gumbel schedule (`gumbel_tau_*`)
+    is searched when ``search_tier >= 3`` (aligned with `optuna_search_v2.py`).
   - MUSTARD: two-stage Random -> TPE-local (small dev set, cheap trials).
   - UR-FUNNY: single-stage TPE (expensive trials, ~1-1.5h each).
 
@@ -22,9 +23,13 @@ comparable** to new studies produced by this driver. New default study names
 now carry an `_albert_hcf` suffix so resuming via `--enqueue_top_from` does
 not silently mix backbones.
 
-Artefact layout matches `optuna_search_v2.py`:
-  logs/<RUN_TAG>/{db,train_logs,checkpoints} when --db sqlite lives under
-  <root>/db/*.db (auto-detected) or pass --artefact_root explicitly.
+Artefact layout (default): classification runs share the same top-level bundle
+as regression Optuna restarts::
+
+  logs/optuna/4090D_restart/classification/<RUN_TAG>/{db,train_logs,checkpoints}
+
+when ``--db`` points at ``.../<RUN_TAG>/db/*.db`` (as the launch scripts set) or
+pass ``--artefact_root`` explicitly.
 """
 
 import argparse
@@ -49,6 +54,10 @@ from selection_utils import (
 
 # ── paths ──
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# With regression Optuna under ``logs/optuna/4090D_restart/phase*``, keep
+# classification artefacts under the same ``4090D_restart`` tree.
+DEFAULT_CLASSIFY_OPTUNA_ROOT = os.path.join(
+    SCRIPT_DIR, "logs", "optuna", "4090D_restart", "classification")
 TRAIN_SCRIPT = os.path.join(SCRIPT_DIR, "train_classify.py")
 PYTHON = sys.executable
 KEEP_TOP_K = 5
@@ -88,10 +97,15 @@ LINEAR_FLOAT_BOUNDS = {
     "warmup_proportion":    (0.02, 0.25),
     "selector_target_temp": (0.30, 0.90),
     "selector_rib_weight":  (0.01, 0.15),
+    # Same as optuna_search_v2.py (Tier3 MSelector annealing endpoints).
+    "gumbel_tau_start":     (0.5, 2.0),
+    "gumbel_tau_end":       (0.1, 1.0),
 }
 
 INT_BOUNDS = {
     "stage1_epochs": (3, 15),
+    "early_stop_patience": (0, 25),
+    "selection_smooth_window": (1, 5),
 }
 
 CATEGORICAL_SPACE = {
@@ -114,11 +128,20 @@ CATEGORICAL_SPACE = {
 # can keep searching past the previous walls. (Beta_ib stays narrowed because
 # top trials sit comfortably inside 6-9 with no edge contact.)
 DATASET_LOG_FLOAT_OVERRIDES = {
+    # MUSTARD — refit from merged top-40 (main s1+s2 top-15 each, binary_acc
+    # 0.6912..0.7647). Prior override's ultra-low edges (learning_rate 2e-6,
+    # ig_learning_rate 2e-5, alpha_ib 3e-4) never attracted top trials under
+    # the s2_local narrowed sampler, so we pull them back toward the region
+    # top trials actually explored and let TPE re-expand as needed. Critical
+    # changes: beta_ib lower bound relaxed from 4.0 (min of top-40 was 4.0035,
+    # edge-saturated) and ig_learning_rate upper bound raised to 3e-3 so the
+    # frontier has headroom.
     "mustard": {
-        "learning_rate":    (2e-6, 5e-5),  # was (5e-6, 5e-5); top trials hit 5.1-6.6e-6
-        "ig_learning_rate": (2e-5, 2e-3),  # was (5e-5, 2e-3); top trials hit 5.9-8.7e-5
-        "beta_ib":          (4.0, 16.0),
-        "alpha_ib":         (3e-4, 5e-2),  # was (1e-3, 5e-2); top trials hit 1.7-2.6e-3
+        "learning_rate":    (5e-6, 5e-5),  # top-40 [9.2e-6, 4.3e-5]
+        "ig_learning_rate": (5e-5, 3e-3),  # top-40 [8.7e-5, 1.6e-3]; +50% headroom above max
+        "beta_ib":          (2.0, 20.0),   # top-40 [4.00, 14.4]; relax lower edge
+        "alpha_ib":         (3e-4, 5e-2),  # top-40 [4.3e-4, 3.2e-2]; keep
+        "weight_decay":     (1e-4, 0.1),   # explicit; matches global default
     },
     # UR-FUNNY v2 — applied to a NEW study that cannot inherit the prior v1's
     # categorical space. Edits are driven by the top-15 (of 66 COMPLETE) on
@@ -131,10 +154,18 @@ DATASET_LOG_FLOAT_OVERRIDES = {
     },
 }
 DATASET_LINEAR_FLOAT_OVERRIDES = {
+    # MUSTARD — see refit rationale in DATASET_LOG_FLOAT_OVERRIDES.
+    # Edges that were saturated in top-40:
+    #   dropout_prob max 0.399 -> cap raised to 0.50
+    #   warmup_proportion max 0.244 (prior 0.25) -> cap 0.30
+    #   selector_target_temp: prior edge 0.95, top-40 max 0.932, p90 0.895 ->
+    #     cap raised to 1.0 so temperature can drift toward uniform routing
+    #   selector_rib_weight: prior edge 0.20, top-40 max 0.168 -> cap 0.25
     "mustard": {
-        "warmup_proportion":    (0.10, 0.25),
-        "selector_target_temp": (0.60, 0.95),  # was 0.60-0.90; top trials hit 0.84-0.87
-        "selector_rib_weight":  (0.01, 0.20),  # was global 0.01-0.15; top trials hit 0.09-0.15
+        "dropout_prob":         (0.05, 0.50),  # was global (0.05, 0.40)
+        "warmup_proportion":    (0.05, 0.30),
+        "selector_target_temp": (0.50, 1.00),
+        "selector_rib_weight":  (0.01, 0.25),
     },
     # UR-FUNNY v2 — see comment above:
     #   * dropout_prob: 8/15 top trials near 0.4 upper bound -> extend to 0.50
@@ -145,7 +176,10 @@ DATASET_LINEAR_FLOAT_OVERRIDES = {
     },
 }
 DATASET_INT_OVERRIDES = {
-    "mustard": {"stage1_epochs": (8, 15)},
+    # MUSTARD — top-40 stage1_epochs saturated the upper edge 15 (p90=14, max=15).
+    # Extend upper bound to 20 so stage-1 budget can grow alongside the new
+    # selector-temperature exploration.
+    "mustard": {"stage1_epochs": (6, 20)},
     # UR-FUNNY v2 — top-15 stage1_epochs median=4, max=8; narrow upper bound
     # so TPE doesn't waste budget on 10-15 range that consistently underperforms.
     "ur_funny": {"stage1_epochs": (3, 10)},
@@ -156,10 +190,19 @@ DATASET_CATEGORICAL_OVERRIDES = {
     # the existing s2_local study exactly (which was narrowed by the s1->s2
     # local-space step). If you need a wider/different categorical set,
     # create a NEW study instead of resuming an old one.
+    # MUSTARD — categorical refit from top-40:
+    #   num_infogate_layers: 4×29, 2×6, 3×5 — 5 never picked -> drop from [2,3,4,5]
+    #   bottleneck_dim: 192×22, 128×18 -> keep [128, 192]
+    #   ema_decay: 0.995×24, 0.99×13, 0.999×3 -> keep [0.99, 0.995, 0.999]
+    #   batch_config: (16,1)×35, (8,4)×3, (8,2)×2 -> narrow to indices [1, 2, 3]
+    #     which map to (8,4), (16,1), (16,2) in BATCH_CANDIDATES["mustard"].
+    #     (16,2) kept over (8,2) because it shares effective-batch 32 with
+    #     (8,4) accum=4 and (32,1), easing resume on a mid-trained sampler.
     "mustard": {
-        "batch_config":   [0, 1, 2, 4],     # drops (16, 2) per s2_local
-        "bottleneck_dim": [128, 192],
-        "ema_decay":      [0.99, 0.995, 0.999],
+        "batch_config":        [1, 2, 3],          # (8,4), (16,1), (16,2)
+        "bottleneck_dim":      [128, 192],
+        "ema_decay":           [0.99, 0.995, 0.999],
+        "num_infogate_layers": [2, 3, 4],
     },
     # UR-FUNNY v2 — NEW study only. Top-15 distributions drove each drop:
     #   * ema_decay: ALL top-15 picked 0.999 -> freeze the family to [0.999]
@@ -212,8 +255,19 @@ DEFAULTS = {
     "ema_start_epoch": 5,
     "selector_target_temp": 0.6,
     "selector_rib_weight": 0.05,
+    "gumbel_tau_start": 1.0,
+    "gumbel_tau_end": 0.5,
     "num_heads": 4,
     "unified_dim": 256,
+    # Tier>=3 training tricks (`train_classify.py`); defaults match legacy runs.
+    "ib_loss_mult_end": 1.0,
+    "freeze_backbone_stage2": False,
+    "focal_gamma": 0.0,
+    "rdrop_alpha": 0.0,
+    "bce_pos_weight_mode": "none",
+    "early_stop_patience": 0,
+    "selection_smooth_window": 1,
+    "selector_balance_weight": 0.0,
 }
 
 
@@ -451,6 +505,40 @@ def suggest_tier3(trial, dataset, local_space=None):
             trial, "ema_start_epoch",
             get_categorical_choices("ema_start_epoch", dataset),
             local_space),
+        "gumbel_tau_start": suggest_float_param(
+            trial, "gumbel_tau_start",
+            get_linear_float_bounds("gumbel_tau_start", dataset),
+            local_space=local_space),
+        "gumbel_tau_end": suggest_float_param(
+            trial, "gumbel_tau_end",
+            get_linear_float_bounds("gumbel_tau_end", dataset),
+            local_space=local_space),
+    }
+
+
+def suggest_tier_tricks(trial, dataset, local_space=None):
+    """Extra knobs for `train_classify.py` (IB decay, focal, R-Drop, etc.)."""
+    return {
+        "ib_loss_mult_end": suggest_float_param(
+            trial, "ib_loss_mult_end", (0.35, 1.0), local_space=local_space),
+        "freeze_backbone_stage2": suggest_categorical_param(
+            trial, "freeze_backbone_stage2", [False, True], local_space),
+        "focal_gamma": suggest_float_param(
+            trial, "focal_gamma", (0.0, 2.0), local_space=local_space),
+        "rdrop_alpha": suggest_float_param(
+            trial, "rdrop_alpha", (0.0, 4.0), local_space=local_space),
+        "bce_pos_weight_mode": suggest_categorical_param(
+            trial, "bce_pos_weight_mode", ["none", "auto"], local_space),
+        "early_stop_patience": suggest_int_param(
+            trial, "early_stop_patience",
+            get_int_bounds("early_stop_patience", dataset), local_space),
+        "selection_smooth_window": suggest_int_param(
+            trial, "selection_smooth_window",
+            get_int_bounds("selection_smooth_window", dataset),
+            local_space),
+        "selector_balance_weight": suggest_float_param(
+            trial, "selector_balance_weight", (0.0, 0.15),
+            local_space=local_space),
     }
 
 
@@ -463,6 +551,7 @@ def build_search_params(trial, tier, dataset, n_epochs_max=None,
         params.update(suggest_tier2(trial, dataset, local_space=local_space))
     if tier >= 3:
         params.update(suggest_tier3(trial, dataset, local_space=local_space))
+        params.update(suggest_tier_tricks(trial, dataset, local_space=local_space))
     return params
 
 
@@ -520,7 +609,7 @@ def trial_train_log_dir(cli):
     root = getattr(cli, "artefact_root", None)
     if root:
         return os.path.join(root, "train_logs")
-    return os.path.join(SCRIPT_DIR, "logs", "optuna_classify")
+    return DEFAULT_CLASSIFY_OPTUNA_ROOT
 
 
 def trial_ckpt_base(cli, dataset, stage_label):
@@ -676,6 +765,12 @@ def build_local_search_space(study, dataset, search_tier, selection_metric, top_
             if vals:
                 local_space[name] = ordered_choice_subset(
                     CATEGORICAL_SPACE[name], vals, best_params.get(name))
+        tier3_linear_names = ("gumbel_tau_start", "gumbel_tau_end")
+        for name in tier3_linear_names:
+            vals = values_for(name)
+            if vals:
+                local_space[name] = narrow_linear_range(
+                    vals, LINEAR_FLOAT_BOUNDS[name])
 
     return local_space, top_trials
 
@@ -699,7 +794,7 @@ def summarize_local_space(local_space):
 def build_stage_db_uri(stage_study_name, base_db=None):
     if base_db is None:
         db_path = os.path.join(
-            SCRIPT_DIR, "logs", "optuna_classify", f"{stage_study_name}.db")
+            DEFAULT_CLASSIFY_OPTUNA_ROOT, f"{stage_study_name}.db")
         return f"sqlite:///{db_path}"
     if base_db.startswith("sqlite:///"):
         base_path = base_db[len("sqlite:///"):]
@@ -720,6 +815,126 @@ def build_two_stage_study_names(cli):
         f"infogate_{cli.dataset}_s1_random_{suffix}",
         f"infogate_{cli.dataset}_s2_local_{suffix}",
     )
+
+
+def _filter_param_for_current_space_classify(key, value, dataset):
+    """Return (kept, new_value). Drops an enqueued param if it lies outside the
+    current (post-override) search space for `dataset`. Mirrors the v2 helper
+    but uses classification bounds/batch grid and respects dataset overrides.
+
+    Categorical values stored by Optuna are **indices into choices**, so we
+    compare the decoded value against the current choices list. For
+    `batch_config` the raw int IS the choice value (it indexes BATCH_CANDIDATES
+    directly), so it must still be a member of the current override list.
+    """
+    if key in LOG_FLOAT_BOUNDS:
+        lo, hi = get_log_float_bounds(key, dataset)
+        fv = float(value)
+        return (lo <= fv <= hi, fv)
+    if key in LINEAR_FLOAT_BOUNDS:
+        lo, hi = get_linear_float_bounds(key, dataset)
+        fv = float(value)
+        return (lo <= fv <= hi, fv)
+    if key in INT_BOUNDS:
+        lo, hi = get_int_bounds(key, dataset)
+        iv = int(value)
+        return (lo <= iv <= hi, iv)
+    if key == "n_epochs":
+        lo, hi = DATASET_EPOCH_RANGE[dataset]
+        iv = int(value)
+        return (True, max(lo, min(hi, iv)))
+    if key == "batch_config":
+        # `value` comes from Optuna `trial.params` which for categorical params
+        # returns the DECODED choice, not the SQL `param_value` index. The
+        # choice value for batch_config is an int index into
+        # BATCH_CANDIDATES[dataset]; the current study's override choices are
+        # also a subset of those indices, so membership-check is correct.
+        try:
+            idx = int(value)
+        except (TypeError, ValueError):
+            return (False, None)
+        choices = get_categorical_choices("batch_config", dataset)
+        if choices is None:
+            choices = list(range(len(BATCH_CANDIDATES[dataset])))
+        return (idx in choices, idx)
+    if key in CATEGORICAL_SPACE:
+        choices = get_categorical_choices(key, dataset)
+        # Same decoding rule as above: value is the literal choice.
+        return (value in choices, value)
+    return (False, None)
+
+
+def enqueue_top_trials_into_study_classify(study, dataset,
+                                           source_db_uris, top_k,
+                                           selection_metric):
+    """Seed `study` with top-k completed trials from each source DB, mirroring
+    v2's helper but respecting maximize/minimize via selection_metric and using
+    the classification filter. Trials that lose >50% of their params are
+    skipped; others are enqueued (skip_if_exists=True) so the running sampler
+    fills in any missing params fresh.
+    """
+    if not source_db_uris:
+        return 0
+    hib = selection_higher_is_better(selection_metric)
+    enqueued_total = 0
+    print(f"\n[enqueue] dataset={dataset}, top_k_per_db={top_k}, "
+          f"{'maximize' if hib else 'minimize'} {selection_metric}")
+    for uri in source_db_uris:
+        uri = uri.strip()
+        if not uri:
+            continue
+        try:
+            summaries = optuna.get_all_study_summaries(storage=uri)
+        except Exception as e:
+            print(f"[enqueue]   skip {uri}: cannot list studies ({e})")
+            continue
+        for summary in summaries:
+            try:
+                src = optuna.load_study(
+                    study_name=summary.study_name, storage=uri)
+            except Exception as e:
+                print(f"[enqueue]   {uri}::{summary.study_name}: "
+                      f"load failed ({e})")
+                continue
+            done = [t for t in src.trials
+                    if t.state == optuna.trial.TrialState.COMPLETE
+                    and t.value is not None]
+            if not done:
+                continue
+            done.sort(key=lambda t: t.value, reverse=hib)
+            picked = done[:top_k]
+            print(f"[enqueue]   from {summary.study_name}: "
+                  f"picking {len(picked)} of {len(done)} complete trials")
+            for t in picked:
+                filtered = {}
+                dropped = []
+                for k, v in t.params.items():
+                    keep, new_v = _filter_param_for_current_space_classify(
+                        k, v, dataset)
+                    if keep:
+                        filtered[k] = new_v
+                    else:
+                        dropped.append(k)
+                if not t.params:
+                    continue
+                if len(filtered) < 0.5 * len(t.params):
+                    print(f"[enqueue]     trial {t.number}: dropped too many "
+                          f"params ({len(dropped)}/{len(t.params)}); skip")
+                    continue
+                try:
+                    study.enqueue_trial(filtered, skip_if_exists=True)
+                    enqueued_total += 1
+                    if dropped:
+                        print(f"[enqueue]     trial {t.number}: queued "
+                              f"(dropped {len(dropped)}: {dropped})")
+                    else:
+                        print(f"[enqueue]     trial {t.number}: queued "
+                              f"(full match)")
+                except Exception as e:
+                    print(f"[enqueue]     trial {t.number}: "
+                          f"enqueue failed ({e})")
+    print(f"[enqueue] total enqueued: {enqueued_total}\n")
+    return enqueued_total
 
 
 def create_study_for_cli(cli):
@@ -867,12 +1082,23 @@ def objective(trial, cli):
         "--weight_decay", f"{params['weight_decay']:.6f}",
         "--ema_decay", str(params["ema_decay"]),
         "--ema_start_epoch", str(params["ema_start_epoch"]),
+        "--gumbel_tau_start", f"{params['gumbel_tau_start']:.4f}",
+        "--gumbel_tau_end", f"{params['gumbel_tau_end']:.4f}",
         "--selector_target_temp", f"{params['selector_target_temp']:.4f}",
         "--selector_rib_weight", f"{params['selector_rib_weight']:.4f}",
         "--selection_metric", cli.selection_metric,
         "--checkpoint_dir", trial_ckpt,
         "--seed", str(params["seed"]),
+        "--ib_loss_mult_end", f"{params['ib_loss_mult_end']:.6f}",
+        "--bce_pos_weight_mode", str(params["bce_pos_weight_mode"]),
+        "--focal_gamma", f"{params['focal_gamma']:.6f}",
+        "--rdrop_alpha", f"{params['rdrop_alpha']:.6f}",
+        "--early_stop_patience", str(params["early_stop_patience"]),
+        "--selection_smooth_window", str(params["selection_smooth_window"]),
+        "--selector_balance_weight", f"{params['selector_balance_weight']:.6f}",
     ]
+    if params.get("freeze_backbone_stage2"):
+        cmd.append("--freeze_backbone_stage2")
 
     for attr, flag in (
         ("disable_l_lib", "--disable_l_lib"),
@@ -983,7 +1209,8 @@ def main():
         help="Per-run directory for train subprocess logs (train_logs/) and "
              "checkpoints (checkpoints/). If omitted and --db is sqlite under "
              ".../<run>/db/*.db, defaults to .../<run>/. Otherwise legacy "
-             "layout logs/optuna_classify/ + checkpoints/ is used.")
+             "layout logs/optuna/4090D_restart/classification/ + "
+             "checkpoints/ is used.")
     pa.add_argument("--selection_metric", type=str,
                     default="binary_acc",
                     choices=SELECTION_METRIC_CHOICES)
@@ -997,6 +1224,17 @@ def main():
                     help="Top-k stage-1 trials used to build stage-2 local space")
     pa.add_argument("--disable_two_stage", action="store_true",
                     help="Disable MUSTARD two-stage search and run a single TPE study")
+    pa.add_argument("--enqueue_top_from", type=str, default=None,
+                    help="Comma-separated list of SQLite URIs (sqlite:///...); "
+                         "for each study found therein, enqueue the top-K "
+                         "completed trials as warm-start anchors before the "
+                         "TPE sampler runs. Only active in the single-stage "
+                         "(--disable_two_stage or ur_funny) branch. Params "
+                         "that fall outside the current search space are "
+                         "dropped (trial skipped if >50%% dropped).")
+    pa.add_argument("--enqueue_top_k", type=int, default=10,
+                    help="How many top trials to enqueue from each source "
+                         "study (selected by --selection_metric direction).")
     pa.add_argument("--disable_l_lib", action="store_true")
     pa.add_argument("--disable_l_rib", action="store_true")
     pa.add_argument("--stage_label", type=str, default=None,
@@ -1013,7 +1251,7 @@ def main():
         cli.study_name = f"infogate_{ds}_classify_albert_hcf_{suffix}"
 
     if cli.db is None:
-        log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna_classify")
+        log_dir = DEFAULT_CLASSIFY_OPTUNA_ROOT
         os.makedirs(log_dir, exist_ok=True)
         db_path = os.path.join(log_dir, f"{cli.study_name}.db")
         cli.db = f"sqlite:///{db_path}"
@@ -1026,7 +1264,7 @@ def main():
         os.makedirs(os.path.join(cli.artefact_root, "train_logs"), exist_ok=True)
         os.makedirs(os.path.join(cli.artefact_root, "checkpoints"), exist_ok=True)
     else:
-        log_dir = os.path.join(SCRIPT_DIR, "logs", "optuna_classify")
+        log_dir = DEFAULT_CLASSIFY_OPTUNA_ROOT
         ckpt_base = os.path.join(SCRIPT_DIR, "checkpoints", f"optuna_{ds}")
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(ckpt_base, exist_ok=True)
@@ -1085,6 +1323,13 @@ def main():
                     stage_label=cli.stage_label, local_space=None)
     study, mode_label = create_study_for_cli(cli)
     print_study_header(cli, mode_label, len(study.trials))
+    if getattr(cli, "enqueue_top_from", None):
+        enqueue_top_trials_into_study_classify(
+            study, ds,
+            [u.strip() for u in cli.enqueue_top_from.split(",") if u.strip()],
+            cli.enqueue_top_k,
+            cli.selection_metric,
+        )
     optimize_with_cleanup(study, cli, trial_ckpt_base(cli, ds, cli.stage_label))
     print_study_summary(study, cli)
 
