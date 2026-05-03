@@ -172,11 +172,12 @@ ONLY=mustard  ./run_optuna_classify.sh
 ./run_optuna_ur_funny_v2.sh        # UR-FUNNY-only, tightened space
 ```
 
-Prior UR-FUNNY Optuna DBs (e.g. `optuna_classify_ur_funny_v2_20260422_*`,
+Prior UR-FUNNY Optuna DBs (e.g. `optuna_classify_ur_funny_v2_20260424_*`,
 best Acc 0.7586) used DeBERTa + no HCF + 81/91 dims. Those study DBs are
-kept for history but are **not directly comparable** to the new
-`_albert_hcf` studies — start fresh rather than resuming with
-`--enqueue_top_from`.
+kept for history under `logs/optuna/4090D_restart/classification/` (older
+`logs/optuna_classify_*` paths are symlinks there) but are **not directly
+comparable** to the new `_albert_hcf` studies — start fresh rather than
+resuming with `--enqueue_top_from`.
 
 ## Repository Layout
 

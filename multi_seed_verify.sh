@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Multi-seed verification of each dataset's current best-MAE Optuna trial.
+# MOSI row: 4090D_restart phase3 s2_local trial 89 (MAE 0.5978).
 # Reproduces train.py with the saved best hparams using N different seeds,
 # so you can report mean ± std in the paper.
 #
@@ -34,7 +35,7 @@ mkdir -p "$OUT_DIR"
 # ---- best hparams (extracted from saved_hparams/<ds>_best_hparams.json) ----
 
 run_mosi () {
-  # msew35_s2_local trial 125, MAE 0.5923, Tier 2
+  # 4090D_restart phase3 s2_local trial 89, test MAE 0.5978 (Best Results), Tier 3
   local seed=$1
   local logfile="$OUT_DIR/mosi_seed${seed}.log"
   local ckpt_dir="$OUT_DIR/ckpts/mosi_seed${seed}"
@@ -42,16 +43,16 @@ run_mosi () {
   echo "[mosi seed=$seed] -> $logfile"
   CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON" -u train.py \
     --dataset mosi \
-    --train_batch_size 32 --gradient_accumulation_step 1 \
-    --n_epochs 107 --stage1_epochs 14 \
-    --learning_rate 1.6325e-5 --ig_learning_rate 6.327e-4 \
-    --beta_ib 34.359 --alpha_ib 0.008570 \
-    --num_infogate_layers 5 --bottleneck_dim 96 --unified_dim 256 --num_heads 4 --ib_hidden_dim 256 \
-    --mse_weight 1.249 --dropout_prob 0.299 \
-    --warmup_proportion 0.136 --weight_decay 0.000640 \
-    --ema_decay 0.995 --ema_start_epoch 5 \
-    --selector_target_temp 0.35 --selector_rib_weight 0.05 \
-    --gumbel_tau_start 1.0 --gumbel_tau_end 0.5 \
+    --train_batch_size 16 --gradient_accumulation_step 4 \
+    --n_epochs 99 --stage1_epochs 8 \
+    --learning_rate 4.0435560151827146e-05 --ig_learning_rate 1.9555720219325748e-04 \
+    --beta_ib 7.385208105955388 --alpha_ib 0.004458028629011018 \
+    --num_infogate_layers 3 --bottleneck_dim 192 --unified_dim 128 --num_heads 8 --ib_hidden_dim 128 \
+    --mse_weight 1.4017893314668146 --dropout_prob 0.2878573110199772 \
+    --warmup_proportion 0.11123528535141979 --weight_decay 0.0003603150408561708 \
+    --ema_decay 0.995 --ema_start_epoch 8 \
+    --selector_target_temp 0.6891975097112971 --selector_rib_weight 0.06135064083078536 \
+    --gumbel_tau_start 1.1626945117846452 --gumbel_tau_end 0.2645430459011354 \
     --selection_metric mae \
     --checkpoint_dir "$ckpt_dir" \
     --seed "$seed" \

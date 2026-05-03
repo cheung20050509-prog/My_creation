@@ -11,6 +11,8 @@ Mirrors `train.py` but switches:
 import argparse
 import os
 import random
+from collections import deque
+
 import numpy as np
 
 from sklearn.metrics import accuracy_score, f1_score
@@ -86,6 +88,36 @@ parser.add_argument("--checkpoint_dir", type=str, default="checkpoints")
 parser.add_argument("--selection_metric", type=str,
                     default="binary_acc",
                     choices=SELECTION_METRIC_CHOICES)
+
+# Training dynamics (defaults preserve legacy behaviour)
+parser.add_argument(
+    "--ib_loss_mult_end", type=float, default=1.0,
+    help="Linear IB multiplier at last epoch (stage2 only); 1.0 disables decay. "
+         "Stage2 ramps from 1.0 at first stage-2 epoch to this value.")
+parser.add_argument(
+    "--freeze_backbone_stage2", action="store_true",
+    help="Freeze ALBERT encoder weights (albert.model.*) during stage 2.")
+parser.add_argument(
+    "--bce_pos_weight_mode", type=str, default="none",
+    choices=("none", "auto"),
+    help="Training-only class balance for BCE: auto sets pos_weight=n_neg/n_pos.")
+parser.add_argument(
+    "--bce_pos_weight", type=float, default=None,
+    help="Manual positive-class weight for BCE (overrides --bce_pos_weight_mode).")
+parser.add_argument(
+    "--focal_gamma", type=float, default=0.0,
+    help="Focal loss gamma on task BCE (0 = standard BCE). Training only.")
+parser.add_argument(
+    "--rdrop_alpha", type=float, default=0.0,
+    help="Symmetric KL consistency weight between two dropout samples (0 = off).")
+parser.add_argument(
+    "--early_stop_patience", type=int, default=0,
+    help="Stop if dev selection score (after smoothing) does not improve for "
+         "this many epochs past stage1; 0 disables.")
+parser.add_argument(
+    "--selection_smooth_window", type=int, default=1,
+    help="Use max dev selection score over the last W epochs when saving / "
+         "early stopping (W=1 = no smoothing).")
 
 args = parser.parse_args()
 
@@ -227,11 +259,6 @@ def toggle_state(enabled):
 # Train / Eval / Test
 # ============================================================
 
-def task_loss(logits, labels):
-    return F.binary_cross_entropy_with_logits(
-        logits.view(-1), labels.view(-1).float())
-
-
 def _unpack_batch(batch, use_hcf):
     """Unpack a humor-dataset batch. Layout depends on ``use_hcf``:
         use_hcf=False:  (input_ids, visual, acoustic, label)
@@ -250,30 +277,125 @@ def _unpack_batch(batch, use_hcf):
     return input_ids, visual, acoustic, None, label_ids
 
 
-def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
+BACKBONE_PREFIX = "albert.model."
+
+
+def set_backbone_requires_grad(model, requires_grad):
+    m = model.module if hasattr(model, "module") else model
+    for n, p in m.named_parameters():
+        if n.startswith(BACKBONE_PREFIX):
+            p.requires_grad = requires_grad
+
+
+def ib_loss_multiplier(epoch, stage1_epochs, n_epochs, mult_end):
+    """Stage 1: 1.0. Stage 2: linear from 1.0 (first stage-2 epoch) to mult_end."""
+    if mult_end >= 1.0 - 1e-9:
+        return 1.0
+    if epoch < stage1_epochs:
+        return 1.0
+    span = max(n_epochs - stage1_epochs, 1)
+    t = (epoch - stage1_epochs) / float(span)
+    return 1.0 + (mult_end - 1.0) * t
+
+
+def estimate_bce_pos_weight(train_dl):
+    """Return scalar tensor for class-1 over-representation (n_neg / n_pos)."""
+    ds = train_dl.dataset
+    if not hasattr(ds, "tensors"):
+        return None
+    labels = ds.tensors[-1].float().view(-1)
+    n_pos = float((labels > 0.5).sum().item())
+    n_neg = float((labels <= 0.5).sum().item())
+    if n_pos < 1.0 or n_neg < 1.0:
+        return None
+    w = n_neg / max(n_pos, 1.0)
+    return torch.tensor([w], dtype=torch.float32)
+
+
+def resolve_pos_weight_tensor(mode, manual, train_dl):
+    if manual is not None and manual > 0:
+        return torch.tensor([manual], dtype=torch.float32, device=DEVICE)
+    if mode == "auto":
+        t = estimate_bce_pos_weight(train_dl)
+        if t is None:
+            return None
+        return t.to(DEVICE)
+    return None
+
+
+def compute_task_loss(logits, label_ids, pos_weight_1d=None):
+    """BCE (+ optional focal); eval path uses plain BCE in test_epoch."""
+    logits_v = logits.view(-1)
+    labels_f = label_ids.view(-1).float()
+    pw = None
+    if pos_weight_1d is not None:
+        pw = pos_weight_1d.to(device=logits_v.device, dtype=logits_v.dtype)
+
+    if args.focal_gamma and args.focal_gamma > 0:
+        ce = F.binary_cross_entropy_with_logits(
+            logits_v, labels_f, reduction="none", pos_weight=pw)
+        pt = torch.where(
+            labels_f > 0.5,
+            torch.sigmoid(logits_v),
+            torch.sigmoid(-logits_v)).clamp(min=1e-8)
+        focal = (1.0 - pt).pow(args.focal_gamma) * ce
+        return focal.mean()
+
+    return F.binary_cross_entropy_with_logits(
+        logits_v, labels_f, pos_weight=pw)
+
+
+def symmetric_kl_binary_logits(logits_a, logits_b):
+    """Symmetric KL between Bernoullis parameterized by logits (R-Drop)."""
+    # pylint: disable=invalid-name
+    p_a = torch.sigmoid(logits_a.view(-1)).clamp(min=1e-8, max=1 - 1e-8)
+    p_b = torch.sigmoid(logits_b.view(-1)).clamp(min=1e-8, max=1 - 1e-8)
+    kl_ab = p_a * (p_a.log() - p_b.log()) + (1 - p_a) * ((1 - p_a).log() - (1 - p_b).log())
+    kl_ba = p_b * (p_b.log() - p_a.log()) + (1 - p_b) * ((1 - p_b).log() - (1 - p_a).log())
+    return 0.5 * (kl_ab.mean() + kl_ba.mean())
+
+
+def train_epoch(model, loader, optimizer, scheduler, stage, ib_mult,
+                pos_weight_1d, ema=None):
     model.train()
     total_loss, steps = 0.0, 0
     sum_task, sum_ib = 0.0, 0.0
     sum_detail = {}
     use_hcf = HCF_DIM > 0
+    use_rdrop = getattr(args, "rdrop_alpha", 0.0) and args.rdrop_alpha > 0
 
     train_pbar = tqdm(loader, desc=f"Train (stage {stage})")
     for step, batch in enumerate(train_pbar):
         batch = tuple(t.to(DEVICE) for t in batch)
         input_ids, visual, acoustic, hcf, label_ids = _unpack_batch(batch, use_hcf)
 
-        logits, ib_loss, loss_dict, _ = model(
-            input_ids, visual, acoustic, hcf=hcf, labels=label_ids, stage=stage)
-
-        pred_flat = logits.view(-1)
-        label_flat = label_ids.view(-1)
-
-        loss_dict['pred_mean'] = pred_flat.mean().item()
-        loss_dict['pred_std'] = pred_flat.std(unbiased=False).item()
-
-        l_task = task_loss(logits, label_ids)
-
-        loss = l_task + ib_loss
+        if use_rdrop:
+            logits1, ib1, loss_dict, _ = model(
+                input_ids, visual, acoustic, hcf=hcf, labels=label_ids,
+                stage=stage)
+            logits2, ib2, _, _ = model(
+                input_ids, visual, acoustic, hcf=hcf, labels=label_ids,
+                stage=stage)
+            pred_flat = logits1.view(-1)
+            loss_dict = dict(loss_dict)
+            loss_dict['pred_mean'] = pred_flat.mean().item()
+            loss_dict['pred_std'] = pred_flat.std(unbiased=False).item()
+            l_task = 0.5 * (
+                compute_task_loss(logits1, label_ids, pos_weight_1d)
+                + compute_task_loss(logits2, label_ids, pos_weight_1d))
+            ib_av = 0.5 * (ib1 + ib2)
+            rdrop_term = symmetric_kl_binary_logits(logits1, logits2)
+            loss = l_task + ib_mult * ib_av + args.rdrop_alpha * rdrop_term
+            ib_loss = ib_av
+        else:
+            logits, ib_loss, loss_dict, _ = model(
+                input_ids, visual, acoustic, hcf=hcf, labels=label_ids,
+                stage=stage)
+            pred_flat = logits.view(-1)
+            loss_dict['pred_mean'] = pred_flat.mean().item()
+            loss_dict['pred_std'] = pred_flat.std(unbiased=False).item()
+            l_task = compute_task_loss(logits, label_ids, pos_weight_1d)
+            loss = l_task + ib_mult * ib_loss
 
         if args.gradient_accumulation_step > 1:
             loss = loss / args.gradient_accumulation_step
@@ -285,8 +407,9 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
             sum_detail[k] = sum_detail.get(k, 0.0) + v
         steps += 1
 
+        ib_show = ib_loss.item()
         train_pbar.set_postfix({"task": f"{l_task.item():.3f}",
-                                "ib": f"{ib_loss.item():.3f}",
+                                "ib": f"{ib_show:.3f}",
                                 "p_std": f"{loss_dict['pred_std']:.2f}"})
 
         if (step + 1) % args.gradient_accumulation_step == 0:
@@ -373,14 +496,26 @@ def main():
     print(f"  beta_ib        : {args.beta_ib}")
     print(f"  alpha_ib       : {args.alpha_ib}")
     print(f"  selector_temp  : {args.selector_target_temp}")
-    print(f"  selector_rib_w : {args.selector_rib_weight}")
-    print(f"  Select by      : {args.selection_metric}")
+    print(f"  selector_bal_w : {args.selector_balance_weight}")
+    print(f"  IB mult end    : {args.ib_loss_mult_end} (stage2 linear decay)")
+    print(f"  Freeze BB stg2 : {args.freeze_backbone_stage2}")
+    print(f"  BCE pos weight : {args.bce_pos_weight_mode}"
+          f"{'' if args.bce_pos_weight is None else f' (manual {args.bce_pos_weight})'}")
+    print(f"  focal_gamma    : {args.focal_gamma}")
+    print(f"  rdrop_alpha    : {args.rdrop_alpha}")
+    print(f"  early_stop_pat : {args.early_stop_patience}")
+    print(f"  select_smooth W: {args.selection_smooth_window}")
     print(f"  Loss terms     : L_lib={toggle_state(args.use_l_lib)}"
           f"  L_rib={toggle_state(args.use_l_rib)}")
     print("=" * 60)
 
     set_seed(args.seed)
     train_dl, dev_dl, test_dl, n_opt = setup_data()
+    pos_weight_t = resolve_pos_weight_tensor(
+        args.bce_pos_weight_mode, args.bce_pos_weight, train_dl)
+    if pos_weight_t is not None:
+        print(f"BCE pos_weight (training): {pos_weight_t.cpu().tolist()}")
+
     model, optimizer, scheduler = build_model(n_opt)
     ema = EMA(model, decay=args.ema_decay)
 
@@ -401,8 +536,15 @@ def main():
     best_test_results = None
     last_test_results = None
 
+    sel_hist = deque(maxlen=max(1, args.selection_smooth_window))
+    epochs_without_improvement = 0
+    final_epoch_reached = args.n_epochs
+
     for epoch in range(args.n_epochs):
         stage = 1 if epoch < args.stage1_epochs else 2
+        freeze_bb = args.freeze_backbone_stage2 and stage == 2
+        set_backbone_requires_grad(model, not freeze_bb)
+
         tau_s = getattr(args, 'gumbel_tau_start', 1.0)
         tau_e = getattr(args, 'gumbel_tau_end', 0.5)
         tau = tau_s + (tau_e - tau_s) * epoch / max(args.n_epochs - 1, 1)
@@ -410,16 +552,21 @@ def main():
         ig = m.albert.infogate
         ig.mselector.gumbel_tau = tau
 
+        ib_mult = ib_loss_multiplier(
+            epoch, args.stage1_epochs, args.n_epochs, args.ib_loss_mult_end)
+
         eval_with_ema = epoch >= args.ema_start_epoch
         if epoch == args.ema_start_epoch:
             ema.reset(model)
         tr_loss, tr_task, tr_ib, tr_detail = train_epoch(
-            model, train_dl, optimizer, scheduler, stage,
-            ema=ema if eval_with_ema else None)
+            model, train_dl, optimizer, scheduler, stage, ib_mult,
+            pos_weight_t, ema=ema if eval_with_ema else None)
 
         print(f"\nEpoch {epoch + 1}/{args.n_epochs}  [stage {stage}]"
-              f"{'  (EMA eval)' if eval_with_ema else ''}")
-        print(f"  Loss  total={tr_loss:.4f}  task={tr_task:.4f}  ib={tr_ib:.4f}")
+              f"{'  (EMA eval)' if eval_with_ema else ''}"
+              f"{'  backbone=Frozen' if freeze_bb else ''}")
+        print(f"  Loss  total={tr_loss:.4f}  task={tr_task:.4f}  ib={tr_ib:.4f}"
+              f"  ib_mult={ib_mult:.4f}")
         detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items()
                                 if k.startswith('L_'))
         print(f"  Detail  {detail_str}")
@@ -484,24 +631,36 @@ def main():
         print(f"  Dev   {fmt_metrics(dev_m)}")
         print(f"  Select {args.selection_metric}={selection_score:.6f}")
 
+        compare_score = selection_score
+        if epoch >= select_start:
+            sel_hist.append(selection_score)
+            compare_score = max(sel_hist)
+            if args.selection_smooth_window > 1:
+                print(f"  Select_smooth max@{len(sel_hist)} "
+                      f"{args.selection_metric}={compare_score:.6f}")
+
         preds, labels = test_epoch(model, test_dl, stage=stage)
         test_m = score(preds, labels)
         print(f"  Test  {fmt_metrics(test_m)}")
 
         last_test_results = test_m
+        final_epoch_reached = epoch + 1
 
+        improved = False
         if epoch >= select_start:
             if best_selection_tiebreak is None:
                 should_save = True
             else:
-                better_score = (selection_score > best_selection_score
+                better_score = (compare_score > best_selection_score
                                 if select_higher_is_better
-                                else selection_score < best_selection_score)
-                same_score = abs(selection_score - best_selection_score) <= 1e-12
-                should_save = better_score or (same_score and selection_tiebreak > best_selection_tiebreak)
+                                else compare_score < best_selection_score)
+                same_score = abs(compare_score - best_selection_score) <= 1e-12
+                should_save = better_score or (
+                    same_score and selection_tiebreak > best_selection_tiebreak)
 
             if should_save:
-                best_selection_score = selection_score
+                improved = True
+                best_selection_score = compare_score
                 best_selection_tiebreak = selection_tiebreak
                 best_results = test_m
                 save_dict = {
@@ -512,6 +671,7 @@ def main():
                     'dev_f1': dev_m["f1"],
                     'selection_metric': args.selection_metric,
                     'selection_score': selection_score,
+                    'selection_compare_score': compare_score,
                     'ablation': {
                         'use_l_lib': args.use_l_lib,
                         'use_l_rib': args.use_l_rib,
@@ -522,8 +682,10 @@ def main():
                 if eval_with_ema:
                     save_dict['ema_state_dict'] = ema.state_dict()
                 torch.save(save_dict, ckpt_path)
-                print(f"  >> Best model saved ({args.selection_metric}={selection_score:.6f}, "
-                      f"Acc={dev_m['acc2']*100:.2f}%, F1={dev_m['f1']*100:.2f}%) to {ckpt_path}")
+                print(f"  >> Best model saved ({args.selection_metric}="
+                      f"{selection_score:.6f}, compare={compare_score:.6f}, "
+                      f"Acc={dev_m['acc2']*100:.2f}%, F1={dev_m['f1']*100:.2f}%) "
+                      f"to {ckpt_path}")
 
         if test_m["acc2"] > best_test_acc:
             best_test_acc = test_m["acc2"]
@@ -532,13 +694,25 @@ def main():
         if eval_with_ema:
             ema.restore(model)
 
+        if (epoch >= select_start and args.early_stop_patience > 0
+                and best_selection_tiebreak is not None):
+            if improved:
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+            if epochs_without_improvement >= args.early_stop_patience:
+                print("\n  Early stopping: no improvement on smoothed dev "
+                      f"{args.selection_metric} for "
+                      f"{args.early_stop_patience} epochs.")
+                break
+
     print("\n" + "=" * 60)
     print(f"Best Results ({args.selection_metric}, epoch >= {select_start + 1}):")
     if best_results:
-        print(f"  Selection score: {best_selection_score:.6f}")
+        print(f"  Selection score (best compare): {best_selection_score:.6f}")
         print(f"  Acc: {best_results['acc2']*100:.2f}%")
         print(f"  F1:  {best_results['f1']*100:.2f}%")
-    print(f"\nLast Epoch ({args.n_epochs}) Results:")
+    print(f"\nLast Epoch ({final_epoch_reached}) Results:")
     if last_test_results:
         print(f"  Acc: {last_test_results['acc2']*100:.2f}%")
         print(f"  F1:  {last_test_results['f1']*100:.2f}%")

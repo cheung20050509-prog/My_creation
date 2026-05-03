@@ -398,40 +398,59 @@ def apply_dataset_bounds_overrides(dataset):
     dropout_prob, learning_rate, n_epochs, mse_weight near upper bound,
     batch grid, bottleneck_dim).
 
-    MOSI: mse_weight upper bound raised from 2.0 to 3.5 — Stage2 best trials
-    clustered near mse_weight≈2.0 (saved in saved_hparams/ before this change).
+    MOSI: refit from 4090D_restart merged top-32 (phase1 s1+s2 + phase2 s1+s2,
+    MAE 0.6064..0.6265); applied only when MOSI phase3 drops --no_dataset_overrides
+    in run_optuna_4090d_restart.sh.
     """
     if dataset == "mosi":
-        # Tier-3 widened/tightened bounds for v3, based on TOP-12 of msew35_s2_local
-        # (MAE-min): all top trials cluster at batch_config=(32,1), bd=96, nL=5,
-        # ema_decay=0.995, and stage1_epochs hit upper bound 20.
-        LOG_FLOAT_BOUNDS["learning_rate"]    = (1e-5, 3e-5)
-        LOG_FLOAT_BOUNDS["ig_learning_rate"] = (2e-4, 1e-3)
-        LOG_FLOAT_BOUNDS["beta_ib"]          = (20.0, 50.0)
-        LOG_FLOAT_BOUNDS["alpha_ib"]         = (3e-3, 1.5e-2)
-        LOG_FLOAT_BOUNDS["weight_decay"]     = (3e-4, 5e-3)
-        LINEAR_FLOAT_BOUNDS["mse_weight"]    = (0.5, 3.0)
-        LINEAR_FLOAT_BOUNDS["dropout_prob"]  = (0.20, 0.45)   # extend upper from 0.4
-        LINEAR_FLOAT_BOUNDS["warmup_proportion"] = (0.05, 0.20)
-        INT_BOUNDS["stage1_epochs"]          = (10, 25)       # extend upper from 20
-        DATASET_EPOCH_RANGE["mosi"]          = (100, 135)
-        CATEGORICAL_SPACE["bottleneck_dim"]  = [96, 128]
-        CATEGORICAL_SPACE["num_infogate_layers"] = [4, 5]
-        CATEGORICAL_SPACE["ema_decay"]       = [0.995, 0.999]
-        BATCH_CANDIDATES["mosi"]             = [(16, 2), (32, 1), (32, 2)]
+        # Refit from 4090D_restart merged top-32 (phase1 s1+s2 + phase2 s1+s2; MAE
+        # 0.6064..0.6265). Supersedes the earlier msew35-derived override so phase3
+        # samples near the current frontier instead of the deprecated beta_ib in
+        # [20,50] / mse_weight in [0.5,3.0] / ig_learning_rate in [2e-4,1e-3] regions.
+        # Categorical values kept as supersets of top-32 so _filter_param_for_current_space
+        # does not silently drop phase2 warm-start trials.
+        LOG_FLOAT_BOUNDS["learning_rate"]    = (8e-6, 5e-5)
+        LOG_FLOAT_BOUNDS["ig_learning_rate"] = (1e-4, 2e-3)
+        LOG_FLOAT_BOUNDS["beta_ib"]          = (4.0, 30.0)
+        LOG_FLOAT_BOUNDS["alpha_ib"]         = (2e-3, 3e-2)
+        LOG_FLOAT_BOUNDS["weight_decay"]     = (1e-4, 5e-3)
+        LINEAR_FLOAT_BOUNDS["mse_weight"]    = (0.05, 2.0)
+        LINEAR_FLOAT_BOUNDS["dropout_prob"]  = (0.15, 0.48)
+        LINEAR_FLOAT_BOUNDS["warmup_proportion"] = (0.04, 0.25)
+        INT_BOUNDS["stage1_epochs"]          = (3, 18)
+        DATASET_EPOCH_RANGE["mosi"]          = (85, 135)
+        CATEGORICAL_SPACE["bottleneck_dim"]      = [96, 128, 192]
+        CATEGORICAL_SPACE["num_infogate_layers"] = [3, 4, 5]
+        CATEGORICAL_SPACE["ema_decay"]           = [0.995, 0.999, 0.9995]
+        BATCH_CANDIDATES["mosi"]                 = [(16, 2), (16, 4), (32, 1), (32, 2)]
     if dataset == "simsv2":
-        LOG_FLOAT_BOUNDS["learning_rate"] = (5e-6, 1e-4)
-        LOG_FLOAT_BOUNDS["alpha_ib"] = (1e-3, 0.1)
-        LOG_FLOAT_BOUNDS["weight_decay"] = (1e-4, 0.3)
-        LINEAR_FLOAT_BOUNDS["mse_weight"] = (0.0, 5.0)
-        LINEAR_FLOAT_BOUNDS["dropout_prob"] = (0.0, 0.20)
-        LINEAR_FLOAT_BOUNDS["warmup_proportion"] = (0.05, 0.40)
-        INT_BOUNDS["stage1_epochs"] = (4, 16)
-        DATASET_EPOCH_RANGE["simsv2"] = (60, 110)
-        CATEGORICAL_SPACE["bottleneck_dim"] = [96, 128, 192]
-        CATEGORICAL_SPACE["num_infogate_layers"] = [3, 4]
-        CATEGORICAL_SPACE["ema_decay"] = [0.995, 0.999, 0.9995, 0.99975, 0.9999]
-        BATCH_CANDIDATES["simsv2"] = [(16, 4), (32, 2), (64, 1), (32, 4)]
+        # Tier-3 narrowed bounds, re-derived from 4090D_restart/phase2 (100 trials,
+        # base space). TOP-15 clusters:
+        #   batch_config → (32,1)×11, (8,4)×3, (16,4)×1
+        #   n_epochs ∈ [63, 72]; learning_rate ∈ [1.0e-5, 3.7e-5] (mode ~1.0-1.7e-5)
+        #   ig_learning_rate ∈ [8.5e-5, 9e-4]; beta_ib ∈ [4.4, 20.9] (most 4-10)
+        #   alpha_ib ∈ [1.1e-3, 1.1e-2]; weight_decay ∈ [5.6e-4, 4.4e-3]
+        #   mse_weight ∈ [0.77, 1.98]; dropout_prob ∈ [0.05, 0.26]
+        #   warmup_proportion ∈ [0.08, 0.24]; stage1_epochs ∈ [3, 12]
+        #   num_infogate_layers=2×13/15 (rest 4); bottleneck_dim=128×11, 64×4
+        #   ema_decay=0.9995×14, 0.995×1
+        LOG_FLOAT_BOUNDS["learning_rate"]    = (8e-6, 4e-5)
+        LOG_FLOAT_BOUNDS["ig_learning_rate"] = (8e-5, 1e-3)
+        LOG_FLOAT_BOUNDS["beta_ib"]          = (3.0, 25.0)
+        LOG_FLOAT_BOUNDS["alpha_ib"]         = (5e-4, 2e-2)
+        LOG_FLOAT_BOUNDS["weight_decay"]     = (3e-4, 1e-2)
+
+        LINEAR_FLOAT_BOUNDS["mse_weight"]        = (0.5, 2.0)
+        LINEAR_FLOAT_BOUNDS["dropout_prob"]      = (0.05, 0.30)
+        LINEAR_FLOAT_BOUNDS["warmup_proportion"] = (0.07, 0.25)
+
+        INT_BOUNDS["stage1_epochs"]     = (3, 14)
+        DATASET_EPOCH_RANGE["simsv2"]   = (55, 80)
+
+        CATEGORICAL_SPACE["bottleneck_dim"]      = [64, 128]
+        CATEGORICAL_SPACE["num_infogate_layers"] = [2, 3, 4]
+        CATEGORICAL_SPACE["ema_decay"]           = [0.995, 0.999, 0.9995]
+        BATCH_CANDIDATES["simsv2"]               = [(8, 4), (16, 4), (32, 1)]
 
 
 def better_than(candidate, best_value, higher_is_better):
@@ -567,12 +586,33 @@ def get_completed_trials(study, selection_metric):
     return sorted(completed, key=lambda trial: trial.value, reverse=hib)
 
 
-def build_local_search_space(study, dataset, search_tier, selection_metric, top_k):
-    ranked = get_completed_trials(study, selection_metric)
-    top_trials = ranked[:top_k]
-    if not top_trials:
+def build_local_search_space_from_trials(
+    anchor_trials,
+    dataset,
+    search_tier,
+    *,
+    tight=False,
+):
+    """Build ``local_space`` from completed anchor trials (best-first).
+
+    ``anchor_trials[0]`` is used as the preferred categorical anchor
+    (``ordered_choice_subset`` best_value).
+
+    Parameters
+    ----------
+    tight :
+        If True, use a smaller neighborhood around single-/few-anchor hulls
+        (narrower log expand, linear pad, and epoch padding).
+    """
+    if not anchor_trials:
         return None, []
 
+    log_expand = 1.10 if tight else 1.25
+    linear_min_pad_ratio = 0.025 if tight else 0.05
+    epoch_min_pad = 2 if tight else 5
+    stage1_min_pad = 2
+
+    top_trials = anchor_trials
     best_params = top_trials[0].params
     params_list = [trial.params for trial in top_trials]
     local_space = {}
@@ -591,7 +631,7 @@ def build_local_search_space(study, dataset, search_tier, selection_metric, top_
     epoch_values = values_for("n_epochs")
     if epoch_values:
         local_space["n_epochs"] = narrow_int_range(
-            epoch_values, DATASET_EPOCH_RANGE[dataset], min_pad=5)
+            epoch_values, DATASET_EPOCH_RANGE[dataset], min_pad=epoch_min_pad)
 
     tier1_log_names = ("learning_rate", "ig_learning_rate", "beta_ib")
     tier1_linear_names = ("mse_weight", "dropout_prob")
@@ -600,11 +640,14 @@ def build_local_search_space(study, dataset, search_tier, selection_metric, top_
     for name in tier1_log_names:
         vals = values_for(name)
         if vals:
-            local_space[name] = narrow_log_range(vals, LOG_FLOAT_BOUNDS[name])
+            local_space[name] = narrow_log_range(
+                vals, LOG_FLOAT_BOUNDS[name], expand=log_expand)
     for name in tier1_linear_names:
         vals = values_for(name)
         if vals:
-            local_space[name] = narrow_linear_range(vals, LINEAR_FLOAT_BOUNDS[name])
+            local_space[name] = narrow_linear_range(
+                vals, LINEAR_FLOAT_BOUNDS[name],
+                min_pad_ratio=linear_min_pad_ratio)
     for name in tier1_cat_names:
         vals = values_for(name)
         if vals:
@@ -618,15 +661,18 @@ def build_local_search_space(study, dataset, search_tier, selection_metric, top_
         stage1_vals = values_for("stage1_epochs")
         if stage1_vals:
             local_space["stage1_epochs"] = narrow_int_range(
-                stage1_vals, INT_BOUNDS["stage1_epochs"], min_pad=2)
+                stage1_vals, INT_BOUNDS["stage1_epochs"], min_pad=stage1_min_pad)
         for name in tier2_log_names:
             vals = values_for(name)
             if vals:
-                local_space[name] = narrow_log_range(vals, LOG_FLOAT_BOUNDS[name])
+                local_space[name] = narrow_log_range(
+                    vals, LOG_FLOAT_BOUNDS[name], expand=log_expand)
         for name in tier2_linear_names:
             vals = values_for(name)
             if vals:
-                local_space[name] = narrow_linear_range(vals, LINEAR_FLOAT_BOUNDS[name])
+                local_space[name] = narrow_linear_range(
+                    vals, LINEAR_FLOAT_BOUNDS[name],
+                    min_pad_ratio=linear_min_pad_ratio)
         for name in tier2_cat_names:
             vals = values_for(name)
             if vals:
@@ -642,7 +688,9 @@ def build_local_search_space(study, dataset, search_tier, selection_metric, top_
         for name in tier3_linear_names:
             vals = values_for(name)
             if vals:
-                local_space[name] = narrow_linear_range(vals, LINEAR_FLOAT_BOUNDS[name])
+                local_space[name] = narrow_linear_range(
+                    vals, LINEAR_FLOAT_BOUNDS[name],
+                    min_pad_ratio=linear_min_pad_ratio)
         for name in tier3_cat_names:
             vals = values_for(name)
             if vals:
@@ -650,6 +698,159 @@ def build_local_search_space(study, dataset, search_tier, selection_metric, top_
                     CATEGORICAL_SPACE[name], vals, best_params.get(name))
 
     return local_space, top_trials
+
+
+def build_local_search_space(study, dataset, search_tier, selection_metric, top_k):
+    ranked = get_completed_trials(study, selection_metric)
+    top_trials = ranked[:top_k]
+    if not top_trials:
+        return None, []
+    local_space, _ = build_local_search_space_from_trials(
+        top_trials, dataset, search_tier, tight=False)
+    return local_space, top_trials
+
+
+def parse_anchor_extra_spec(spec):
+    """Parse ``storage_uri::study_name::9,10`` for --local_space_anchor_extra."""
+    spec = (spec or "").strip()
+    parts = spec.split("::")
+    if len(parts) != 3:
+        return None
+    storage_uri, study_name, trials_csv = parts[0].strip(), parts[1].strip(), parts[2].strip()
+    trial_nums = parse_comma_int_list(trials_csv)
+    if not storage_uri or not study_name or not trial_nums:
+        return None
+    return storage_uri, study_name, trial_nums
+
+
+def merge_anchor_trials_with_extras(primary_study, primary_trial_nums, selection_metric,
+                                    extra_specs):
+    """Load primary anchor trials, then merge trials from extra storage::study::nums specs."""
+    anchor_trials = load_anchor_trials_from_study(
+        primary_study, primary_trial_nums, selection_metric)
+    hib = selection_higher_is_better(selection_metric)
+    for spec in extra_specs or []:
+        parsed = parse_anchor_extra_spec(spec)
+        if parsed is None:
+            print(
+                "ERROR: --local_space_anchor_extra must look like "
+                "storage_uri::study_name::1,2,3",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        storage_uri, study_name, trial_nums = parsed
+        try:
+            extra_study = optuna.load_study(study_name=study_name, storage=storage_uri)
+        except Exception as e:
+            print(f"ERROR: cannot load extra anchor study: {e}", file=sys.stderr)
+            sys.exit(1)
+        anchor_trials.extend(
+            load_anchor_trials_from_study(extra_study, trial_nums, selection_metric))
+    anchor_trials.sort(key=lambda t: t.value, reverse=hib)
+    return anchor_trials
+
+
+def load_anchor_trials_from_study(study, trial_numbers, selection_metric):
+    """Load COMPLETE trials by number; return list sorted best-first."""
+    by_num = {t.number: t for t in study.trials}
+    missing = []
+    incomplete = []
+    trials = []
+    for num in trial_numbers:
+        if num not in by_num:
+            missing.append(num)
+            continue
+        t = by_num[num]
+        if (t.state != optuna.trial.TrialState.COMPLETE
+                or t.value is None):
+            incomplete.append(num)
+            continue
+        trials.append(t)
+
+    if missing:
+        print(f"ERROR: anchor trial(s) not found in study: {missing}", file=sys.stderr)
+        sys.exit(1)
+    if incomplete:
+        print(f"ERROR: anchor trial(s) not COMPLETE or missing value: {incomplete}",
+              file=sys.stderr)
+        sys.exit(1)
+
+    hib = selection_higher_is_better(selection_metric)
+    trials.sort(key=lambda t: t.value, reverse=hib)
+    return trials
+
+
+def parse_comma_int_list(s):
+    """Parse '148' or '148, 114, 137' into a list of ints; ignores empty tokens."""
+    out = []
+    for part in (s or "").split(","):
+        p = part.strip()
+        if p:
+            out.append(int(p))
+    return out
+
+
+def _enqueue_one_trial_filtered(study, dataset, trial, source_study_name):
+    """Enqueue a single trial's params after search-space filtering."""
+    filtered = {}
+    dropped = []
+    for k, v in trial.params.items():
+        keep, new_v = _filter_param_for_current_space(
+            k, v, dataset, source_study_name)
+        if keep:
+            filtered[k] = new_v
+        else:
+            dropped.append(k)
+    if not trial.params:
+        return False
+    if len(filtered) < 0.5 * len(trial.params):
+        print(f"[enqueue]     trial {trial.number}: dropped too many params "
+              f"({len(dropped)}/{len(trial.params)}); skip")
+        return False
+    try:
+        study.enqueue_trial(filtered, skip_if_exists=True)
+        if dropped:
+            print(f"[enqueue]     trial {trial.number}: queued "
+                  f"(dropped {len(dropped)}: {dropped})")
+        else:
+            print(f"[enqueue]     trial {trial.number}: queued (full match)")
+        return True
+    except Exception as e:
+        print(f"[enqueue]     trial {trial.number}: enqueue failed ({e})")
+        return False
+
+
+def enqueue_trials_by_numbers_into_study(
+    study, dataset, storage_uri, source_study_name, trial_numbers,
+):
+    """Warm-start: enqueue specific trial numbers from one named study."""
+    if not trial_numbers:
+        return 0
+    try:
+        src = optuna.load_study(study_name=source_study_name, storage=storage_uri)
+    except Exception as e:
+        print(f"[enqueue] cannot load {storage_uri}::{source_study_name}: {e}",
+              file=sys.stderr)
+        sys.exit(1)
+
+    by_num = {t.number: t for t in src.trials}
+    enqueued = 0
+    print(f"\n[enqueue] by trial number: {source_study_name} @ {storage_uri}")
+    print(f"           trial_numbers={trial_numbers}")
+    for num in trial_numbers:
+        t = by_num.get(num)
+        if t is None:
+            print(f"[enqueue]     trial {num}: not found; abort", file=sys.stderr)
+            sys.exit(1)
+        if (t.state != optuna.trial.TrialState.COMPLETE
+                or t.value is None):
+            print(f"[enqueue]     trial {num}: not COMPLETE or no value; abort",
+                  file=sys.stderr)
+            sys.exit(1)
+        if _enqueue_one_trial_filtered(study, dataset, t, source_study_name):
+            enqueued += 1
+    print(f"[enqueue] total enqueued by number: {enqueued}\n")
+    return enqueued
 
 
 def summarize_local_space(local_space):
@@ -704,8 +905,10 @@ def create_study_for_cli(cli):
             sampler = RandomSampler(seed=sampler_seed)
             mode_label = "single-obj Random"
         else:
-            sampler = TPESampler(n_startup_trials=n_startup, seed=sampler_seed)
-            mode_label = "single-obj TPE"
+            use_mv = getattr(cli, "tpe_multivariate", False)
+            sampler = TPESampler(
+                n_startup_trials=n_startup, seed=sampler_seed, multivariate=use_mv)
+            mode_label = "single-obj TPE" + ("+multivariate" if use_mv else "")
         study = optuna.create_study(
             study_name=cli.study_name,
             storage=cli.db,
@@ -724,7 +927,9 @@ def create_study_for_cli(cli):
             if sampler_name == "random":
                 study.sampler = RandomSampler(seed=shifted)
             else:
-                study.sampler = TPESampler(n_startup_trials=n_startup, seed=shifted)
+                study.sampler = TPESampler(
+                    n_startup_trials=n_startup, seed=shifted,
+                    multivariate=getattr(cli, "tpe_multivariate", False))
             mode_label += f" [resume: seed+{existing}]"
         return study, mode_label
 
@@ -1118,7 +1323,8 @@ def objective(trial, cli):
                     trial.report(selection_value, epoch)
                 last_reported_epoch = epoch
 
-            if PRUNE_FN[ds](epoch, best_dev, s1_ep):
+            if (not getattr(cli, "disable_pruning", False)
+                    and PRUNE_FN[ds](epoch, best_dev, s1_ep)):
                 a2 = best_dev["Acc2"] if best_dev else 0
                 m = best_dev["MAE"] if best_dev else 9
                 s2 = max(0, epoch - s1_ep)
@@ -1224,6 +1430,64 @@ def main():
                          "seeds in the new study before sampling begins.")
     pa.add_argument("--enqueue_top_k", type=int, default=10,
                     help="Number of top trials per source DB to enqueue.")
+    pa.add_argument(
+        "--local_space_anchor_storage",
+        type=str,
+        default=None,
+        help="sqlite URI of an existing study DB (e.g. phase3 simsv2.db) for anchor trials.",
+    )
+    pa.add_argument(
+        "--local_space_anchor_study",
+        type=str,
+        default=None,
+        help="Study name inside --local_space_anchor_storage (e.g. infogate_simsv2_phase3_4090d).",
+    )
+    pa.add_argument(
+        "--local_space_anchor_trials",
+        type=str,
+        default=None,
+        help="Comma-separated trial numbers to hull the local search (e.g. 148 or 148,114,137).",
+    )
+    pa.add_argument(
+        "--local_space_anchor_extra",
+        action="append",
+        default=None,
+        help="Repeatable. Merge more anchors from another DB: storage_uri::study_name::t1,t2 "
+             "(e.g. merge phase4 trial 0 into a phase3-anchored SIMS hull).",
+    )
+    pa.add_argument(
+        "--local_space_tight",
+        action="store_true",
+        help="Narrow single-anchor / hull expansion (smaller log expand, linear pad, epoch pad).",
+    )
+    pa.add_argument(
+        "--tpe_multivariate",
+        action="store_true",
+        help="Use TPESampler(multivariate=True) for guided single-objective search.",
+    )
+    pa.add_argument(
+        "--disable_pruning",
+        action="store_true",
+        help="Never prune training subprocesses based on mid-run dev metrics.",
+    )
+    pa.add_argument(
+        "--enqueue_trials_storage",
+        type=str,
+        default=None,
+        help="sqlite URI to enqueue specific trial numbers from (often same as anchor DB).",
+    )
+    pa.add_argument(
+        "--enqueue_trials_study",
+        type=str,
+        default=None,
+        help="Study name for --enqueue_trials_numbers.",
+    )
+    pa.add_argument(
+        "--enqueue_trials_numbers",
+        type=str,
+        default=None,
+        help="Comma-separated trial numbers to enqueue as warm-start (e.g. 148).",
+    )
     pa.add_argument("--no_dataset_overrides", action="store_true",
                     help="Skip apply_dataset_bounds_overrides(); use the FULL global "
                          "search space. Use for cold restarts that should NOT inherit "
@@ -1263,6 +1527,59 @@ def main():
         and not cli.multi_objective
         and not cli.disable_two_stage_mosi
     )
+
+    anchor_parts = (
+        cli.local_space_anchor_storage,
+        cli.local_space_anchor_study,
+        cli.local_space_anchor_trials,
+    )
+    enq_num_parts = (
+        cli.enqueue_trials_storage,
+        cli.enqueue_trials_study,
+        cli.enqueue_trials_numbers,
+    )
+    if any(anchor_parts) and not all(anchor_parts):
+        print(
+            "ERROR: --local_space_anchor_storage, --local_space_anchor_study, "
+            "--local_space_anchor_trials must be set together.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if any(enq_num_parts) and not all(enq_num_parts):
+        print(
+            "ERROR: --enqueue_trials_storage, --enqueue_trials_study, "
+            "--enqueue_trials_numbers must be set together.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if any(anchor_parts) and not parse_comma_int_list(cli.local_space_anchor_trials):
+        print(
+            "ERROR: --local_space_anchor_trials must list at least one integer.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if any(enq_num_parts) and not parse_comma_int_list(cli.enqueue_trials_numbers):
+        print(
+            "ERROR: --enqueue_trials_numbers must list at least one integer.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    anchor_extras = list(cli.local_space_anchor_extra or [])
+    if anchor_extras and not all(anchor_parts):
+        print(
+            "ERROR: --local_space_anchor_extra requires "
+            "--local_space_anchor_storage, --local_space_anchor_study, "
+            "and --local_space_anchor_trials.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if use_two_stage_mosi and (any(anchor_parts) or any(enq_num_parts) or anchor_extras):
+        print(
+            "ERROR: --local_space_anchor_* , --enqueue_trials_* (by number), "
+            "and --local_space_anchor_extra are not supported with MOSI two-stage search.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     if use_two_stage_mosi:
         s1_name, s2_name = build_two_stage_study_names(cli)
@@ -1313,9 +1630,50 @@ def main():
         print_study_summary(stage2_study, stage2_cli)
         return
 
+    local_space = None
+    if any(anchor_parts):
+        trial_nums = parse_comma_int_list(cli.local_space_anchor_trials)
+        try:
+            anchor_study = optuna.load_study(
+                study_name=cli.local_space_anchor_study,
+                storage=cli.local_space_anchor_storage,
+            )
+        except Exception as e:
+            print(f"ERROR: cannot load anchor study: {e}", file=sys.stderr)
+            sys.exit(1)
+        if anchor_extras:
+            anchor_trials = merge_anchor_trials_with_extras(
+                anchor_study, trial_nums, cli.selection_metric, anchor_extras)
+        else:
+            anchor_trials = load_anchor_trials_from_study(
+                anchor_study, trial_nums, cli.selection_metric)
+        local_space, anchor_ranked = build_local_search_space_from_trials(
+            anchor_trials, ds, cli.search_tier, tight=cli.local_space_tight)
+        print("\n" + "=" * 60)
+        print("Local search from anchor trial(s)")
+        print(f"  Storage: {cli.local_space_anchor_storage}")
+        print(f"  Study:   {cli.local_space_anchor_study}")
+        print(f"  Trial # (requested): {trial_nums}")
+        if anchor_extras:
+            print(f"  Extra anchor group(s): {anchor_extras}")
+        print(f"  Trial # (best-first, merged): {[t.number for t in anchor_ranked]}")
+        print(summarize_local_space(local_space), end="")
+
+    enqueue_trials_resolved = (
+        parse_comma_int_list(cli.enqueue_trials_numbers)
+        if any(enq_num_parts) else None
+    )
+
     cli = clone_cli(cli, sampler_name="tpe", sampler_seed=128,
-                    stage_label=cli.stage_label, local_space=None)
+                    stage_label=cli.stage_label, local_space=local_space)
     study, mode_label = create_study_for_cli(cli)
+    if enqueue_trials_resolved:
+        enqueue_trials_by_numbers_into_study(
+            study, ds,
+            cli.enqueue_trials_storage,
+            cli.enqueue_trials_study,
+            enqueue_trials_resolved,
+        )
     if getattr(cli, "enqueue_top_from", None):
         enqueue_top_trials_into_study(
             study, cli.dataset,

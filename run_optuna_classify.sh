@@ -43,7 +43,11 @@ PARALLEL="${PARALLEL:-1}"
 ONLY="${ONLY:-both}"     # both | mustard | ur_funny
 
 # Knobs (override via env)
+# UR-FUNNY uses SEARCH_TIER (default 2). MUStARD defaults to tier 3 so Tier3
+# knobs (num_heads, unified_dim, Gumbel schedule, focal/R-Drop, etc.) are
+# searched on top of the existing tier-1/2 space; override with SEARCH_TIER_MUSTARD.
 SEARCH_TIER="${SEARCH_TIER:-2}"
+SEARCH_TIER_MUSTARD="${SEARCH_TIER_MUSTARD:-3}"
 N_STARTUP="${N_STARTUP:-20}"
 URFUNNY_TRIALS="${URFUNNY_TRIALS:-80}"
 MUSTARD_S1_TRIALS="${MUSTARD_S1_TRIALS:-40}"
@@ -61,6 +65,7 @@ echo "$RUN_TAG" > "$RUN_ROOT/RUN_TAG.txt"
 echo "RUN_TAG=$RUN_TAG"
 echo "RUN_ROOT=$RUN_ROOT"
 echo "PYTHON=$PYTHON"
+echo "SEARCH_TIER_MUSTARD=$SEARCH_TIER_MUSTARD  SEARCH_TIER_URFUNNY=$SEARCH_TIER"
 
 db_uri () {
   local name="$1"
@@ -77,7 +82,7 @@ launch_mustard () {
   nohup env CUDA_VISIBLE_DEVICES="${gpu}" "${PYTHON}" -u optuna_search_classify.py \
     --dataset mustard \
     --gpu 0 \
-    --search_tier "${SEARCH_TIER}" \
+    --search_tier "${SEARCH_TIER_MUSTARD}" \
     --n_startup_trials "${N_STARTUP}" \
     --stage1_trials "${MUSTARD_S1_TRIALS}" \
     --stage2_trials "${MUSTARD_S2_TRIALS}" \
@@ -123,7 +128,7 @@ else
   if [[ "${ONLY}" == "both" || "${ONLY}" == "mustard" ]]; then
     env CUDA_VISIBLE_DEVICES="${GPU_MUSTARD}" "${PYTHON}" -u optuna_search_classify.py \
       --dataset mustard --gpu 0 \
-      --search_tier "${SEARCH_TIER}" \
+      --search_tier "${SEARCH_TIER_MUSTARD}" \
       --n_startup_trials "${N_STARTUP}" \
       --stage1_trials "${MUSTARD_S1_TRIALS}" \
       --stage2_trials "${MUSTARD_S2_TRIALS}" \
