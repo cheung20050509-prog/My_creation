@@ -36,6 +36,14 @@
 #   ONLY=simsv2 ./run_optuna_4090d_restart.sh phase5_simsv2  # after phase4 SIMS db exists
 #   ONLY=mosi ./run_optuna_4090d_restart.sh phase4_mosi  # or phase5_mosi (clean db)
 #
+# Optional env (defaults in-script): MOSI_N_EPOCHS_CAP, MOSI_EARLY_STOP_PATIENCE;
+# SIMSV2_N_EPOCHS_CAP, SIMSV2_EARLY_STOP_PATIENCE (phase4 / phase5_simsv2 only).
+# Resume trial budget: MOSI_MICRO_N_TRIALS (phase4_mosi|phase5_mosi), SIMSV2_N_TRIALS (phase4|phase5_simsv2).
+# New Optuna study name (same DB file allows multiple studies): set MOSI_STUDY_NAME / SIMSV2_STUDY_NAME,
+# or MOSI_STUDY_SUFFIX / SIMSV2_STUDY_SUFFIX (appended to default name) when parameter distributions changed.
+# Parallel two drivers: wrap each in `( cd .../My_creation && ONLY=... ./run_optuna_4090d_restart.sh ... ) &`
+# so both see the script directory (plain `cd && A & B &` only applies `cd` to the first background job).
+#
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -52,6 +60,19 @@ case "$PHASE" in
   phase5_simsv2) TIER=3 ;;
   *) echo "ERROR: unknown phase '$PHASE'; expected phase1|phase2|phase3|phase4|phase4_mosi|phase5_mosi|phase5_simsv2" >&2; exit 1 ;;
 esac
+
+# MOSI micro-local (phase4_mosi / phase5_mosi): Optuna n_epochs cap + train dev early stop
+MOSI_N_EPOCHS_CAP="${MOSI_N_EPOCHS_CAP:-110}"
+MOSI_EARLY_STOP_PATIENCE="${MOSI_EARLY_STOP_PATIENCE:-15}"
+
+# SIMSv2 tier-3 local hull (phase4 / phase5_simsv2): same knobs via optuna_search_v2 -> train.py
+SIMSV2_N_EPOCHS_CAP="${SIMSV2_N_EPOCHS_CAP:-75}"
+SIMSV2_EARLY_STOP_PATIENCE="${SIMSV2_EARLY_STOP_PATIENCE:-15}"
+
+MOSI_STUDY_NAME="${MOSI_STUDY_NAME:-}"
+MOSI_STUDY_SUFFIX="${MOSI_STUDY_SUFFIX:-}"
+SIMSV2_STUDY_NAME="${SIMSV2_STUDY_NAME:-}"
+SIMSV2_STUDY_SUFFIX="${SIMSV2_STUDY_SUFFIX:-}"
 
 # Per-phase trial budgets
 case "$PHASE" in
@@ -73,11 +94,11 @@ case "$PHASE" in
   phase4)  # tier 3; SIMSv2 micro-local around phase3 trial 148 (see launch_simsv2)
     MOSI_S1_TRIALS=60;  MOSI_S2_TRIALS=140; MOSI_S2_TOP_K=8;  MOSI_S2_NSTART=25
     MOSEI_TRIALS=150;   MOSEI_NSTART=55
-    SIMSV2_TRIALS=90;   SIMSV2_NSTART=22
+    SIMSV2_TRIALS=120;   SIMSV2_NSTART=22
     ;;
   phase4_mosi)  # tier 3; MOSI single-study micro-local (see launch_mosi_micro_local)
-    # 90 = resume headroom after an initial 60-trial block (optuna load_if_exists).
-    MOSI_MICRO_TRIALS=90
+    # Target total trials for Optuna resume (load_if_exists); increase to add budget on same DB.
+    MOSI_MICRO_TRIALS=120
     MOSI_MICRO_NSTART=15
     MOSEI_TRIALS=150
     MOSEI_NSTART=55
@@ -92,6 +113,21 @@ case "$PHASE" in
     MOSI_S1_TRIALS=60;  MOSI_S2_TRIALS=140; MOSI_S2_TOP_K=8;  MOSI_S2_NSTART=25
     MOSEI_TRIALS=150;   MOSEI_NSTART=55
     SIMSV2_TRIALS=90;   SIMSV2_NSTART=22
+    ;;
+esac
+
+# Resume / add budget on same DB without editing case values:
+#   MOSI_MICRO_N_TRIALS   — overrides MOSI_MICRO_TRIALS for phase4_mosi|phase5_mosi
+#   SIMSV2_N_TRIALS       — overrides SIMSV2_TRIALS for phase4|phase5_simsv2
+case "$PHASE" in
+  phase4)
+    SIMSV2_TRIALS="${SIMSV2_N_TRIALS:-$SIMSV2_TRIALS}"
+    ;;
+  phase4_mosi|phase5_mosi)
+    MOSI_MICRO_TRIALS="${MOSI_MICRO_N_TRIALS:-$MOSI_MICRO_TRIALS}"
+    ;;
+  phase5_simsv2)
+    SIMSV2_TRIALS="${SIMSV2_N_TRIALS:-$SIMSV2_TRIALS}"
     ;;
 esac
 
@@ -184,7 +220,8 @@ launch_mosi () {
 launch_mosi_micro_local () {
   local gpu="$1"
   local logfile="$PHASE_ROOT/run/mosi.log"
-  local study="infogate_mosi_${PHASE}_4090d"
+  local study_default="infogate_mosi_${PHASE}_4090d${MOSI_STUDY_SUFFIX}"
+  local study="${MOSI_STUDY_NAME:-$study_default}"
   local db; db="$(db_uri mosi)"
   local p3_s2_db="sqlite:///${ROOT}/logs/optuna/4090D_restart/phase3/db/mosi_infogate_mosi_phase3_4090d_s2_local.db"
   local p3_s2_study="infogate_mosi_phase3_4090d_s2_local"
@@ -203,6 +240,8 @@ launch_mosi_micro_local () {
     --search_tier "${TIER}" \
     --n_trials "${MOSI_MICRO_TRIALS}" \
     --n_startup_trials "${MOSI_MICRO_NSTART}" \
+    --n_epochs "${MOSI_N_EPOCHS_CAP}" \
+    --early_stop_patience "${MOSI_EARLY_STOP_PATIENCE}" \
     --selection_metric mae \
     --study_name "${study}" \
     --db "${db}" \
@@ -212,7 +251,6 @@ launch_mosi_micro_local () {
     --local_space_anchor_study "${p4_mosi_study}" \
     --local_space_anchor_trials "8" \
     --local_space_anchor_extra "${p3_s2_db}::${p3_s2_study}::89,43,75" \
-    --tpe_multivariate \
     --enqueue_trials_storage "${p4_mosi_db}" \
     --enqueue_trials_study "${p4_mosi_study}" \
     --enqueue_trials_numbers "8" \
@@ -248,7 +286,8 @@ launch_mosei () {
 launch_simsv2 () {
   local gpu="$1"
   local logfile="$PHASE_ROOT/run/simsv2.log"
-  local study="infogate_simsv2_${PHASE}_4090d"
+  local study_default="infogate_simsv2_${PHASE}_4090d${SIMSV2_STUDY_SUFFIX}"
+  local study="${SIMSV2_STUDY_NAME:-$study_default}"
   local db; db="$(db_uri simsv2)"
 
   # phase3 uses the narrowed SIMSv2 overrides derived from phase2 top-15
@@ -258,6 +297,7 @@ launch_simsv2 () {
   local enqueue_args=()
   local local_space_args=()
   local artefact_args=()
+  local simsv2_train_caps=()
   if [[ "$PHASE" == "phase3" ]]; then
     override_args=()
     # SQLite absolute URI: 3 slashes + absolute path = 4 slashes total.
@@ -267,6 +307,10 @@ launch_simsv2 () {
       --enqueue_top_k 12
     )
   elif [[ "$PHASE" == "phase4" ]]; then
+    simsv2_train_caps=(
+      --n_epochs "${SIMSV2_N_EPOCHS_CAP}"
+      --early_stop_patience "${SIMSV2_EARLY_STOP_PATIENCE}"
+    )
     override_args=()
     artefact_args=(--artefact_root "${PHASE_ROOT}")
     local p3_db="sqlite:///${ROOT}/logs/optuna/4090D_restart/phase3/db/simsv2.db"
@@ -278,9 +322,12 @@ launch_simsv2 () {
       --enqueue_trials_storage "${p3_db}"
       --enqueue_trials_study "${p3_study}"
       --enqueue_trials_numbers "148"
-      --tpe_multivariate
     )
   elif [[ "$PHASE" == "phase5_simsv2" ]]; then
+    simsv2_train_caps=(
+      --n_epochs "${SIMSV2_N_EPOCHS_CAP}"
+      --early_stop_patience "${SIMSV2_EARLY_STOP_PATIENCE}"
+    )
     override_args=()
     artefact_args=(--artefact_root "${PHASE_ROOT}")
     local p3_db="sqlite:///${ROOT}/logs/optuna/4090D_restart/phase3/db/simsv2.db"
@@ -300,7 +347,6 @@ launch_simsv2 () {
       --enqueue_trials_storage "${p3_db}"
       --enqueue_trials_study "${p3_study}"
       --enqueue_trials_numbers "148"
-      --tpe_multivariate
     )
   fi
 
@@ -323,6 +369,7 @@ launch_simsv2 () {
     "${artefact_args[@]}" \
     "${enqueue_args[@]}" \
     "${local_space_args[@]}" \
+    "${simsv2_train_caps[@]}" \
     >> "${logfile}" 2>&1 &
   echo "    PID=$!"
 }

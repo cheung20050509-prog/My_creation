@@ -90,6 +90,17 @@ parser.add_argument("--early_stop_patience", type=int, default=0,
 parser.add_argument("--early_stop_min_delta", type=float, default=0.0,
                     help="When >0, a dev improvement must exceed this margin on the "
                          "selection score (tiebreak-only wins still count).")
+parser.add_argument("--ablation", type=str, default="none",
+                    choices=["none", "no_infogate", "no_mselector", "no_ib",
+                             "no_conf_gating", "no_adaptive_gate"],
+                    help="Architectural ablation mode.")
+
+# Load best hyperparameters from local hparams.py, keyed by --dataset
+from hparams import MOSI, MOSEI, SIMSv2 as SIMSV2
+_BEST_HPARAMS = {"mosi": MOSI, "mosei": MOSEI, "simsv2": SIMSV2}
+_known, _ = parser.parse_known_args()
+if _known.dataset in _BEST_HPARAMS:
+    parser.set_defaults(**_BEST_HPARAMS[_known.dataset])
 
 args = parser.parse_args()
 

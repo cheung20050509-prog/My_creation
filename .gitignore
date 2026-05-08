@@ -18,6 +18,9 @@ datasets
 .venv/
 venv/
 
+# Claude Code — optional machine-local overrides (keep shared CLAUDE.md tracked)
+.claude/settings.local.json
+
 # LaTeX/paper build artifacts (keep sources tracked; ignore regenerated outputs)
 
 paper_files/*.aux
