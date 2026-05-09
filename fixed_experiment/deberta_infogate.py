@@ -13,7 +13,10 @@ from infogate_modules import InfoGate
 import global_configs
 from global_configs import DEVICE
 
-_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base")
+# Snapshot under fixed_experiment/; DeBERTa weights live in My_creation/.
+_FE_DIR = os.path.dirname(os.path.abspath(__file__))
+_MY_CREATION_DIR = os.path.dirname(_FE_DIR)
+_MODEL_DIR = os.path.join(_MY_CREATION_DIR, "deberta-v3-base")
 
 
 def _resolve_dims(config, mc):

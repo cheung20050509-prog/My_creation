@@ -1,4 +1,8 @@
-"""InfoGate training script for complete-modality optimization."""
+"""InfoGate training script for complete-modality optimization.
+
+Copy vendored under ``fixed_experiment/`` for MOSI trial 234 frozen runs.
+Paths to ``deberta-v3-base`` and ``datasets/*.pkl`` resolve to ``My_creation/`` parent.
+"""
 
 import argparse
 import math
@@ -31,12 +35,16 @@ from selection_utils import (
     selection_higher_is_better,
 )
 
+# Snapshot copy under fixed_experiment/: tokenizer weights + pickles live in My_creation/.
+_FIXED_EXP_DIR = os.path.dirname(os.path.abspath(__file__))
+_MY_CREATION_DIR = os.path.dirname(_FIXED_EXP_DIR)
+
 # ============================================================
 # CLI
 # ============================================================
 parser = argparse.ArgumentParser(description="InfoGate Training")
 parser.add_argument("--model", type=str,
-                    default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base"))
+                    default=os.path.join(_MY_CREATION_DIR, "deberta-v3-base"))
 parser.add_argument("--dataset", type=str, choices=["mosi", "mosei", "simsv2"], default="mosi")
 parser.add_argument("--max_seq_length", type=int, default=50)
 parser.add_argument("--train_batch_size", type=int, default=32)
@@ -90,13 +98,6 @@ parser.add_argument("--early_stop_patience", type=int, default=0,
 parser.add_argument("--early_stop_min_delta", type=float, default=0.0,
                     help="When >0, a dev improvement must exceed this margin on the "
                          "selection score (tiebreak-only wins still count).")
-
-# Load best hyperparameters from local hparams.py, keyed by --dataset
-from hparams import MOSI, MOSEI, SIMSv2 as SIMSV2
-_BEST_HPARAMS = {"mosi": MOSI, "mosei": MOSEI, "simsv2": SIMSV2}
-_known, _ = parser.parse_known_args()
-if _known.dataset in _BEST_HPARAMS:
-    parser.set_defaults(**_BEST_HPARAMS[_known.dataset])
 
 args = parser.parse_args()
 
@@ -233,7 +234,8 @@ def get_dataset(data):
 
 
 def setup_data():
-    with open(f"datasets/{args.dataset}.pkl", "rb") as fh:
+    ds_path = os.path.join(_MY_CREATION_DIR, "datasets", f"{args.dataset}.pkl")
+    with open(ds_path, "rb") as fh:
         data = pickle.load(fh)
 
     train_ds = get_dataset(data["train"])

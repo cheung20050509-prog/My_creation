@@ -376,8 +376,10 @@ launch_simsv2 () {
 
 # GPU layout: MOSI GPU0; MOSEI GPU1; SIMSv2 GPU0 (use ONLY= to avoid MOSI+SIMSv2 on same card).
 # phase4_mosi: physical GPU via MOSI_GPU (default 0).
+# MOSEI: MOSEI_GPU (default 1). Set MOSEI_GPU=0 on single-GPU machines.
 # SIMSv2: SIMS_GPU (default 0). Set SIMS_GPU=1 when a second GPU is available for true parallelism.
 MOSI_GPU="${MOSI_GPU:-0}"
+MOSEI_GPU="${MOSEI_GPU:-1}"
 SIMS_GPU="${SIMS_GPU:-0}"
 if [[ "$PHASE" == "phase4_mosi" || "$PHASE" == "phase5_mosi" ]]; then
   if [[ "$ONLY" != "mosi" && "$ONLY" != "all" ]]; then
@@ -393,7 +395,7 @@ elif [[ "$PHASE" == "phase5_simsv2" ]]; then
   launch_simsv2 "${SIMS_GPU}"
 else
   if [[ "$ONLY" == "all" || "$ONLY" == "mosi"   ]]; then launch_mosi   0; fi
-  if [[ "$ONLY" == "all" || "$ONLY" == "mosei"  ]]; then launch_mosei  1; fi
+  if [[ "$ONLY" == "all" || "$ONLY" == "mosei"  ]]; then launch_mosei "${MOSEI_GPU}"; fi
   if [[ "$ONLY" == "all" || "$ONLY" == "simsv2" ]]; then launch_simsv2 "${SIMS_GPU}"; fi
 fi
 
