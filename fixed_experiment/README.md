@@ -1,20 +1,50 @@
-# Fixed experiments (CMU-MOSI, CMU-MOSEI & CH-SIMS v2)
+# Fixed experiment: frozen Optuna trials (MOSI, MOSEI, SIMSv2)
 
-Self-contained snapshots under [`fixed_experiment/`](.) invoke **this folder’s** [`train.py`](train.py) with `cwd` = [`My_creation/`](../). CLI float formatting matches [`optuna_search_v2.objective()`](../optuna_search_v2.py) so parsed learning rates match the gold Optuna train logs.
+Reproducible single runs with hyperparameters copied from **`My_creation/logs/optuna/4090D_restart`**. CLI float formatting matches `optuna_search_v2.objective()` so parsed learning rates match the gold Optuna train log headers.
+
+**Environment:** same stack as the Optuna driver is recommended (e.g. conda `ITHP5090`, `transformers==4.29.2`). Override interpreter with `PYTHON=/path/to/python` in the shell wrappers.
+
+### MOSEI + SIMSv2 in parallel (two GPUs)
+
+If you have **two** GPUs, bind one job per card to avoid sequential wall-clock:
+
+```bash
+cd My_creation && bash fixed_experiment/run_mosei70_simsv52_parallel.sh
+```
+
+Defaults: `MOSEI_GPU=0`, `SIMSV2_GPU=1`. Override, for example:
+
+```bash
+MOSEI_GPU=1 SIMSV2_GPU=0 bash fixed_experiment/run_mosei70_simsv52_parallel.sh
+```
+
+Or start each run yourself with different `CUDA_VISIBLE_DEVICES` in two terminals.
+
+**Note:** Do not chain `run_mosei…; run_simsv2…` in one `bash -c` if you want parallelism; if you already started such a job, you can `kill` the **outer** sequential `bash -c` PID (the parent of `run_mosei_phase1_trial70.sh`)—MOSEI’s `train.py` typically keeps running while the trailing SIMSv2 step is skipped.
+
+## Vendored Python (snapshot)
+
+These files are **copies** of the corresponding modules under [`My_creation/`](../); imports resolve within `fixed_experiment/`. The copied [`train.py`](train.py) patches paths so **`deberta-v3-base`**, **`bert-base-chinese`**, and **`datasets/{mosi,mosei,simsv2}.pkl`** are read from **`My_creation/`**, not from this directory.
+
+| File | Role |
+|------|------|
+| [`train.py`](train.py) | Entry training script (path patches for snapshot layout) |
+| [`deberta_infogate.py`](deberta_infogate.py) | DeBERTa + InfoGate (MOSI / MOSEI) |
+| [`bert_infogate.py`](bert_infogate.py) | BERT path (SIMSv2) |
+| [`infogate_modules.py`](infogate_modules.py) | Shared InfoGate blocks |
+| [`global_configs.py`](global_configs.py) | Dataset dims / device |
+| [`simsv2_metrics.py`](simsv2_metrics.py) | SIMSv2 metrics |
+| [`selection_utils.py`](selection_utils.py) | Checkpoint selection helpers |
+
+If you change training logic under `My_creation/`, **refresh these copies** when you want this frozen bundle to stay aligned (for example: `cp ../train.py ../deberta_infogate.py ... fixed_experiment/` then re-apply the small path patches in `fixed_experiment/train.py`).
 
 ---
 
-## CMU-MOSI — Optuna trial 234
+## CMU-MOSI — phase4_mosi trial 234
 
-Single run frozen to **study `infogate_mosi_phase4_mosi_4090d`, trial 234**.
-
-| Entry | Role |
-|------|------|
-| [`mosi_trial234_hparams.py`](mosi_trial234_hparams.py) | Params + `build_train_argv()` |
-| [`train_fixed_mosi_trial234.py`](train_fixed_mosi_trial234.py) | Python launcher |
-| [`run_mosi_trial234.sh`](run_mosi_trial234.sh) | Shell entry (`CUDA_VISIBLE_DEVICES`, log tee) |
-
-Outputs: `My_creation/fixed_experiment/runs/mosi_trial234/` (`train.log`, `checkpoints/`).
+- **Study:** `infogate_mosi_phase4_mosi_4090d`
+- **Files:** [`mosi_trial234_hparams.py`](mosi_trial234_hparams.py), [`train_fixed_mosi_trial234.py`](train_fixed_mosi_trial234.py), [`run_mosi_trial234.sh`](run_mosi_trial234.sh)
+- **Outputs:** `fixed_experiment/runs/mosi_trial234/` (`train.log`, `checkpoints/`)
 
 ```bash
 bash /path/to/My_creation/fixed_experiment/run_mosi_trial234.sh
@@ -27,115 +57,59 @@ Dry-run:
 cd My_creation && python fixed_experiment/train_fixed_mosi_trial234.py --dry-run
 ```
 
-Check:
+Verify argv vs gold log:
 
 ```bash
 cd My_creation && python scripts/verify_mosi_trial234_optuna_train_argv.py
 ```
 
-Same recipe as [`run_reproduce_mosi_phase4_mosi_trial234.sh`](../run_reproduce_mosi_phase4_mosi_trial234.sh).
+Same hyperparameters as [`run_reproduce_mosi_phase4_mosi_trial234.sh`](../run_reproduce_mosi_phase4_mosi_trial234.sh).
 
 ---
 
-## CMU-MOSEI — 4090D_restart phase1 trial 70
+## CMU-MOSEI — phase1 trial 70
 
-Single run frozen to **[`logs/optuna/4090D_restart/phase1`](../logs/optuna/4090D_restart/phase1)** study **`infogate_mosei_phase1_4090d`**, **Tier 1**, **trial 70**. Optuna-reported test MAE **0.4994** matches the paper table MOSEI MAE **0.499** (rounding). Phase1 search only sampled tier1 knobs; tier2/3 values are [`optuna_search_v2`](../optuna_search_v2.py) **`DEFAULTS`**.
+- **Study:** `infogate_mosei_phase1_4090d` (paper / ablation: phase1, trial 70; see `overleaf_69e83a58/acl_latex.tex`)
+- **Gold log:** `logs/optuna/4090D_restart/phase1/train_logs/mosei_phase1_trial_70.log`
+- **Files:** [`mosei_phase1_trial70_hparams.py`](mosei_phase1_trial70_hparams.py), [`train_fixed_mosei_phase1_trial70.py`](train_fixed_mosei_phase1_trial70.py), [`run_mosei_phase1_trial70.sh`](run_mosei_phase1_trial70.sh)
+- **Outputs:** `fixed_experiment/runs/mosei_phase1_trial70/`
 
-**Note:** The separate Optuna relaunch line ([`saved_hparams/mosei_best_hparams.json`](../saved_hparams/mosei_best_hparams.json), trial 37, MAE ~0.494) is a different study — better MAE but not the 4090D_restart / paper-row lineage documented above.
-
-| Entry | Role |
-|------|------|
-| [`mosei_phase1_trial70_hparams.py`](mosei_phase1_trial70_hparams.py) | Params + `build_train_argv()` (no `--early_stop_patience`; matches phase1 driver) |
-| [`train_fixed_mosei_phase1_trial70.py`](train_fixed_mosei_phase1_trial70.py) | Python launcher |
-| [`run_mosei_phase1_trial70.sh`](run_mosei_phase1_trial70.sh) | Shell entry |
-
-Gold log: [`logs/optuna/4090D_restart/phase1/train_logs/mosei_phase1_trial_70.log`](../logs/optuna/4090D_restart/phase1/train_logs/mosei_phase1_trial_70.log).
-
-Outputs: `My_creation/fixed_experiment/runs/mosei_phase1_trial70/`.
+Phase1 MOSEI Optuna does **not** pass `--early_stop_patience` (train full `n_epochs`; `train.py` default patience 0).
 
 ```bash
 bash /path/to/My_creation/fixed_experiment/run_mosei_phase1_trial70.sh
-# or: cd My_creation/fixed_experiment && ./run_mosei_phase1_trial70.sh
 ```
 
-Dry-run:
+Dry-run / verify:
 
 ```bash
 cd My_creation && python fixed_experiment/train_fixed_mosei_phase1_trial70.py --dry-run
-```
-
-Check:
-
-```bash
 cd My_creation && python scripts/verify_mosei_phase1_trial70_optuna_train_argv.py
 ```
 
-Optional DB merge:
-
-```bash
-cd My_creation && python scripts/verify_mosei_phase1_trial70_optuna_train_argv.py \
-  --storage "sqlite:///$(pwd)/logs/optuna/4090D_restart/phase1/db/mosei.db"
-```
-
-PRISM six-mode ablations (same trial 70 knobs, local `ablation_study/train.py`): [`ablation_study/run_prism_ablations_mosei_phase1_trial70.sh`](../ablation_study/run_prism_ablations_mosei_phase1_trial70.sh).
-
 ---
 
-## CH-SIMS v2 — 4090D_restart phase6_simsv2 trial 0
+## CH-SIMS v2 — phase4 trial 52
 
-Single run frozen to **[`logs/optuna/4090D_restart/phase6_simsv2`](../logs/optuna/4090D_restart/phase6_simsv2)** study **`infogate_simsv2_phase6_simsv2_4090d_space3`**, **trial 0**. Optuna-reported selection value **0.3113**; driver uses **`--selection_metric mae`** and **`--early_stop_patience 15`** (see [`run_optuna_4090d_restart.sh`](../run_optuna_4090d_restart.sh) `phase6_simsv2`). `batch_config` 0 → train batch **8** × grad accum **4**.
+- **Study:** `infogate_simsv2_phase4_4090d` (paper main row: use final **trial 52** in `phase4/run/simsv2.log`, second `Trial 52 finished` block; Best MAE **0.3113** in `simsv2_phase4_trial_52.log`)
+- **Files:** [`simsv2_phase4_trial52_hparams.py`](simsv2_phase4_trial52_hparams.py), [`train_fixed_simsv2_phase4_trial52.py`](train_fixed_simsv2_phase4_trial52.py), [`run_simsv2_phase4_trial52.sh`](run_simsv2_phase4_trial52.sh)
+- **Outputs:** `fixed_experiment/runs/simsv2_phase4_trial52/`
 
-| Entry | Role |
-|------|------|
-| [`simsv2_phase6_trial0_hparams.py`](simsv2_phase6_trial0_hparams.py) | Params + `build_train_argv()` (includes `--early_stop_patience 15`) |
-| [`train_fixed_simsv2_phase6_trial0.py`](train_fixed_simsv2_phase6_trial0.py) | Python launcher |
-| [`run_simsv2_phase6_trial0.sh`](run_simsv2_phase6_trial0.sh) | Shell entry — **`CUDA_VISIBLE_DEVICES` defaults to 1** |
-
-Gold log: [`logs/optuna/4090D_restart/phase6_simsv2/train_logs/simsv2_phase6_simsv2_trial_0.log`](../logs/optuna/4090D_restart/phase6_simsv2/train_logs/simsv2_phase6_simsv2_trial_0.log).
-
-Outputs: `My_creation/fixed_experiment/runs/simsv2_phase6_trial0/`.
-
-PRISM six-mode ablations (same trial 0 knobs via [`ablation_study/train.py`](../ablation_study/train.py)): [`run_prism_ablations_simsv2_phase6_trial0.sh`](../ablation_study/run_prism_ablations_simsv2_phase6_trial0.sh).
+Uses `--early_stop_patience 15` (same as `run_optuna_4090d_restart.sh` phase4 SIMSv2 default).
 
 ```bash
-bash /path/to/My_creation/fixed_experiment/run_simsv2_phase6_trial0.sh
-# or: cd My_creation/fixed_experiment && ./run_simsv2_phase6_trial0.sh
-# Override GPU: CUDA_VISIBLE_DEVICES=0 bash run_simsv2_phase6_trial0.sh
+bash /path/to/My_creation/fixed_experiment/run_simsv2_phase4_trial52.sh
 ```
 
-Dry-run:
+Dry-run / verify:
 
 ```bash
-cd My_creation && python fixed_experiment/train_fixed_simsv2_phase6_trial0.py --dry-run
-```
-
-Check:
-
-```bash
-cd My_creation && python scripts/verify_simsv2_phase6_trial0_optuna_train_argv.py
-```
-
-Optional DB merge:
-
-```bash
-cd My_creation && python scripts/verify_simsv2_phase6_trial0_optuna_train_argv.py \
-  --storage "sqlite:///$(pwd)/logs/optuna/4090D_restart/phase6_simsv2/db/simsv2.db"
+cd My_creation && python fixed_experiment/train_fixed_simsv2_phase4_trial52.py --dry-run
+cd My_creation && python scripts/verify_simsv2_phase4_trial52_optuna_train_argv.py
 ```
 
 ---
 
-## Vendored Python (snapshot)
+## Paper repro bundle
 
-These files are **copies** of modules under [`My_creation/`](../); [`train.py`](train.py) patches paths so **`deberta-v3-base`** and **`datasets/{mosi,mosei,simsv2}.pkl`** resolve under **`My_creation/`**.
-
-| File | Role |
-|------|------|
-| [`train.py`](train.py) | Training entry (path patches) |
-| [`deberta_infogate.py`](deberta_infogate.py) | DeBERTa + InfoGate |
-| [`bert_infogate.py`](bert_infogate.py) | BERT path (e.g. SIMSv2) |
-| [`infogate_modules.py`](infogate_modules.py) | Shared InfoGate blocks |
-| [`global_configs.py`](global_configs.py) | Dataset dims / device |
-| [`simsv2_metrics.py`](simsv2_metrics.py) | SIMSv2 metrics |
-| [`selection_utils.py`](selection_utils.py) | Checkpoint selection helpers |
-
-After changing training code upstream, refresh copies and re-apply [`fixed_experiment/train.py`](train.py) path patches if needed.
+[`scripts/bundle_paper_repro_to_fixed_experiment.sh`](../scripts/bundle_paper_repro_to_fixed_experiment.sh) copies these `*_hparams.py` files into `fixed_experiment/paper_repro_bundle/frozen/` together with thin launchers.

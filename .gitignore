@@ -5,6 +5,9 @@ __pycache__/
 checkpoints/
 logs/
 *.log
+
+# Frozen repro local outputs (checkpoints live under runs/*/checkpoints/)
+fixed_experiment/runs/
 deberta-v3-base/
 albert-base-v2/
 bert-base-chinese/

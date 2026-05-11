@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fixed single-run MOSEI training — Optuna infogate_mosei_phase1_4090d trial 70 (4090D_restart).
+# Fixed single-run MOSEI training — Optuna infogate_mosei_phase1_4090d trial 70.
 set -euo pipefail
 MY_CREATION="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$MY_CREATION"
