@@ -426,28 +426,33 @@ def apply_dataset_bounds_overrides(dataset):
         CATEGORICAL_SPACE["bottleneck_dim"]      = [96, 128, 192]
         BATCH_CANDIDATES["mosi"]                 = [(16, 2), (16, 4), (32, 1), (32, 2)]
     if dataset == "simsv2":
-        # Phase4 _space3: widened bounds informed by space2 top-trial analysis.
-        # Best space2 trial (#52) used dropout=0.064 → under-regularized;
-        # beta_ib=5.44 sits low in former (3,25) range → weak IB pressure;
-        # bottleneck_dim was capped at 128 → no 192 option explored.
-        # Epoch and layer counts widened to match MOSI-tier flexibility.
-        LOG_FLOAT_BOUNDS["learning_rate"]    = (5e-6, 5e-5)
+        # Tier-3 narrowed bounds, re-derived from 4090D_restart/phase2 (100 trials,
+        # base space). TOP-15 clusters:
+        #   batch_config → (32,1)×11, (8,4)×3, (16,4)×1
+        #   n_epochs ∈ [63, 72]; learning_rate ∈ [1.0e-5, 3.7e-5] (mode ~1.0-1.7e-5)
+        #   ig_learning_rate ∈ [8.5e-5, 9e-4]; beta_ib ∈ [4.4, 20.9] (most 4-10)
+        #   alpha_ib ∈ [1.1e-3, 1.1e-2]; weight_decay ∈ [5.6e-4, 4.4e-3]
+        #   mse_weight ∈ [0.77, 1.98]; dropout_prob ∈ [0.05, 0.26]
+        #   warmup_proportion ∈ [0.08, 0.24]; stage1_epochs ∈ [3, 12]
+        #   num_infogate_layers=2×13/15 (rest 4); bottleneck_dim=128×11, 64×4
+        #   ema_decay=0.9995×14, 0.995×1
+        LOG_FLOAT_BOUNDS["learning_rate"]    = (8e-6, 4e-5)
         LOG_FLOAT_BOUNDS["ig_learning_rate"] = (8e-5, 1e-3)
-        LOG_FLOAT_BOUNDS["beta_ib"]          = (3.0, 35.0)
+        LOG_FLOAT_BOUNDS["beta_ib"]          = (3.0, 25.0)
         LOG_FLOAT_BOUNDS["alpha_ib"]         = (5e-4, 2e-2)
         LOG_FLOAT_BOUNDS["weight_decay"]     = (3e-4, 1e-2)
 
-        LINEAR_FLOAT_BOUNDS["mse_weight"]        = (0.1, 2.5)
-        LINEAR_FLOAT_BOUNDS["dropout_prob"]      = (0.05, 0.45)
+        LINEAR_FLOAT_BOUNDS["mse_weight"]        = (0.5, 2.0)
+        LINEAR_FLOAT_BOUNDS["dropout_prob"]      = (0.05, 0.30)
         LINEAR_FLOAT_BOUNDS["warmup_proportion"] = (0.07, 0.25)
         LINEAR_FLOAT_BOUNDS["ema_decay"]          = (0.995, 0.9995)
 
-        INT_BOUNDS["stage1_epochs"]          = (3, 14)
-        INT_BOUNDS["num_infogate_layers"]    = (2, 5)
-        DATASET_EPOCH_RANGE["simsv2"]        = (55, 100)
+        INT_BOUNDS["stage1_epochs"]     = (3, 14)
+        INT_BOUNDS["num_infogate_layers"] = (2, 4)
+        DATASET_EPOCH_RANGE["simsv2"]   = (55, 80)
 
-        CATEGORICAL_SPACE["bottleneck_dim"]      = [64, 128, 192]
-        BATCH_CANDIDATES["simsv2"]               = [(8, 4), (16, 4), (32, 1), (32, 2)]
+        CATEGORICAL_SPACE["bottleneck_dim"]      = [64, 128]
+        BATCH_CANDIDATES["simsv2"]               = [(8, 4), (16, 4), (32, 1)]
 
 
 def better_than(candidate, best_value, higher_is_better):
