@@ -1,4 +1,8 @@
-"""
+"""Frozen baseline InfoGate (verbatim snapshot of ``fixed_experiment/infogate_modules.py``).
+
+Used only when ``multimodal_config.ablation == 'none'`` so MOSI trial234 matches the frozen
+fixed run bit-for-bit at the module level. Re-sync from fixed_experiment when the baseline changes.
+---
 InfoGate: Information Bottleneck-Guided Adaptive Cross-Attention
 for Robust Multimodal Fusion
 

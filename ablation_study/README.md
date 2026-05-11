@@ -1,6 +1,8 @@
-# Ablation study: CMU-MOSI (trial 234 / 220), CMU-MOSEI trial 70 & CH-SIMS v2 trial 0
+# Ablation study: CMU-MOSI (trial 234 / 220), CMU-MOSEI trial 70 & CH-SIMS v2 phase4 trial 52
 
 Prepared by mirroring [`fixed_experiment/`](../fixed_experiment/) into this directory; launcher paths use `ablation_study/` so runs stay isolated under `ablation_study/runs/`. CLI float formatting matches `optuna_search_v2.objective()` so parsed learning rates match the gold Optuna train log headers.
+
+**Environment:** use conda env **`ITHP5090`** with **`transformers==4.29.2`** (same stack as `fixed_experiment`). DeBERTa loads via `from_pretrained` on `My_creation/deberta-v3-base` (no meta-tensor workarounds). **Parallel:** `run_prism_ablations_*.sh` scripts use `GPU_LIST` / `JOBS_PER_GPU` for wave scheduling across six PRISM `--ablation` modes.
 
 ## CMU-MOSI — Optuna trial 234
 
@@ -54,24 +56,24 @@ From `My_creation`, argv check (validates **fixed_experiment** file; ablation `n
 python scripts/verify_mosei_phase1_trial70_optuna_train_argv.py
 ```
 
-## CH-SIMS v2 — Optuna phase6_simsv2 trial 0
+## CH-SIMS v2 — Optuna 4090D_restart phase4 trial 52
 
-Frozen to **study `infogate_simsv2_phase6_simsv2_4090d_space3`**, **trial 0** ([`4090D_restart/phase6_simsv2`](../logs/optuna/4090D_restart/phase6_simsv2)). Same numeric CLI as [`fixed_experiment/simsv2_phase6_trial0_hparams.py`](../fixed_experiment/simsv2_phase6_trial0_hparams.py): train batch **8** × grad accum **4**, **`--selection_metric mae`**, **`--early_stop_patience 15`**. Selection line in gold log: **Best Results (mae, epoch >= 6)** (`stage1_epochs=5`).
+Frozen to **study `4090D_restart/phase4` SIMSv2**, **trial 52** (paper row; same numeric knobs as phase6 space3 trial 0). Same numeric CLI as [`fixed_experiment/simsv2_phase4_trial52_hparams.py`](../fixed_experiment/simsv2_phase4_trial52_hparams.py): train batch **8** × grad accum **4**, **`--selection_metric mae`**, **`--early_stop_patience 15`**. Selection line in gold log: **Best Results (mae, epoch >= 6)** (`stage1_epochs=5`).
 
 | Entry | Role |
 |------|------|
-| [`simsv2_phase6_trial0_hparams.py`](simsv2_phase6_trial0_hparams.py) | Params + `build_train_argv(..., ablation=)` |
-| [`train_fixed_simsv2_phase6_trial0.py`](train_fixed_simsv2_phase6_trial0.py) | Python launcher |
-| [`run_simsv2_phase6_trial0.sh`](run_simsv2_phase6_trial0.sh) | Single-run shell (`--ablation none`; **`CUDA_VISIBLE_DEVICES` defaults to 1**) |
+| [`simsv2_phase4_trial52_hparams.py`](simsv2_phase4_trial52_hparams.py) | Params + `build_train_argv(..., ablation=)` |
+| [`train_fixed_simsv2_phase4_trial52.py`](train_fixed_simsv2_phase4_trial52.py) | Python launcher |
+| [`run_simsv2_phase4_trial52.sh`](run_simsv2_phase4_trial52.sh) | Single-run shell (`--ablation none`; **`CUDA_VISIBLE_DEVICES` defaults to 1**) |
 
-Outputs: `My_creation/ablation_study/runs/simsv2_phase6_trial0/`.
+Outputs: `My_creation/ablation_study/runs/simsv2_phase4_trial52/`.
 
-Gold Optuna log: [`logs/optuna/4090D_restart/phase6_simsv2/train_logs/simsv2_phase6_simsv2_trial_0.log`](../logs/optuna/4090D_restart/phase6_simsv2/train_logs/simsv2_phase6_simsv2_trial_0.log).
+Gold Optuna log: [`logs/optuna/4090D_restart/phase4/train_logs/simsv2_phase4_trial_52.log`](../logs/optuna/4090D_restart/phase4/train_logs/simsv2_phase4_trial_52.log).
 
 From `My_creation`, argv check (validates **fixed_experiment** file; ablation `none` here should produce the same tokens):
 
 ```bash
-python scripts/verify_simsv2_phase6_trial0_optuna_train_argv.py
+python scripts/verify_simsv2_phase4_trial52_optuna_train_argv.py
 ```
 
 ## PRISM six-mode ablations
@@ -83,7 +85,7 @@ Batch scripts run `none`, `no_infogate`, `no_mselector`, `no_ib`, `no_conf_gatin
 | MOSI trial 234 | [`run_prism_ablations_mosi_trial234.sh`](run_prism_ablations_mosi_trial234.sh) |
 | MOSI trial 220 | [`run_prism_ablations_mosi_trial220.sh`](run_prism_ablations_mosi_trial220.sh) |
 | MOSEI trial 70 | [`run_prism_ablations_mosei_phase1_trial70.sh`](run_prism_ablations_mosei_phase1_trial70.sh) |
-| SIMSv2 phase6 trial 0 | [`run_prism_ablations_simsv2_phase6_trial0.sh`](run_prism_ablations_simsv2_phase6_trial0.sh) |
+| SIMSv2 phase4 trial 52 | [`run_prism_ablations_simsv2_phase4_trial52.sh`](run_prism_ablations_simsv2_phase4_trial52.sh) |
 
 **Queue MOSI trial220 after MOSEI:** [`run_prism_ablations_mosei_phase1_trial70.sh`](run_prism_ablations_mosei_phase1_trial70.sh) writes its bash PID to [`runs/mosei_phase1_trial70_prism_master.pid`](runs/mosei_phase1_trial70_prism_master.pid) on startup. Start [`queue_mosi_trial220_after_mosei_prism.sh`](queue_mosi_trial220_after_mosei_prism.sh) (e.g. with `nohup`). It **blocks until that PID exits** — i.e. **MOSEI’s six PRISM ablations have finished all waves** — then runs [**`run_prism_ablations_mosi_trial220.sh`**](run_prism_ablations_mosi_trial220.sh) for **MOSI’s six PRISM modes** (`none`, `no_infogate`, …). **`JOBS_PER_GPU=1,1` by default** for MOSI unless you export another value. Override wait target with `MOSEI_MASTER_PID`, or `SKIP_MOSEI_WAIT=1` to run MOSI immediately (debug).
 
@@ -126,10 +128,10 @@ bash /path/to/My_creation/ablation_study/run_mosi_trial220.sh
 bash /path/to/My_creation/ablation_study/run_mosei_phase1_trial70.sh
 ```
 
-**CH-SIMS v2 trial 0**
+**CH-SIMS v2 phase4 trial 52**
 
 ```bash
-bash /path/to/My_creation/ablation_study/run_simsv2_phase6_trial0.sh
+bash /path/to/My_creation/ablation_study/run_simsv2_phase4_trial52.sh
 ```
 
 Dry-run (print command only):
@@ -138,7 +140,7 @@ Dry-run (print command only):
 cd My_creation && python ablation_study/train_fixed_mosi_trial234.py --dry-run
 cd My_creation && python ablation_study/train_fixed_mosi_trial220.py --dry-run
 cd My_creation && python ablation_study/train_fixed_mosei_phase1_trial70.py --dry-run
-cd My_creation && python ablation_study/train_fixed_simsv2_phase6_trial0.py --dry-run
+cd My_creation && python ablation_study/train_fixed_simsv2_phase4_trial52.py --dry-run
 ```
 
 ## Optional check (argv vs gold logs)
@@ -148,14 +150,14 @@ From `My_creation`:
 ```bash
 python scripts/verify_mosi_trial234_optuna_train_argv.py
 python scripts/verify_mosi_trial220_optuna_train_argv.py
-python scripts/verify_simsv2_phase6_trial0_optuna_train_argv.py
+python scripts/verify_simsv2_phase4_trial52_optuna_train_argv.py
 ```
 
-Confirms objective-style argv produces the same backbone / InfoGate LR banner lines as `mosi_phase4_mosi_trial_234.log` / `mosi_phase4_mosi_trial_220.log` / `simsv2_phase6_simsv2_trial_0.log` (SIMSv2).
+Confirms objective-style argv produces the same backbone / InfoGate LR banner lines as `mosi_phase4_mosi_trial_234.log` / `mosi_phase4_mosi_trial_220.log` / `simsv2_phase4_trial_52.log` (SIMSv2).
 
 ## Relation to other scripts
 
 - **MOSI trial 234:** same hyperparameters as [`run_reproduce_mosi_phase4_mosi_trial234.sh`](../run_reproduce_mosi_phase4_mosi_trial234.sh); this folder uses `ablation_study/runs/` and the **local** `train.py` snapshot in this directory.
 - **MOSI trial 220:** Optuna-only baseline ([`phase4_mosi/train_logs/mosi_phase4_mosi_trial_220.log`](../logs/optuna/4090D_restart/phase4_mosi/train_logs/mosi_phase4_mosi_trial_220.log)); no separate `fixed_experiment` launcher unless you add one later.
 - **MOSEI trial 70:** same hyperparameters as [`fixed_experiment/run_mosei_phase1_trial70.sh`](../fixed_experiment/run_mosei_phase1_trial70.sh) / [`train_fixed_mosei_phase1_trial70.py`](../fixed_experiment/train_fixed_mosei_phase1_trial70.py), but training goes through `ablation_study/train.py` and PRISM `--ablation` when used from this tree.
-- **CH-SIMS v2 trial 0:** same numeric knobs as [`fixed_experiment/simsv2_phase6_trial0_hparams.py`](../fixed_experiment/simsv2_phase6_trial0_hparams.py) / [`run_simsv2_phase6_trial0.sh`](../fixed_experiment/run_simsv2_phase6_trial0.sh); ablation launchers use `ablation_study/runs/` and this folder’s `train.py`.
+- **CH-SIMS v2 phase4 trial 52:** same numeric knobs as [`fixed_experiment/simsv2_phase4_trial52_hparams.py`](../fixed_experiment/simsv2_phase4_trial52_hparams.py) / [`run_simsv2_phase4_trial52.sh`](../fixed_experiment/run_simsv2_phase4_trial52.sh); ablation launchers use `ablation_study/runs/` and this folder’s `train.py`.

@@ -1,23 +1,31 @@
 """
-InfoGate + DeBERTa integration module.
-Uses DeBERTa-v3-base as the text encoder; prediction is handled by InfoGate's
-internal MLP head.
+InfoGate + BERT integration module.
+Uses BERT as the text encoder; prediction is handled by InfoGate's internal MLP head.
+
+Relative ``multimodal_config.model`` names resolve under ``My_creation/`` (same layout
+as ``ablation_study/train.py`` path patches).
 """
+
+from __future__ import annotations
 
 import os
 
-from transformers.models.deberta_v2.modeling_deberta_v2 import (
-    DebertaV2PreTrainedModel, DebertaV2Model,
-)
-from infogate_modules import InfoGate
+from transformers import BertPreTrainedModel, BertModel
+from infogate_modules import InfoGate as InfoGatePrism
+from infogate_modules_fixed import InfoGate as InfoGateFixed
 import global_configs
 from global_configs import DEVICE
 
-# Snapshot under fixed_experiment/; DeBERTa weights live in My_creation/.
-_FE_DIR = os.path.dirname(os.path.abspath(__file__))
-_MY_CREATION_DIR = os.path.dirname(_FE_DIR)
-_MODEL_DIR = os.path.join(_MY_CREATION_DIR, "deberta-v3-base")
+_ABL_DIR = os.path.dirname(os.path.abspath(__file__))
+_MY_CREATION_DIR = os.path.dirname(_ABL_DIR)
 
+
+def _resolve_bert_pretrained_dir(mc) -> str:
+    raw = getattr(mc, "model", "bert-base-chinese")
+    if os.path.isabs(raw):
+        return raw
+    base = os.path.basename(raw.rstrip(os.sep))
+    return os.path.join(_MY_CREATION_DIR, base)
 
 def _resolve_dims(config, mc):
     text_dim = getattr(mc, 'text_dim', None) or global_configs.TEXT_DIM
@@ -40,14 +48,14 @@ def _resolve_dims(config, mc):
         )
     return text_dim, acoustic_dim, visual_dim
 
-
-class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
+class InfoGate_BertModel(BertPreTrainedModel):
     def __init__(self, config, multimodal_config):
         super().__init__(config)
         TEXT_DIM, ACOUSTIC_DIM, VISUAL_DIM = _resolve_dims(config, multimodal_config)
         self.config = config
 
-        model = DebertaV2Model.from_pretrained(_MODEL_DIR)
+        bert_dir = _resolve_bert_pretrained_dir(multimodal_config)
+        model = BertModel.from_pretrained(bert_dir)
         self.model = model.to(DEVICE)
 
         ig_args = {
@@ -70,9 +78,15 @@ class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
             'selector_rib_weight': getattr(multimodal_config, 'selector_rib_weight', 0.05),
             'gumbel_tau': getattr(multimodal_config, 'gumbel_tau_start', 1.0),
             'task_type': getattr(multimodal_config, 'task_type', 'regression'),
+            'ablation': getattr(multimodal_config, 'ablation', 'none'),
         }
 
-        self.infogate = InfoGate(ig_args)
+        _abl = ig_args.get('ablation', 'none')
+        if _abl == 'none':
+            ig_fixed = {k: v for k, v in ig_args.items() if k != 'ablation'}
+            self.infogate = InfoGateFixed(ig_fixed)
+        else:
+            self.infogate = InfoGatePrism(ig_args)
         self.init_weights()
 
     def forward(self, input_ids, visual, acoustic,
@@ -92,14 +106,14 @@ class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
         return logits, ib_loss, loss_dict, h_p
 
 
-class InfoGate_DeBertaForSequenceClassification(DebertaV2PreTrainedModel):
+class InfoGate_BertForSequenceClassification(BertPreTrainedModel):
     def __init__(self, config, multimodal_config):
         super().__init__(config)
-        self.dberta = InfoGate_DebertaModel(config, multimodal_config)
+        self.bert = InfoGate_BertModel(config, multimodal_config)
 
     def forward(self, input_ids, visual, acoustic,
                 labels=None, stage=1):
-        return self.dberta(
+        return self.bert(
             input_ids, visual, acoustic,
             labels=labels, stage=stage,
         )

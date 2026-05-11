@@ -1,7 +1,7 @@
 """InfoGate training script for complete-modality optimization.
 
-Copy vendored under ``fixed_experiment/`` for MOSI trial 234 frozen runs.
-Paths to ``deberta-v3-base`` and ``datasets/*.pkl`` resolve to ``My_creation/`` parent.
+Baseline aligned with ``fixed_experiment/train.py``; PRISM ``--ablation`` switches
+live only under ``ablation_study/``. Paths resolve to ``My_creation/`` parent.
 """
 
 import argparse
@@ -35,7 +35,7 @@ from selection_utils import (
     selection_higher_is_better,
 )
 
-# Snapshot copy under fixed_experiment/: tokenizer weights + pickles live in My_creation/.
+# Snapshot under ablation_study/: tokenizer weights + pickles live in My_creation/.
 _FIXED_EXP_DIR = os.path.dirname(os.path.abspath(__file__))
 _MY_CREATION_DIR = os.path.dirname(_FIXED_EXP_DIR)
 
@@ -78,6 +78,21 @@ parser.add_argument("--disable_l_lib", action="store_true",
                     help="Ablate the label-level IB loss.")
 parser.add_argument("--disable_l_rib", action="store_true",
                     help="Ablate the routing IB prior loss.")
+ABLATION_CHOICES = (
+    "none",
+    "no_infogate",
+    "no_mselector",
+    "no_ib",
+    "no_conf_gating",
+    "no_adaptive_gate",
+)
+parser.add_argument(
+    "--ablation",
+    type=str,
+    default="none",
+    choices=ABLATION_CHOICES,
+    help="PRISM-style architectural ablation (frozen recipe otherwise).",
+)
 parser.add_argument("--mse_weight", type=float, default=0.5)
 
 parser.add_argument("--ema_decay", type=float, default=0.999)
@@ -103,7 +118,7 @@ args = parser.parse_args()
 
 if args.dataset == "simsv2":
     if "deberta-v3-base" in args.model:
-        args.model = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bert-base-chinese")
+        args.model = os.path.join(_MY_CREATION_DIR, "bert-base-chinese")
 
 if isinstance(args.model, str):
     pass # Added to ensure valid code block
@@ -502,6 +517,7 @@ def main():
     print(f"  selector_bal   : {args.selector_balance_weight}")
     print(f"  selector_rib_w : {args.selector_rib_weight}")
     print(f"  Select by      : {args.selection_metric}")
+    print(f"  Ablation       : {args.ablation}")
     print(f"  Loss terms     : L_lib={toggle_state(args.use_l_lib)} "
             f"L_rib={toggle_state(args.use_l_rib)}")
     print("=" * 60)
@@ -630,6 +646,7 @@ def main():
                     'selection_metric': args.selection_metric,
                     'selection_score': selection_score,
                     'ablation': {
+                        'arch': args.ablation,
                         'use_l_lib': args.use_l_lib,
                         'use_l_rib': args.use_l_rib,
                     },

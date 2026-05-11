@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Finish remaining SIMSv2 phase6 trial0 PRISM modes after no_infogate / no_mselector.
+# Finish remaining SIMSv2 phase4 trial 52 PRISM modes after no_infogate / no_mselector.
 # Two physical GPUs (indices 0,1): treat "GPU1" as device 1 and "GPU2" as device 0.
 # Wave 1 (parallel): no_ib @ GPU1, no_conf_gating @ GPU0
 # Wave 2 (parallel): none @ GPU1, no_adaptive_gate @ GPU0
@@ -18,13 +18,13 @@ run_job() {
   local mode="$2"
   local OUT
   if [[ "$mode" == "none" ]]; then
-    OUT="${MY_CREATION}/ablation_study/runs/simsv2_phase6_trial0"
+    OUT="${MY_CREATION}/ablation_study/runs/simsv2_phase4_trial52"
   else
-    OUT="${MY_CREATION}/ablation_study/runs/simsv2_phase6_trial0_${mode}"
+    OUT="${MY_CREATION}/ablation_study/runs/simsv2_phase4_trial52_${mode}"
   fi
   mkdir -p "${OUT}/checkpoints"
   echo "======== $(date -Is) START ablation=${mode} CUDA_VISIBLE_DEVICES=${gpu} OUT=${OUT} ========"
-  CUDA_VISIBLE_DEVICES="${gpu}" "$PYTHON" -u ablation_study/train_fixed_simsv2_phase6_trial0.py \
+  CUDA_VISIBLE_DEVICES="${gpu}" "$PYTHON" -u ablation_study/train_fixed_simsv2_phase4_trial52.py \
     --ablation "$mode" \
     --checkpoint-dir "${OUT}/checkpoints" \
     >>"${OUT}/train.log" 2>&1
@@ -45,4 +45,4 @@ run_job 0 no_adaptive_gate &
 p4=$!
 wait "${p3}" "${p4}"
 
-echo "======== $(date -Is) all remaining SIMSv2 phase6 trial0 modes finished ========"
+echo "======== $(date -Is) all remaining SIMSv2 phase4 trial 52 modes finished ========"

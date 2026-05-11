@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# SIMSv2 phase6 trial0: six PRISM --ablation modes, separate runs/*/ dirs.
+# SIMSv2 phase4 trial 52: six PRISM --ablation modes, separate runs/*/ dirs.
 # Multi-GPU: each physical GPU can run a different number of concurrent trainings;
 # wait for the whole batch, then the next chunk (parallel within batch, ordered across batches).
 #
 # Baseline (--ablation none) certification vs Optuna gold log and fixed_experiment reproduce:
-#   logs/optuna/4090D_restart/phase6_simsv2/train_logs/simsv2_phase6_simsv2_trial_0.log
+#   logs/optuna/4090D_restart/phase4/train_logs/simsv2_phase4_trial_52.log
 #   Do NOT run none on a GPU shared with another training job in the same wave (e.g. avoid
 #   JOBS_PER_GPU>1 stacking none + another mode on one card). For a strict reproduction, run
 #   none alone: CUDA_VISIBLE_DEVICES=1 GPU_LIST=1 JOBS_PER_GPU=1 bash … or only the launcher
@@ -115,7 +115,7 @@ for ((gi = 0; gi < NUM_GPUS; gi++)); do
 done
 PARALLEL=${#SLOT_GPUS[@]}
 
-echo "======== $(date -Is) SIMSv2 phase6 trial0 PRISM ablation batch: GPUs=[${GPU_IDS[*]}] JOBS_PER_GPU=[${JOBS_ARR[*]}] PARALLEL=${PARALLEL} (EXCLUDE_GPUS auto-only: ${EXCLUDE_GPUS:-∅}) ========"
+echo "======== $(date -Is) SIMSv2 phase4 trial 52 PRISM ablation batch: GPUs=[${GPU_IDS[*]}] JOBS_PER_GPU=[${JOBS_ARR[*]}] PARALLEL=${PARALLEL} (EXCLUDE_GPUS auto-only: ${EXCLUDE_GPUS:-∅}) ========"
 echo "NOTE: Baseline none vs Optuna gold — run none as the sole CUDA job on that GPU (no second training on the same card)."
 
 MODES=(none no_infogate no_mselector no_ib no_conf_gating no_adaptive_gate)
@@ -132,14 +132,14 @@ for ((start = 0; start < n_modes; start += PARALLEL)); do
     gpu="${SLOT_GPUS[$slot]}"
     m="${MODES[$idx]}"
     if [[ "$m" == "none" ]]; then
-      OUT="${MY_CREATION}/ablation_study/runs/simsv2_phase6_trial0"
+      OUT="${MY_CREATION}/ablation_study/runs/simsv2_phase4_trial52"
     else
-      OUT="${MY_CREATION}/ablation_study/runs/simsv2_phase6_trial0_${m}"
+      OUT="${MY_CREATION}/ablation_study/runs/simsv2_phase4_trial52_${m}"
     fi
     mkdir -p "${OUT}/checkpoints"
     : >"${OUT}/train.log"
     echo "  $(date -Is) ablation=${m} CUDA_VISIBLE_DEVICES=${gpu} slot=${slot} OUT=${OUT}"
-    CUDA_VISIBLE_DEVICES="${gpu}" nohup "$PYTHON" -u ablation_study/train_fixed_simsv2_phase6_trial0.py \
+    CUDA_VISIBLE_DEVICES="${gpu}" nohup "$PYTHON" -u ablation_study/train_fixed_simsv2_phase4_trial52.py \
       --ablation "$m" \
       --checkpoint-dir "${OUT}/checkpoints" \
       >>"${OUT}/train.log" 2>&1 &
