@@ -47,7 +47,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PHASE="${1:?Usage: $0 <phase1|phase2|phase3|phase4|phase4_mosi|phase5_mosi|phase5_simsv2>}"
+PHASE="${1:?Usage: $0 <phase1|phase2|phase3|phase4|phase4_mosi|phase5_mosi|phase5_simsv2|phase6_simsv2>}"
 ONLY="${ONLY:-all}"   # all | mosi | mosei | simsv2
 
 case "$PHASE" in
@@ -58,7 +58,8 @@ case "$PHASE" in
   phase4_mosi) TIER=3 ;;
   phase5_mosi) TIER=3 ;;
   phase5_simsv2) TIER=3 ;;
-  *) echo "ERROR: unknown phase '$PHASE'; expected phase1|phase2|phase3|phase4|phase4_mosi|phase5_mosi|phase5_simsv2" >&2; exit 1 ;;
+  phase6_simsv2) TIER=3 ;;
+  *) echo "ERROR: unknown phase '$PHASE'; expected phase1|phase2|phase3|phase4|phase4_mosi|phase5_mosi|phase5_simsv2|phase6_simsv2" >&2; exit 1 ;;
 esac
 
 # MOSI micro-local (phase4_mosi / phase5_mosi): Optuna n_epochs cap + train dev early stop
@@ -114,6 +115,11 @@ case "$PHASE" in
     MOSEI_TRIALS=150;   MOSEI_NSTART=55
     SIMSV2_TRIALS=90;   SIMSV2_NSTART=22
     ;;
+  phase6_simsv2)  # tier 3; expanded SIMS search (no anchor, full global bounds)
+    MOSI_S1_TRIALS=60;  MOSI_S2_TRIALS=140; MOSI_S2_TOP_K=8;  MOSI_S2_NSTART=25
+    MOSEI_TRIALS=150;   MOSEI_NSTART=55
+    SIMSV2_TRIALS=120;  SIMSV2_NSTART=55
+    ;;
 esac
 
 # Resume / add budget on same DB without editing case values:
@@ -126,7 +132,7 @@ case "$PHASE" in
   phase4_mosi|phase5_mosi)
     MOSI_MICRO_TRIALS="${MOSI_MICRO_N_TRIALS:-$MOSI_MICRO_TRIALS}"
     ;;
-  phase5_simsv2)
+  phase5_simsv2|phase6_simsv2)
     SIMSV2_TRIALS="${SIMSV2_N_TRIALS:-$SIMSV2_TRIALS}"
     ;;
 esac
@@ -348,6 +354,29 @@ launch_simsv2 () {
       --enqueue_trials_study "${p3_study}"
       --enqueue_trials_numbers "148"
     )
+  elif [[ "$PHASE" == "phase6_simsv2" ]]; then
+    simsv2_train_caps=(
+      --n_epochs "${SIMSV2_N_EPOCHS_CAP:-100}"
+      --early_stop_patience "${SIMSV2_EARLY_STOP_PATIENCE:-15}"
+    )
+    override_args=()
+    artefact_args=(--artefact_root "${PHASE_ROOT}")
+    # No local_space_anchor -- TPE samples from full global bounds (expanded in
+    # apply_dataset_bounds_overrides for simsv2).
+    local_space_args=()
+    # Warm-start from best _space2 trials (trial 52=0.3113, 81=0.3118, 0=0.3122)
+    local p4_db="sqlite:///${ROOT}/logs/optuna/4090D_restart/phase4/db/simsv2.db"
+    local p4_study="infogate_simsv2_phase4_4090d_space2"
+    local p4_path="${ROOT}/logs/optuna/4090D_restart/phase4/db/simsv2.db"
+    if [[ ! -f "${p4_path}" ]]; then
+      echo "ERROR: phase6_simsv2 requires existing ${p4_path} (run phase4 SIMSv2 space2 first)." >&2
+      exit 1
+    fi
+    enqueue_args=(
+      --enqueue_trials_storage "${p4_db}"
+      --enqueue_trials_study "${p4_study}"
+      --enqueue_trials_numbers "52,81,0"
+    )
   fi
 
   echo "  [$(date -Iseconds)] simsv2 -> GPU${gpu}  ${logfile}"
@@ -387,6 +416,12 @@ if [[ "$PHASE" == "phase4_mosi" || "$PHASE" == "phase5_mosi" ]]; then
     exit 1
   fi
   launch_mosi_micro_local "${MOSI_GPU}"
+elif [[ "$PHASE" == "phase6_simsv2" ]]; then
+  if [[ "$ONLY" != "simsv2" && "$ONLY" != "all" ]]; then
+    echo "ERROR: phase6_simsv2 only launches SIMSv2 expanded search; use ONLY=simsv2 or ONLY=all." >&2
+    exit 1
+  fi
+  launch_simsv2 "${SIMS_GPU}"
 elif [[ "$PHASE" == "phase5_simsv2" ]]; then
   if [[ "$ONLY" != "simsv2" && "$ONLY" != "all" ]]; then
     echo "ERROR: phase5_simsv2 only launches SIMSv2 dual-anchor search; use ONLY=simsv2 or ONLY=all." >&2

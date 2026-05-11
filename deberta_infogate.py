@@ -1,19 +1,16 @@
 """
 InfoGate + DeBERTa integration module.
 Uses DeBERTa-v3-base as the text encoder; prediction is handled by InfoGate's
-internal MLP head.
+internal MLP head. Backbone weights are filled by parent ``from_pretrained`` /
+training checkpoints (Transformers >=4.57: avoid nested ``from_pretrained`` under
+``init_empty_weights``).
 """
-
-import os
 
 from transformers.models.deberta_v2.modeling_deberta_v2 import (
     DebertaV2PreTrainedModel, DebertaV2Model,
 )
 from infogate_modules import InfoGate
 import global_configs
-from global_configs import DEVICE
-
-_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base")
 
 
 def _resolve_dims(config, mc):
@@ -44,8 +41,9 @@ class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
         TEXT_DIM, ACOUSTIC_DIM, VISUAL_DIM = _resolve_dims(config, multimodal_config)
         self.config = config
 
-        model = DebertaV2Model.from_pretrained(_MODEL_DIR)
-        self.model = model.to(DEVICE)
+        # Transformers >=4.57 wraps `from_pretrained` in `init_empty_weights`; nested
+        # `DebertaV2Model.from_pretrained` + `.to(DEVICE)` fails on meta tensors.
+        self.model = DebertaV2Model(config)
 
         ig_args = {
             'text_dim': TEXT_DIM,
