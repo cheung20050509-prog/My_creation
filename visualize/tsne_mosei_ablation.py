@@ -55,6 +55,38 @@ ABLATION_DISPLAY = {
 
 SUBPANEL_LABELS = tuple(chr(ord("a") + i) for i in range(26))
 
+# HF 4.5x: from_pretrained uses init_empty_weights; project DeBERTa wrapper then fails on
+# meta + .to(device). Work around in this script only (do not modify deberta_infogate).
+_TSNE_ORIG_GET_INIT_CONTEXT_DESC = None
+
+
+def _patch_transformers_skip_meta_init() -> None:
+    global _TSNE_ORIG_GET_INIT_CONTEXT_DESC
+    from transformers.modeling_utils import PreTrainedModel, is_deepspeed_zero3_enabled, no_init_weights
+
+    if _TSNE_ORIG_GET_INIT_CONTEXT_DESC is not None:
+        return
+    _TSNE_ORIG_GET_INIT_CONTEXT_DESC = PreTrainedModel.__dict__["get_init_context"]
+    _orig_bound = PreTrainedModel.get_init_context
+
+    @classmethod
+    def _get_init_context_tsne(cls, is_quantized: bool, _is_ds_init_called: bool):
+        if is_deepspeed_zero3_enabled():
+            return _orig_bound(is_quantized, _is_ds_init_called)
+        return [no_init_weights()]
+
+    PreTrainedModel.get_init_context = _get_init_context_tsne
+
+
+def _restore_transformers_init_context() -> None:
+    global _TSNE_ORIG_GET_INIT_CONTEXT_DESC
+    if _TSNE_ORIG_GET_INIT_CONTEXT_DESC is None:
+        return
+    from transformers.modeling_utils import PreTrainedModel
+
+    setattr(PreTrainedModel, "get_init_context", _TSNE_ORIG_GET_INIT_CONTEXT_DESC)
+    _TSNE_ORIG_GET_INIT_CONTEXT_DESC = None
+
 
 def apply_paper_style() -> None:
     mpl.rcParams.update(
@@ -113,12 +145,9 @@ def load_ablation_train_module(saved_ns: argparse.Namespace):
 
     ab_dir = str(_MY_CREATION / "ablation_study")
     mc_dir = str(_MY_CREATION)
-    # Ablation snapshot must shadow My_creation for `deberta_infogate` (insert(0, mc)
-    # after insert(0, ab) would otherwise put My_creation first and load the wrong module).
-    if ab_dir not in sys.path:
-        sys.path.insert(0, ab_dir)
-    if mc_dir not in sys.path:
-        sys.path.append(mc_dir)
+    for d in (ab_dir, mc_dir):
+        if d not in sys.path:
+            sys.path.insert(0, d)
 
     ns_copy = copy.deepcopy(saved_ns)
     real_parse = argparse_mod.ArgumentParser.parse_args
@@ -334,134 +363,138 @@ def main() -> int:
     )
     outdir.mkdir(parents=True, exist_ok=True)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    _patch_transformers_skip_meta_init()
+    try:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    series: list[tuple[str, np.ndarray, np.ndarray]] = []
+        series: list[tuple[str, np.ndarray, np.ndarray]] = []
 
-    for name, ckpt_path in ckpt_specs:
-        if not ckpt_path.is_file():
-            raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
-        try:
-            bundle = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-        except TypeError:
-            bundle = torch.load(ckpt_path, map_location="cpu")
-        if "args" not in bundle or "model_state_dict" not in bundle:
-            raise KeyError(f"{ckpt_path}: expected keys 'args', 'model_state_dict'")
-        saved_ns = bundle["args"]
-        if getattr(saved_ns, "dataset", None) != "mosei":
-            print(
-                f"WARNING: {name}: ckpt dataset is {getattr(saved_ns, 'dataset', None)!r}, "
-                "expected 'mosei'. Continuing anyway.",
-                file=sys.stderr,
+        for name, ckpt_path in ckpt_specs:
+            if not ckpt_path.is_file():
+                raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+            try:
+                bundle = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+            except TypeError:
+                bundle = torch.load(ckpt_path, map_location="cpu")
+            if "args" not in bundle or "model_state_dict" not in bundle:
+                raise KeyError(f"{ckpt_path}: expected keys 'args', 'model_state_dict'")
+            saved_ns = bundle["args"]
+            if getattr(saved_ns, "dataset", None) != "mosei":
+                print(
+                    f"WARNING: {name}: ckpt dataset is {getattr(saved_ns, 'dataset', None)!r}, "
+                    "expected 'mosei'. Continuing anyway.",
+                    file=sys.stderr,
+                )
+
+            train_mod = load_ablation_train_module(saved_ns)
+            train_mod.set_seed(args_cli.seed)
+            train_mod.global_configs.set_dataset_config(saved_ns.dataset)
+            _, dev_dl, test_dl, n_opt = train_mod.setup_data()
+            loader = dev_dl if args_cli.split == "dev" else test_dl
+
+            model, _, _ = train_mod.build_model(n_opt)
+            missing, unexpected = model.load_state_dict(
+                bundle["model_state_dict"], strict=False
             )
+            if missing:
+                print(f"WARNING {name}: missing keys ({len(missing)}):", missing[:5], file=sys.stderr)
+            if unexpected:
+                print(f"WARNING {name}: unexpected keys ({len(unexpected)}):", unexpected[:5], file=sys.stderr)
+            model.to(device)
 
-        train_mod = load_ablation_train_module(saved_ns)
-        train_mod.set_seed(args_cli.seed)
-        train_mod.global_configs.set_dataset_config(saved_ns.dataset)
-        _, dev_dl, test_dl, n_opt = train_mod.setup_data()
-        loader = dev_dl if args_cli.split == "dev" else test_dl
+            H, y = collect_h_p(model, loader, device)
+            series.append((name, H, y))
+            print(f"{name}: embeddings shape={H.shape} labels shape={y.shape}")
 
-        model, _, _ = train_mod.build_model(n_opt)
-        missing, unexpected = model.load_state_dict(
-            bundle["model_state_dict"], strict=False
-        )
-        if missing:
-            print(f"WARNING {name}: missing keys ({len(missing)}):", missing[:5], file=sys.stderr)
-        if unexpected:
-            print(f"WARNING {name}: unexpected keys ({len(unexpected)}):", unexpected[:5], file=sys.stderr)
-        model.to(device)
+            del model, bundle
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
-        H, y = collect_h_p(model, loader, device)
-        series.append((name, H, y))
-        print(f"{name}: embeddings shape={H.shape} labels shape={y.shape}")
+        n_min = min(H.shape[0] for _, H, _ in series)
+        idx = subsample_indices(n_min, args_cli.max_samples, args_cli.seed)
 
-        del model, bundle
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        display_names = [ABLATION_DISPLAY.get(n, n) for n, _, _ in series]
 
-    n_min = min(H.shape[0] for _, H, _ in series)
-    idx = subsample_indices(n_min, args_cli.max_samples, args_cli.seed)
+        if args_cli.mode == "facet":
+            all_y = np.concatenate([y[idx] for _, _, y in series])
+            vmin = float(np.percentile(all_y, 2))
+            vmax = float(np.percentile(all_y, 98))
 
-    display_names = [ABLATION_DISPLAY.get(n, n) for n, _, _ in series]
+            facet_cmap = _facet_sentiment_cmap()
+            norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
-    if args_cli.mode == "facet":
-        all_y = np.concatenate([y[idx] for _, _, y in series])
-        vmin = float(np.percentile(all_y, 2))
-        vmax = float(np.percentile(all_y, 98))
+            n_ckpt = len(series)
+            ncols = min(3, n_ckpt)
+            nrows = math.ceil(n_ckpt / ncols)
+            fig, axes = plt.subplots(
+                nrows, ncols, figsize=(3.35 * ncols, 3.15 * nrows), squeeze=False
+            )
+            for i, (name, H, y) in enumerate(series):
+                row, col = divmod(i, ncols)
+                ax = axes[row][col]
+                Z = run_tsne(
+                    H[idx],
+                    perplexity=args_cli.perplexity,
+                    seed=args_cli.seed,
+                    standard_scale=args_cli.standard_scale,
+                )
+                scatter_facet_calm(
+                    ax,
+                    Z,
+                    y[idx],
+                    facet_cmap,
+                    display_names[i],
+                    SUBPANEL_LABELS[i],
+                    vmin,
+                    vmax,
+                )
+            for j in range(len(series), nrows * ncols):
+                row, col = divmod(j, ncols)
+                axes[row][col].axis("off")
 
-        facet_cmap = _facet_sentiment_cmap()
-        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-
-        n_ckpt = len(series)
-        ncols = min(3, n_ckpt)
-        nrows = math.ceil(n_ckpt / ncols)
-        fig, axes = plt.subplots(
-            nrows, ncols, figsize=(3.35 * ncols, 3.15 * nrows), squeeze=False
-        )
-        for i, (name, H, y) in enumerate(series):
-            row, col = divmod(i, ncols)
-            ax = axes[row][col]
+            sm = mpl.cm.ScalarMappable(cmap=facet_cmap, norm=norm)
+            sm.set_array([])
+            fig.subplots_adjust(
+                left=0.05, right=0.98, top=0.91, bottom=0.16, wspace=0.14, hspace=0.36
+            )
+            cbar_ax = fig.add_axes([0.28, 0.035, 0.44, 0.022])
+            cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
+            cbar.set_ticks([vmin, vmax])
+            cbar.set_ticklabels(["Negative", "Positive"])
+            cbar.ax.tick_params(axis="x", which="major", length=0, pad=4)
+            cbar.outline.set_linewidth(0.45)
+            cbar.outline.set_edgecolor("black")
+        else:
+            X_blocks: list[np.ndarray] = []
+            model_ids: list[np.ndarray] = []
+            for m, (name, H, y) in enumerate(series):
+                X_blocks.append(H[idx])
+                model_ids.append(np.full(len(idx), m, dtype=np.int32))
+            X_all = np.vstack(X_blocks)
+            mid = np.concatenate(model_ids)
             Z = run_tsne(
-                H[idx],
+                X_all,
                 perplexity=args_cli.perplexity,
                 seed=args_cli.seed,
                 standard_scale=args_cli.standard_scale,
             )
-            scatter_facet_calm(
-                ax,
-                Z,
-                y[idx],
-                facet_cmap,
-                display_names[i],
-                SUBPANEL_LABELS[i],
-                vmin,
-                vmax,
-            )
-        for j in range(len(series), nrows * ncols):
-            row, col = divmod(j, ncols)
-            axes[row][col].axis("off")
+            fig, ax = plt.subplots(figsize=(5.8, 5.0))
+            scatter_models(ax, Z, mid, display_names, palette)
+            ax.legend(loc="best", ncol=2, fontsize=8.5)
+            add_subplot_label(ax, SUBPANEL_LABELS[0])
+            plt.tight_layout()
 
-        sm = mpl.cm.ScalarMappable(cmap=facet_cmap, norm=norm)
-        sm.set_array([])
-        fig.subplots_adjust(
-            left=0.05, right=0.98, top=0.91, bottom=0.16, wspace=0.14, hspace=0.36
-        )
-        cbar_ax = fig.add_axes([0.28, 0.035, 0.44, 0.022])
-        cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
-        cbar.set_ticks([vmin, vmax])
-        cbar.set_ticklabels(["Negative", "Positive"])
-        cbar.ax.tick_params(axis="x", which="major", length=0, pad=4)
-        cbar.outline.set_linewidth(0.45)
-        cbar.outline.set_edgecolor("black")
-    else:
-        X_blocks: list[np.ndarray] = []
-        model_ids: list[np.ndarray] = []
-        for m, (name, H, y) in enumerate(series):
-            X_blocks.append(H[idx])
-            model_ids.append(np.full(len(idx), m, dtype=np.int32))
-        X_all = np.vstack(X_blocks)
-        mid = np.concatenate(model_ids)
-        Z = run_tsne(
-            X_all,
-            perplexity=args_cli.perplexity,
-            seed=args_cli.seed,
-            standard_scale=args_cli.standard_scale,
-        )
-        fig, ax = plt.subplots(figsize=(5.8, 5.0))
-        scatter_models(ax, Z, mid, display_names, palette)
-        ax.legend(loc="best", ncol=2, fontsize=8.5)
-        add_subplot_label(ax, SUBPANEL_LABELS[0])
-        plt.tight_layout()
-
-    stem = f"mosei_tsne_{args_cli.split}_{args_cli.mode}"
-    pdf_path = outdir / f"{stem}.pdf"
-    png_path = outdir / f"{stem}.png"
-    fig.savefig(pdf_path, bbox_inches="tight", format="pdf")
-    fig.savefig(png_path, bbox_inches="tight", dpi=300, format="png")
-    plt.close(fig)
-    print(f"Wrote {pdf_path}")
-    print(f"Wrote {png_path}")
-    return 0
+        stem = f"mosei_tsne_{args_cli.split}_{args_cli.mode}"
+        pdf_path = outdir / f"{stem}.pdf"
+        png_path = outdir / f"{stem}.png"
+        fig.savefig(pdf_path, bbox_inches="tight", format="pdf")
+        fig.savefig(png_path, bbox_inches="tight", dpi=300, format="png")
+        plt.close(fig)
+        print(f"Wrote {pdf_path}")
+        print(f"Wrote {png_path}")
+        return 0
+    finally:
+        _restore_transformers_init_context()
 
 
 if __name__ == "__main__":
