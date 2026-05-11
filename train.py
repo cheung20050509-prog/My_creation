@@ -1,11 +1,7 @@
-"""
-InfoGate training script.
-Two-stage training:
-  Stage 1  -- L_task + alpha_ib * L_IB + delta_nce * L_nce
-  Stage 2  -- L_task + alpha_ib * L_IB + gamma_cyc * L_cyc + delta_nce * L_nce
-"""
+"""InfoGate training script for complete-modality optimization."""
 
 import argparse
+import math
 import os
 import random
 import pickle
@@ -19,12 +15,21 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from transformers import get_linear_schedule_with_warmup, DebertaV2Tokenizer
+from transformers import get_linear_schedule_with_warmup, DebertaV2Tokenizer, BertTokenizer
 from torch.optim import AdamW
 
 from deberta_infogate import InfoGate_DeBertaForSequenceClassification
+from bert_infogate import InfoGate_BertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
+from simsv2_metrics import compute_simsv2_kuda_metrics
+from selection_utils import (
+    DEFAULT_SELECTION_METRIC,
+    SELECTION_METRIC_CHOICES,
+    build_selection_tiebreak,
+    compute_selection_score,
+    selection_higher_is_better,
+)
 
 # ============================================================
 # CLI
@@ -32,7 +37,7 @@ from global_configs import DEVICE
 parser = argparse.ArgumentParser(description="InfoGate Training")
 parser.add_argument("--model", type=str,
                     default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "deberta-v3-base"))
-parser.add_argument("--dataset", type=str, choices=["mosi", "mosei"], default="mosi")
+parser.add_argument("--dataset", type=str, choices=["mosi", "mosei", "simsv2"], default="mosi")
 parser.add_argument("--max_seq_length", type=int, default=50)
 parser.add_argument("--train_batch_size", type=int, default=32)
 parser.add_argument("--dev_batch_size", type=int, default=128)
@@ -54,23 +59,49 @@ parser.add_argument("--bottleneck_dim", type=int, default=128)
 parser.add_argument("--num_heads", type=int, default=4)
 parser.add_argument("--num_infogate_layers", type=int, default=3)
 parser.add_argument("--beta_ib", type=float, default=32)
-parser.add_argument("--gamma_cyc", type=float, default=1.0)
 parser.add_argument("--alpha_ib", type=float, default=0.01)
-parser.add_argument("--alpha_nce", type=float, default=0.05)
-parser.add_argument("--alpha_sac", type=float, default=0.1)
+parser.add_argument("--selector_target_temp", type=float, default=0.35,
+                    help="Temperature for modality-quality routing targets.")
+parser.add_argument("--selector_balance_weight", type=float, default=0.0,
+                    help="Batch-level routing entropy regularization weight.")
+parser.add_argument("--selector_rib_weight", type=float, default=0.05,
+                    help="Overall weight of the routing supervision loss.")
+parser.add_argument("--disable_l_lib", action="store_true",
+                    help="Ablate the label-level IB loss.")
+parser.add_argument("--disable_l_rib", action="store_true",
+                    help="Ablate the routing IB prior loss.")
 parser.add_argument("--mse_weight", type=float, default=0.5)
-parser.add_argument("--cra_layers", type=int, default=8)
-parser.add_argument("--cra_dims", default="64,32,16", type=str)
 
 parser.add_argument("--ema_decay", type=float, default=0.999)
 parser.add_argument("--ema_start_epoch", type=int, default=5)
 
+parser.add_argument("--gumbel_tau_start", type=float, default=1.0,
+                    help="Gumbel-Softmax temperature at start of training.")
+parser.add_argument("--gumbel_tau_end", type=float, default=0.5,
+                    help="Gumbel-Softmax temperature at end of training (annealed).")
+
 parser.add_argument("--checkpoint_dir", type=str, default="checkpoints")
+parser.add_argument("--selection_metric", type=str,
+                    default=DEFAULT_SELECTION_METRIC,
+                    choices=SELECTION_METRIC_CHOICES)
+parser.add_argument("--early_stop_patience", type=int, default=0,
+                    help="Stop after this many dev epochs (epoch>=stage1) without "
+                         "selection-metric improvement; 0 disables.")
+parser.add_argument("--early_stop_min_delta", type=float, default=0.0,
+                    help="When >0, a dev improvement must exceed this margin on the "
+                         "selection score (tiebreak-only wins still count).")
 
 args = parser.parse_args()
 
-if isinstance(args.cra_dims, str):
-    args.cra_dims = [int(x) for x in args.cra_dims.split(',')]
+if args.dataset == "simsv2":
+    if "deberta-v3-base" in args.model:
+        args.model = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bert-base-chinese")
+
+if isinstance(args.model, str):
+    pass # Added to ensure valid code block
+
+args.use_l_lib = not args.disable_l_lib
+args.use_l_rib = not args.disable_l_rib
 
 global_configs.set_dataset_config(args.dataset)
 ACOUSTIC_DIM = global_configs.ACOUSTIC_DIM
@@ -122,31 +153,64 @@ def prepare_deberta_input(tokens, visual, acoustic, tokenizer):
 
 def convert_to_features(examples, max_seq_length, tokenizer):
     features = []
-    for example in examples:
-        (words, visual, acoustic), label_id, segment = example
+    if args.dataset == "simsv2":
+        # examples is a dict
+        num_samples = len(examples["raw_text"])
+        for i in range(num_samples):
+            words = examples["raw_text"][i]
+            visual = examples["vision"][i]
+            acoustic = examples["audio"][i]
+            label_id = examples["regression_labels"][i]
+            
+            # Ensure it's a scalar value
+            if isinstance(label_id, (list, tuple, np.ndarray)):
+                label_id = label_id[0]
 
-        tokens, inversions = [], []
-        for idx, word in enumerate(words):
-            toks = tokenizer.tokenize(word)
-            tokens.extend(toks)
-            inversions.extend([idx] * len(toks))
+            tokens = tokenizer.tokenize(words)
+            if len(tokens) > max_seq_length - 2:
+                tokens = tokens[:max_seq_length - 2]
+                visual = visual[:max_seq_length - 2]
+                acoustic = acoustic[:max_seq_length - 2]
+            else:
+                # pad or truncate if needed, SIMSv2 pre-extracts features usually matching text tokens
+                # Let's just truncate visual/acoustic to the length of tokens.
+                min_len = min(len(tokens), len(visual), len(acoustic))
+                tokens = tokens[:min_len]
+                visual = visual[:min_len]
+                acoustic = acoustic[:min_len]
 
-        aligned_v = np.array([visual[i] for i in inversions])
-        aligned_a = np.array([acoustic[i] for i in inversions])
+            ids, vis, aud, mask, seg = prepare_deberta_input(
+                tokens, visual, acoustic, tokenizer)
 
-        if len(tokens) > max_seq_length - 2:
-            tokens = tokens[:max_seq_length - 2]
-            aligned_a = aligned_a[:max_seq_length - 2]
-            aligned_v = aligned_v[:max_seq_length - 2]
+            features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+    else:
+        for example in examples:
+            (words, visual, acoustic), label_id, segment = example
 
-        ids, vis, aud, mask, seg = prepare_deberta_input(
-            tokens, aligned_v, aligned_a, tokenizer)
+            tokens, inversions = [] , []
+            for idx, word in enumerate(words):
+                toks = tokenizer.tokenize(word)
+                tokens.extend(toks)
+                inversions.extend([idx] * len(toks))
 
-        features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+            aligned_v = np.array([visual[i] for i in inversions])
+            aligned_a = np.array([acoustic[i] for i in inversions])
+
+            if len(tokens) > max_seq_length - 2:
+                tokens = tokens[:max_seq_length - 2]
+                aligned_a = aligned_a[:max_seq_length - 2]
+                aligned_v = aligned_v[:max_seq_length - 2]
+
+            ids, vis, aud, mask, seg = prepare_deberta_input(
+                tokens, aligned_v, aligned_a, tokenizer)
+
+            features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
     return features
 
 
 def get_tokenizer(model):
+    if args.dataset == "simsv2":
+        return BertTokenizer.from_pretrained(model)
     return DebertaV2Tokenizer.from_pretrained(model)
 
 
@@ -166,7 +230,12 @@ def setup_data():
         data = pickle.load(fh)
 
     train_ds = get_dataset(data["train"])
-    dev_ds = get_dataset(data["dev"])
+    if "dev" in data:
+        dev_ds = get_dataset(data["dev"])
+    elif "valid" in data:
+        dev_ds = get_dataset(data["valid"])
+    else:
+        raise KeyError("Could not find validation data split ('dev' or 'valid')")
     test_ds = get_dataset(data["test"])
 
     n_opt = int(len(train_ds) / args.train_batch_size
@@ -194,13 +263,17 @@ def set_seed(seed):
 
 
 def build_model(n_opt):
-    model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
-        args.model, multimodal_config=args, num_labels=1)
+    if args.dataset == "simsv2":
+        model = InfoGate_BertForSequenceClassification.from_pretrained(
+            args.model, multimodal_config=args, num_labels=1)
+        backbone_prefix = "bert.model."
+    else:
+        model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
+            args.model, multimodal_config=args, num_labels=1)
+        backbone_prefix = "dberta.model."
     model.to(DEVICE)
 
     no_decay = {"bias", "LayerNorm.bias", "LayerNorm.weight"}
-
-    backbone_prefix = "dberta.model."
     ig_lr = getattr(args, 'ig_learning_rate', 5e-4)
 
     backbone_decay, backbone_no_decay = [], []
@@ -273,24 +346,8 @@ class EMA:
                 self.shadow[n].copy_(p.data)
 
 
-# ============================================================
-# Sentiment-Aware Contrastive + Ordinal Ranking Losses
-# ============================================================
-
-def compute_sentiment_contrastive(h_fused, labels, temperature=0.1):
-    """Sentiment-distance-weighted contrastive loss in bottleneck space."""
-    B = h_fused.size(0)
-    if B < 2:
-        return h_fused.new_tensor(0.0)
-
-    h_norm = F.normalize(h_fused, dim=-1)
-    sim = torch.mm(h_norm, h_norm.t())
-
-    label_dist = torch.abs(labels.unsqueeze(0) - labels.unsqueeze(1))
-    target_sim = torch.exp(-label_dist / temperature)
-
-    mask = ~torch.eye(B, dtype=torch.bool, device=h_fused.device)
-    return F.mse_loss(sim[mask], target_sim[mask])
+def toggle_state(enabled):
+    return "on" if enabled else "off"
 
 
 # ============================================================
@@ -303,25 +360,26 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
     sum_task, sum_ib = 0.0, 0.0
     sum_detail = {}
 
-    for step, batch in enumerate(tqdm(loader, desc=f"Train (stage {stage})")):
+    train_pbar = tqdm(loader, desc=f"Train (stage {stage})")
+    for step, batch in enumerate(train_pbar):
         batch = tuple(t.to(DEVICE) for t in batch)
         input_ids, visual, acoustic, label_ids = batch
         visual = visual.squeeze(1)
         acoustic = acoustic.squeeze(1)
 
-        v_norm = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
-        a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
-
-        logits, ib_loss, loss_dict, h_pooled = model(
-            input_ids, v_norm, a_norm, labels=label_ids, stage=stage)
+        logits, ib_loss, loss_dict, _ = model(
+            input_ids, visual, acoustic, labels=label_ids, stage=stage)
 
         pred_flat = logits.view(-1)
         label_flat = label_ids.view(-1)
+        
+        # Log prediction distribution
+        loss_dict['pred_mean'] = pred_flat.mean().item()
+        loss_dict['pred_std'] = pred_flat.std(unbiased=False).item()
+
         l_task = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
 
-        l_sac = compute_sentiment_contrastive(h_pooled, label_flat) if h_pooled is not None else 0.0
-
-        loss = l_task + ib_loss + args.alpha_sac * l_sac
+        loss = l_task + ib_loss
 
         if args.gradient_accumulation_step > 1:
             loss = loss / args.gradient_accumulation_step
@@ -332,6 +390,9 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
         for k, v in loss_dict.items():
             sum_detail[k] = sum_detail.get(k, 0.0) + v
         steps += 1
+        
+        # Real-time progress monitoring
+        train_pbar.set_postfix({"task": f"{l_task.item():.3f}", "ib": f"{ib_loss.item():.3f}", "p_std": f"{loss_dict['pred_std']:.2f}"})
 
         if (step + 1) % args.gradient_accumulation_step == 0:
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -346,28 +407,6 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
     return total_loss / n, sum_task / n, sum_ib / n, detail
 
 
-def eval_epoch(model, loader, stage=2):
-    model.eval()
-    total_loss, steps = 0.0, 0
-    with torch.no_grad():
-        for batch in tqdm(loader, desc="Val"):
-            batch = tuple(t.to(DEVICE) for t in batch)
-            input_ids, visual, acoustic, label_ids = batch
-            visual = visual.squeeze(1)
-            acoustic = acoustic.squeeze(1)
-
-            v_norm = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
-            a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
-
-            logits, _, _, _ = model(input_ids, v_norm, a_norm, stage=stage)
-            pred_flat = logits.view(-1)
-            label_flat = label_ids.view(-1)
-            loss = F.l1_loss(pred_flat, label_flat) + args.mse_weight * F.mse_loss(pred_flat, label_flat)
-            total_loss += loss.item()
-            steps += 1
-    return total_loss / max(steps, 1)
-
-
 def test_epoch(model, loader, stage=2, desc="Test"):
     model.eval()
     preds, labels, all_w = [], [], []
@@ -378,10 +417,7 @@ def test_epoch(model, loader, stage=2, desc="Test"):
             visual = visual.squeeze(1)
             acoustic = acoustic.squeeze(1)
 
-            v_norm = (visual - visual.min()) / (visual.max() - visual.min() + 1e-8)
-            a_norm = (acoustic - acoustic.min()) / (acoustic.max() - acoustic.min() + 1e-8)
-
-            logits, _, _, _ = model(input_ids, v_norm, a_norm, stage=stage)
+            logits, _, _, _ = model(input_ids, visual, acoustic, stage=stage)
             preds.extend(logits.view(-1).cpu().numpy().tolist())
             labels.extend(label_ids.view(-1).cpu().numpy().tolist())
 
@@ -389,20 +425,52 @@ def test_epoch(model, loader, stage=2, desc="Test"):
 
 
 def score(preds, y, use_zero=False):
-    preds = preds.flatten()
-    y = y.flatten()
-    nz = np.array([i for i, e in enumerate(y) if e != 0 or use_zero])
-    p, y2 = preds[nz], y[nz]
-    mae = np.mean(np.abs(p - y2))
-    corr = np.corrcoef(p, y2)[0][1] if len(p) > 1 else 0.0
-    pb = p >= 0
-    yb = y2 >= 0
+    preds = np.asarray(preds).flatten()
+    y = np.asarray(y).flatten()
+
+    if args.dataset == "simsv2":
+        return compute_simsv2_kuda_metrics(preds, y)
+
+    # Full set for MAE, Corr, Acc7
+    mae = np.mean(np.abs(preds - y))
+    corr = np.corrcoef(preds, y)[0][1] if len(preds) > 1 else 0.0
+
+    # Filtered set for Acc2, F1
+    nz = np.array([i for i, e in enumerate(y) if e != 0])
+    p_nz, y_nz = preds[nz], y[nz]
+    pb = p_nz >= 0
+    yb = y_nz >= 0
     acc2 = accuracy_score(yb, pb)
     f1 = f1_score(yb, pb, average="weighted")
-    p7 = np.clip(np.round(p), -3, 3).astype(int) + 3
-    y7 = np.clip(np.round(y2), -3, 3).astype(int) + 3
-    acc7 = accuracy_score(y7, p7)
-    return acc2, acc7, mae, corr, f1
+
+    result = {"acc2": acc2, "mae": mae, "corr": corr, "f1": f1}
+    p7 = np.clip(np.round(preds), -3, 3).astype(int) + 3
+    y7 = np.clip(np.round(y), -3, 3).astype(int) + 3
+    result["acc7"] = accuracy_score(y7, p7)
+    return result
+
+
+def fmt_metrics(m, prefix=""):
+    """Format metrics dict for printing."""
+    s = f"{prefix}Acc2={m['acc2']*100:.2f}%"
+    if "acc5" in m:
+        s += f"  Acc5={m['acc5']*100:.2f}%  Acc3={m['acc3']*100:.2f}%"
+    else:
+        s += f"  Acc7={m['acc7']*100:.2f}%"
+    s += f"  MAE={m['mae']:.4f}  Corr={m['corr']:.4f}  F1={m['f1']:.4f}"
+    return s
+
+
+def selection_kwargs(m):
+    """Build keyword args for compute_selection_score / build_selection_tiebreak."""
+    kw = dict(acc2=m["acc2"], mae=m["mae"], corr=m["corr"], f1=m["f1"])
+    if "acc7" in m:
+        kw["acc7"] = m["acc7"]
+    if "acc5" in m:
+        kw["acc5"] = m["acc5"]
+    if "acc3" in m:
+        kw["acc3"] = m["acc3"]
+    return kw
 
 
 # ============================================================
@@ -420,8 +488,13 @@ def main():
     print(f"  InfoGate layers: {args.num_infogate_layers}")
     print(f"  Bottleneck dim : {args.bottleneck_dim}")
     print(f"  beta_ib        : {args.beta_ib}")
-    print(f"  gamma_cyc      : {args.gamma_cyc}")
     print(f"  mse_weight     : {args.mse_weight}")
+    print(f"  selector_temp  : {args.selector_target_temp}")
+    print(f"  selector_bal   : {args.selector_balance_weight}")
+    print(f"  selector_rib_w : {args.selector_rib_weight}")
+    print(f"  Select by      : {args.selection_metric}")
+    print(f"  Loss terms     : L_lib={toggle_state(args.use_l_lib)} "
+            f"L_rib={toggle_state(args.use_l_rib)}")
     print("=" * 60)
 
     set_seed(args.seed)
@@ -437,15 +510,30 @@ def main():
 
     os.makedirs(args.checkpoint_dir, exist_ok=True)
     ckpt_path = os.path.join(args.checkpoint_dir, f"infogate_{args.dataset}_best.pt")
-    select_start = args.n_epochs // 2
-    best_dev_score = float('inf')
+    select_start = args.stage1_epochs
+    select_higher_is_better = selection_higher_is_better(args.selection_metric)
+    best_selection_score = float('-inf') if select_higher_is_better else float('inf')
+    best_selection_tiebreak = None
     best_results = None
     best_test_mae = float('inf')
     best_test_results = None
     last_test_results = None
+    last_completed_epoch = 0
+    early_patience = max(0, int(getattr(args, "early_stop_patience", 0) or 0))
+    early_min_delta = float(getattr(args, "early_stop_min_delta", 0.0) or 0.0)
+    no_improve_epochs = 0
 
     for epoch in range(args.n_epochs):
         stage = 1 if epoch < args.stage1_epochs else 2
+        # Gumbel-Softmax tau annealing: linear decay from start to end
+        tau_s = getattr(args, 'gumbel_tau_start', 1.0)
+        tau_e = getattr(args, 'gumbel_tau_end', 0.5)
+        tau = tau_s + (tau_e - tau_s) * epoch / max(args.n_epochs - 1, 1)
+        # Update tau on the model's MSelector
+        m = model.module if hasattr(model, 'module') else model
+        ig = m.dberta.infogate if hasattr(m, 'dberta') else m.bert.infogate
+        ig.mselector.gumbel_tau = tau
+
         eval_with_ema = epoch >= args.ema_start_epoch
         if epoch == args.ema_start_epoch:
             ema.reset(model)
@@ -460,93 +548,172 @@ def main():
         detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items()
                                 if k.startswith('L_'))
         print(f"  Detail  {detail_str}")
-        # Diagnostics: MSelector weights, primary selection, confidence
+        # Diagnostics: MSelector weights, primary selection, confidence, and prediction bounds
         diag_keys = ['w_acoustic', 'w_language', 'w_visual',
+                     'target_acoustic', 'target_language', 'target_visual',
                      'primary_a', 'primary_l', 'primary_v',
-                     'conf_t', 'conf_a', 'conf_v', 'fusion_conf']
+                     'err_acoustic', 'err_language', 'err_visual',
+                     'conf_t', 'conf_a', 'conf_v', 'fusion_conf',
+                     'routing_entropy', 'pred_mean', 'pred_std']
         diag_vals = {k: tr_detail[k] for k in diag_keys if k in tr_detail}
         if diag_vals:
             w_str = (f"w=[a:{diag_vals.get('w_acoustic',0):.3f} "
                      f"l:{diag_vals.get('w_language',0):.3f} "
                      f"v:{diag_vals.get('w_visual',0):.3f}]")
+            tgt_str = (f"target=[a:{diag_vals.get('target_acoustic',0):.3f} "
+                       f"l:{diag_vals.get('target_language',0):.3f} "
+                       f"v:{diag_vals.get('target_visual',0):.3f}]")
             p_str = (f"primary=[a:{diag_vals.get('primary_a',0):.2f} "
                      f"l:{diag_vals.get('primary_l',0):.2f} "
                      f"v:{diag_vals.get('primary_v',0):.2f}]")
+            err_str = (f"err=[a:{diag_vals.get('err_acoustic',0):.3f} "
+                       f"l:{diag_vals.get('err_language',0):.3f} "
+                       f"v:{diag_vals.get('err_visual',0):.3f}]")
             c_str = (f"conf=[t:{diag_vals.get('conf_t',0):.3f} "
                      f"a:{diag_vals.get('conf_a',0):.3f} "
                      f"v:{diag_vals.get('conf_v',0):.3f} "
                      f"fused:{diag_vals.get('fusion_conf',0):.3f}]")
-            print(f"  Diag  {w_str}  {p_str}  {c_str}")
+            rib_str = f"route_H={diag_vals.get('routing_entropy',0):.3f}"
+            pred_str = (f"pred=[mean:{diag_vals.get('pred_mean',0):.3f} "
+                        f"std:{diag_vals.get('pred_std',0):.3f}]")
+            print(f"  Diag  {w_str}  {tgt_str}  {p_str}\n"
+                  f"  Qual  {err_str}  {c_str}  {rib_str}  gumbel_tau={tau:.3f}\n"
+                  f"  Stats {pred_str}")
 
         if eval_with_ema:
             ema.apply(model)
 
         dev_preds, dev_labels = test_epoch(model, dev_dl, stage=stage, desc="Dev")
-        dev_acc2, dev_acc7, dev_mae, dev_corr, dev_f1 = score(dev_preds, dev_labels)
-        print(f"  Dev   Acc2={dev_acc2*100:.2f}%  Acc7={dev_acc7*100:.2f}%  "
-              f"MAE={dev_mae:.4f}  Corr={dev_corr:.4f}  F1={dev_f1:.4f}")
+        dev_m = score(dev_preds, dev_labels)
+        dev_kw = selection_kwargs(dev_m)
+        selection_score = compute_selection_score(args.selection_metric, **dev_kw)
+        selection_tiebreak = build_selection_tiebreak(**dev_kw)
+        print(f"  Dev   {fmt_metrics(dev_m)}")
+        score_str = f"acc2_composite={selection_score:.4f}" if args.selection_metric == "acc2_composite" else f"{args.selection_metric}={selection_score:.6f}"
+        print(f"  Select {score_str}")
 
         preds, labels = test_epoch(model, test_dl, stage=stage)
-        acc2, acc7, mae, corr, f1 = score(preds, labels)
-        print(f"  Test  Acc2={acc2*100:.2f}%  Acc7={acc7*100:.2f}%  "
-              f"MAE={mae:.4f}  Corr={corr:.4f}  F1={f1:.4f}")
+        test_m = score(preds, labels)
+        print(f"  Test  {fmt_metrics(test_m)}")
 
-        last_test_results = (acc2, acc7, mae, corr, f1)
+        last_test_results = test_m
 
         if epoch >= select_start:
-            dev_score = dev_mae - 0.5 * dev_corr
-            if dev_score < best_dev_score:
-                best_dev_score = dev_score
-                best_results = (acc2, acc7, mae, corr, f1)
+            prev_best_selection_score = best_selection_score
+            prev_best_selection_tiebreak = best_selection_tiebreak
+            if best_selection_tiebreak is None:
+                should_save = True
+            else:
+                better_score = selection_score > best_selection_score if select_higher_is_better else selection_score < best_selection_score
+                same_score = abs(selection_score - best_selection_score) <= 1e-12
+                should_save = better_score or (same_score and selection_tiebreak > best_selection_tiebreak)
+
+            if should_save:
+                best_selection_score = selection_score
+                best_selection_tiebreak = selection_tiebreak
+                best_results = test_m
                 save_dict = {
                     'epoch': epoch + 1,
                     'model_state_dict': model.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
-                    'dev_mae': dev_mae,
-                    'dev_corr': dev_corr,
-                    'dev_score': dev_score,
+                    'dev_mae': dev_m["mae"],
+                    'dev_corr': dev_m["corr"],
+                    'selection_metric': args.selection_metric,
+                    'selection_score': selection_score,
+                    'ablation': {
+                        'use_l_lib': args.use_l_lib,
+                        'use_l_rib': args.use_l_rib,
+                    },
                     'test_results': best_results,
                     'args': args,
                 }
                 if eval_with_ema:
                     save_dict['ema_state_dict'] = ema.state_dict()
                 torch.save(save_dict, ckpt_path)
-                print(f"  >> Best model saved (dev score={dev_score:.4f}, "
-                      f"MAE={dev_mae:.4f}, Corr={dev_corr:.4f}) to {ckpt_path}")
+                print(f"  >> Best model saved ({args.selection_metric}={selection_score:.6f}, "
+                      f"MAE={dev_m['mae']:.4f}, Corr={dev_m['corr']:.4f}) to {ckpt_path}")
 
-        if mae < best_test_mae:
-            best_test_mae = mae
-            best_test_results = (acc2, acc7, mae, corr, f1, epoch + 1)
+            if early_patience > 0:
+                improved_for_early_stop = should_save
+                if early_min_delta > 0.0 and should_save and prev_best_selection_tiebreak is not None:
+                    same_score_prev = abs(selection_score - prev_best_selection_score) <= 1e-12
+                    if same_score_prev:
+                        improved_for_early_stop = True
+                    elif math.isfinite(prev_best_selection_score):
+                        if select_higher_is_better:
+                            improved_for_early_stop = (
+                                selection_score - prev_best_selection_score
+                            ) > early_min_delta
+                        else:
+                            improved_for_early_stop = (
+                                prev_best_selection_score - selection_score
+                            ) > early_min_delta
+                    else:
+                        improved_for_early_stop = True
+                if improved_for_early_stop:
+                    no_improve_epochs = 0
+                else:
+                    no_improve_epochs += 1
+
+        if test_m["mae"] < best_test_mae:
+            best_test_mae = test_m["mae"]
+            best_test_results = {**test_m, "epoch": epoch + 1}
 
         if eval_with_ema:
             ema.restore(model)
 
+        last_completed_epoch = epoch + 1
+
+        if (
+            early_patience > 0
+            and epoch >= select_start
+            and no_improve_epochs >= early_patience
+        ):
+            print(
+                f"\n  >> Early stop: no dev selection improvement for "
+                f"{early_patience} epoch(s) (epoch {epoch + 1}, "
+                f"best {args.selection_metric}={best_selection_score:.6f})."
+            )
+            break
+
     print("\n" + "=" * 60)
-    print(f"Best Results (dev score, epoch >= {select_start + 1}):")
+    acc_label_hi = "Acc-5" if args.dataset == "simsv2" else "Acc-7"
+    print(f"Best Results ({args.selection_metric}, epoch >= {select_start + 1}):")
     if best_results:
-        acc2, acc7, mae, corr, f1 = best_results
-        print(f"  Acc-2: {acc2*100:.2f}%")
-        print(f"  Acc-7: {acc7*100:.2f}%")
-        print(f"  MAE:   {mae:.4f}")
-        print(f"  Corr:  {corr:.4f}")
-        print(f"  F1:    {f1:.4f}")
-    print(f"\nLast Epoch ({args.n_epochs}) Results:")
+        print(f"  Selection score: {best_selection_score:.6f}")
+        print(f"  Acc-2: {best_results['acc2']*100:.2f}%")
+        if args.dataset == "simsv2":
+            print(f"  Acc-5: {best_results['acc5']*100:.2f}%")
+            print(f"  Acc-3: {best_results['acc3']*100:.2f}%")
+        else:
+            print(f"  Acc-7: {best_results['acc7']*100:.2f}%")
+        print(f"  MAE:   {best_results['mae']:.4f}")
+        print(f"  Corr:  {best_results['corr']:.4f}")
+        print(f"  F1:    {best_results['f1']:.4f}")
+    le = last_completed_epoch if last_completed_epoch > 0 else args.n_epochs
+    print(f"\nLast Epoch ({le}) Results:")
     if last_test_results:
-        acc2, acc7, mae, corr, f1 = last_test_results
-        print(f"  Acc-2: {acc2*100:.2f}%")
-        print(f"  Acc-7: {acc7*100:.2f}%")
-        print(f"  MAE:   {mae:.4f}")
-        print(f"  Corr:  {corr:.4f}")
-        print(f"  F1:    {f1:.4f}")
+        print(f"  Acc-2: {last_test_results['acc2']*100:.2f}%")
+        if args.dataset == "simsv2":
+            print(f"  Acc-5: {last_test_results['acc5']*100:.2f}%")
+            print(f"  Acc-3: {last_test_results['acc3']*100:.2f}%")
+        else:
+            print(f"  Acc-7: {last_test_results['acc7']*100:.2f}%")
+        print(f"  MAE:   {last_test_results['mae']:.4f}")
+        print(f"  Corr:  {last_test_results['corr']:.4f}")
+        print(f"  F1:    {last_test_results['f1']:.4f}")
     print("\nBest Test MAE (oracle, for reference only):")
     if best_test_results:
-        acc2, acc7, mae, corr, f1, ep = best_test_results
-        print(f"  Epoch: {ep}")
-        print(f"  Acc-2: {acc2*100:.2f}%")
-        print(f"  Acc-7: {acc7*100:.2f}%")
-        print(f"  MAE:   {mae:.4f}")
-        print(f"  Corr:  {corr:.4f}")
-        print(f"  F1:    {f1:.4f}")
+        print(f"  Epoch: {best_test_results['epoch']}")
+        print(f"  Acc-2: {best_test_results['acc2']*100:.2f}%")
+        if args.dataset == "simsv2":
+            print(f"  Acc-5: {best_test_results['acc5']*100:.2f}%")
+            print(f"  Acc-3: {best_test_results['acc3']*100:.2f}%")
+        else:
+            print(f"  Acc-7: {best_test_results['acc7']*100:.2f}%")
+        print(f"  MAE:   {best_test_results['mae']:.4f}")
+        print(f"  Corr:  {best_test_results['corr']:.4f}")
+        print(f"  F1:    {best_test_results['f1']:.4f}")
 
 
 if __name__ == '__main__':

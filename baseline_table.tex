@@ -1,0 +1,108 @@
+\begin{table*}[t]
+\centering
+\caption{Comparison with SOTA models on CMU-MOSI and CMU-MOSEI datasets~\citep{zadeh2016mosi,zadeh2018multimodal}.}
+\label{tab:baseline_mosi_mosei}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{l|ccccc|ccccc}
+\toprule
+\multirow{2}{*}{Baseline Models} & \multicolumn{5}{c|}{CMU-MOSI} & \multicolumn{5}{c}{CMU-MOSEI} \\
+ & Acc7$\uparrow$ & Acc2$\uparrow$ & F1$\uparrow$ & MAE$\downarrow$ & Corr$\uparrow$
+ & Acc7$\uparrow$ & Acc2$\uparrow$ & F1$\uparrow$ & MAE$\downarrow$ & Corr$\uparrow$ \\
+\midrule
+MFM~\citep{tsai2018learning}          & 33.3 & 80.0 & 80.1 & 0.948 & 0.664 & 50.8 & 83.4 & 83.4 & 0.580 & 0.722 \\
+Self-MM~\citep{yu2021learning}      & 45.8 & 84.9 & 84.8 & 0.731 & 0.785 & 53.0 & 85.2 & 85.2 & 0.540 & 0.763 \\
+AtCAF$^\dagger$~\citep{huang2025atcaf}  & 46.5 & 88.6 & 88.5 & 0.650 & 0.831 & \underline{55.9} & 87.0 & 86.8 & 0.508 & 0.785 \\
+DLF$^\dagger$~\citep{wang2025dlf}    & 47.1 & 85.1 & 85.0 & 0.731 & 0.781 & 53.9 & 85.4 & 85.3 & 0.536 & 0.764 \\
+KuDA$^\dagger$~\citep{feng2024knowledge}   & 47.1 & 86.4 & 86.5 & 0.705 & 0.795 & 52.9 & 86.5 & 86.6 & 0.529 & 0.776 \\
+DEVA$^\dagger$~\citep{wu2025deva}   & 46.3 & 86.3 & 86.3 & 0.730 & 0.787 & 52.3 & 86.1 & 86.2 & 0.541 & 0.769 \\
+C-MIB~\citep{mai2022mib}        & 47.7 & 87.8 & 87.8 & 0.662 & 0.835 & 52.7 & 86.9 & 86.8 & 0.542 & 0.784 \\
+ITHP~\citep{xiaoneuro}         & 47.7 & 88.5 & 88.5 & 0.663 & 0.856 & 52.2 & 87.1 & 87.1 & 0.550 & 0.792 \\
+Multimodal Boosting~\citep{mai2024multimodalboosting} & \underline{49.1} & 88.5 & 88.4 & 0.634 & 0.855 & 54.0 & 86.5 & 86.5 & 0.523 & 0.779 \\
+CaMIB$^\dagger$~\citep{jiang2025towards}  & 48.0 & \underline{89.8} & \textbf{89.8} & 0.616 & 0.857 & 53.5 & 87.3 & 87.2 & 0.517 & 0.788 \\
+DMD~\citep{li2023decoupled}          & 44.9 & 84.3 & 84.3 & 0.726 & 0.788 & 52.8 & 84.6 & 84.6 & 0.538 & 0.768 \\
+EMOE~\citep{fang2025emoe}         & 45.2 & 84.8 & 84.8 & 0.723 & 0.790 & 52.5 & 85.0 & 85.0 & 0.542 & 0.760 \\
+TMSON$^\dagger$~\citep{xie2024tmson}  & 47.4 & 87.2 & 87.2 & 0.687 & 0.809 & 55.6 & 86.4 & 86.2 & 0.526 & 0.766 \\
+MOAC$^\dagger$~\citep{yang2025improving}   & 48.6 & 89.0 & \underline{89.0} & \underline{0.605} & \underline{0.857} & 54.3 & \underline{87.6} & \underline{87.6} & 0.512 & \underline{0.793} \\
+\midrule
+\textbf{PRISM (InfoGate fusion)} & 49.6 & 88.4 & 88.3 & 0.598 & 0.855 & \textbf{55.1} & 85.9 & 86.0 & \textbf{0.506} & 0.802 \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\caption{Comparison with SOTA models on CH-SIMS~v2~\citep{liu2022make}.}
+\label{tab:baseline_simsv2}
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{l|cccccc}
+\toprule
+Baseline Models & Acc5$\uparrow$ & Acc3$\uparrow$ & Acc2$\uparrow$ & F1$\uparrow$ & MAE$\downarrow$ & Corr$\uparrow$ \\
+\midrule
+EF-LSTM~\citep{mao2022m}      & 53.7 & \underline{73.5} & 80.1 & 80.0 & 0.309 & 0.700 \\
+LF-DNN~\citep{mao2022m}       & 51.8 & 71.2 & 77.8 & 77.9 & 0.322 & 0.668 \\
+TFN~\citep{zadeh2017tensor}          & 53.3 & 70.9 & 78.1 & 78.1 & 0.322 & 0.662 \\
+LMF~\citep{liu2018efficient}          & 51.6 & 70.0 & 77.8 & 77.8 & 0.327 & 0.651 \\
+MFN~\citep{zadeh2018memory}          & \textbf{55.4} & 72.7 & 79.4 & 79.4 & \underline{0.301} & 0.712 \\
+Graph-MFN~\citep{zadeh2018multimodal}    & 48.9 & 68.6 & 76.6 & 76.6 & 0.334 & 0.644 \\
+MISA~\citep{hazarika2020misa}         & 47.5 & 68.9 & 78.2 & 78.3 & 0.342 & 0.671 \\
+MAG-BERT~\citep{rahman2020integrating}     & 49.2 & 70.6 & 77.1 & 77.1 & 0.346 & 0.641 \\
+Self-MM~\citep{yu2021learning}      & 53.5 & 72.7 & 78.7 & 78.6 & 0.315 & 0.691 \\
+MMIM~\citep{han2021improving}         & 50.5 & 70.4 & 77.8 & 77.8 & 0.339 & 0.641 \\
+AV-MC~\citep{liu2022make}        & 52.1 & 73.2 & 80.6 & 80.7 & 0.301 & 0.721 \\
+KuDA$^\dagger$~\citep{feng2024knowledge} & 53.1 & \textbf{74.3} & 80.2 & 80.1 & \textbf{0.289} & \textbf{0.741} \\
+\midrule
+\textbf{PRISM (InfoGate fusion)} & 52.8 & 73.4 & 79.4 & 79.5 & 0.312 & 0.680 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table*}[t]
+\centering
+\caption{Comparison with classification baselines on UR-FUNNY and MUStARD (accuracy, \%)~\citep{hasan2019ur,castro2019towards}. Panel~(a): UR-FUNNY; panel~(b): MUStARD. $^\dagger$: reproduced setups without released parameter counts ($-$).}
+\label{tab:baseline_mustard_cls}
+\noindent\textit{(a) UR-FUNNY}\\
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lcc}
+\toprule
+Model & Accuracy & \#Parameters \\
+\midrule
+MISA-ALBERT$^\dagger$~\citep{hazarika2020misa} & 69.82 & $-$ \\
+MAG-ALBERT$^\dagger$~\citep{rahman2020integrating} & 72.43 & $-$ \\
+HKT$^\dagger$~\citep{hasan2021humorkt} & 77.36 & $-$ \\
+\midrule
+HKT~\citep{hasan2021humorkt} & 76.46 & 17{,}066{,}564 \\
+MCL~\citep{mai2023excavating} & 77.67 & 13{,}762{,}973 \\
+MGCL~\citep{mai2023globalcontrastive} & 78.06 & 14{,}062{,}342 \\
+\midrule
+\textbf{MOAC}~\citep{yang2025improving} & \textbf{78.57} & \textbf{13{,}272{,}272} \\
+\midrule
+\textbf{PRISM (InfoGate fusion)} & 73.44 & $-$ \\
+\bottomrule
+\end{tabular}
+}
+
+\vspace{1.25ex}
+
+\noindent\textit{(b) MUStARD}\\
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lcc}
+\toprule
+Model & Accuracy & \#Parameters \\
+\midrule
+MISA-ALBERT$^\dagger$~\citep{hazarika2020misa} & 66.18 & $-$ \\
+MAG-ALBERT$^\dagger$~\citep{rahman2020integrating} & 69.12 & $-$ \\
+HKT$^\dagger$~\citep{hasan2021humorkt} & 79.41 & $-$ \\
+\midrule
+HKT~\citep{hasan2021humorkt} & 76.47 & 17{,}101{,}372 \\
+MCL~\citep{mai2023excavating} & 77.94 & 13{,}828{,}449 \\
+MGCL~\citep{mai2023globalcontrastive} & 77.94 & 14{,}282{,}000 \\
+\midrule
+\textbf{MOAC}~\citep{yang2025improving} & \textbf{80.88} & \textbf{13{,}454{,}832} \\
+\midrule
+\textbf{PRISM (InfoGate fusion)} & 76.47 & $-$ \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}

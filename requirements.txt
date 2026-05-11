@@ -2,3 +2,5 @@ transformers>=4.30.0
 numpy>=1.21.0
 scikit-learn>=1.0.0
 tqdm>=4.60.0
+optuna>=3.6.0
+matplotlib>=3.5.0

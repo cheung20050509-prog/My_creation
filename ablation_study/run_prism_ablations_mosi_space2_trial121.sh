@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# MOSI phase4_mosi_space2 trial121 (Best Test MAE 0.5939): six PRISM --ablation modes.
+# Hyperparameters from Optuna study infogate_mosi_phase4_mosi_4090d_space2, trial 121.
+#
+# Same scheduling notes as run_prism_ablations_mosi_trial234.sh: use JOBS_PER_GPU=1 with
+# dual GPUs so baseline none does not share a card with another training in the same wave.
+#
+# Env: GPU_LIST, JOBS_PER_GPU, EXCLUDE_GPUS — see run_prism_ablations_mosi_trial234.sh
+set -euo pipefail
+MY_CREATION="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$MY_CREATION"
+
+PYTHON="${PYTHON:-/root/autodl-tmp/anaconda3/envs/ITHP5090/bin/python}"
+if ! "$PYTHON" -c "import torch" 2>/dev/null; then
+  PYTHON="${PYTHON:-python3}"
+fi
+
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+
+if [[ ! "${EXCLUDE_GPUS+x}" ]]; then
+  EXCLUDE_GPUS=1
+fi
+
+is_excluded() {
+  local id="$1"
+  [[ -z "${EXCLUDE_GPUS// /}" ]] && return 1
+  local tok
+  IFS=',' read -ra _ex <<< "$(echo "$EXCLUDE_GPUS" | tr -d '[:space:]')"
+  for tok in "${_ex[@]}"; do
+    [[ "$tok" == "$id" ]] && return 0
+  done
+  return 1
+}
+
+ng=$(nvidia-smi -L 2>/dev/null | wc -l | tr -d '[:space:]')
+if [[ -z "$ng" || "$ng" -lt 1 ]]; then
+  ng=1
+fi
+
+GPU_LIST="${GPU_LIST:-}"
+if [[ -n "$GPU_LIST" ]]; then
+  IFS=',' read -ra GPU_IDS <<< "$(echo "$GPU_LIST" | tr -d '[:space:]')"
+else
+  GPU_IDS=()
+  if [[ "$ng" -eq 2 ]]; then
+    GPU_IDS=(0 1)
+  else
+    for ((i = 0; i < ng; i++)); do
+      if is_excluded "$i"; then
+        continue
+      fi
+      GPU_IDS+=("$i")
+    done
+    if [[ ${#GPU_IDS[@]} -eq 0 ]]; then
+      echo "ERROR: no GPUs left after EXCLUDE_GPUS=${EXCLUDE_GPUS:-∅}" >&2
+      exit 1
+    fi
+  fi
+fi
+
+NUM_GPUS=${#GPU_IDS[@]}
+
+validate_int() {
+  [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+JOBS_ARR=()
+if [[ "${JOBS_PER_GPU+x}" && "$JOBS_PER_GPU" == *","* ]]; then
+  IFS=',' read -ra JOBS_ARR <<< "$(echo "$JOBS_PER_GPU" | tr -d '[:space:]')"
+  if [[ ${#JOBS_ARR[@]} -ne $NUM_GPUS ]]; then
+    echo "ERROR: JOBS_PER_GPU has ${#JOBS_ARR[@]} entries but GPU_LIST has ${NUM_GPUS} GPUs" >&2
+    exit 1
+  fi
+  for j in "${JOBS_ARR[@]}"; do
+    if ! validate_int "$j"; then
+      echo "ERROR: invalid JOBS_PER_GPU component: ${j}" >&2
+      exit 1
+    fi
+  done
+elif [[ ! "${JOBS_PER_GPU+x}" ]] && [[ "$NUM_GPUS" -eq 2 ]] && [[ "${GPU_IDS[0]}" == "0" ]] && [[ "${GPU_IDS[1]}" == "1" ]]; then
+  JOBS_ARR=(2 1)
+elif [[ "${JOBS_PER_GPU+x}" ]]; then
+  j="${JOBS_PER_GPU}"
+  if ! validate_int "$j"; then
+    echo "ERROR: JOBS_PER_GPU must be a positive integer or comma list, got ${j}" >&2
+    exit 1
+  fi
+  for ((i = 0; i < NUM_GPUS; i++)); do
+    JOBS_ARR+=("$j")
+  done
+else
+  j=2
+  for ((i = 0; i < NUM_GPUS; i++)); do
+    JOBS_ARR+=("$j")
+  done
+fi
+
+SLOT_GPUS=()
+for ((gi = 0; gi < NUM_GPUS; gi++)); do
+  g="${GPU_IDS[$gi]}"
+  nj="${JOBS_ARR[$gi]}"
+  for ((k = 0; k < nj; k++)); do
+    SLOT_GPUS+=("$g")
+  done
+done
+PARALLEL=${#SLOT_GPUS[@]}
+
+echo "======== $(date -Is) PRISM ablation batch (space2 trial121): GPUs=[${GPU_IDS[*]}] JOBS_PER_GPU=[${JOBS_ARR[*]}] PARALLEL=${PARALLEL} ========"
+echo "NOTE: Run none as sole CUDA job on that GPU when comparing to Optuna gold."
+
+MODES=(none no_infogate no_mselector no_ib no_conf_gating no_adaptive_gate)
+n_modes=${#MODES[@]}
+
+for ((start = 0; start < n_modes; start += PARALLEL)); do
+  pids=()
+  echo "-------- batch start_index=${start} $(date -Is) --------"
+  for ((slot = 0; slot < PARALLEL; slot++)); do
+    idx=$((start + slot))
+    if ((idx >= n_modes)); then
+      break
+    fi
+    gpu="${SLOT_GPUS[$slot]}"
+    m="${MODES[$idx]}"
+    if [[ "$m" == "none" ]]; then
+      OUT="${MY_CREATION}/ablation_study/runs/mosi_space2_trial121"
+    else
+      OUT="${MY_CREATION}/ablation_study/runs/mosi_space2_trial121_${m}"
+    fi
+    mkdir -p "${OUT}/checkpoints"
+    : >"${OUT}/train.log"
+    echo "  $(date -Is) ablation=${m} CUDA_VISIBLE_DEVICES=${gpu} slot=${slot} OUT=${OUT}"
+    CUDA_VISIBLE_DEVICES="${gpu}" nohup "$PYTHON" -u ablation_study/train_fixed_mosi_space2_trial121.py \
+      --ablation "$m" \
+      --checkpoint-dir "${OUT}/checkpoints" \
+      >>"${OUT}/train.log" 2>&1 &
+    pid=$!
+    pids+=("$pid")
+    echo "  Started PID=${pid} (GPU ${gpu}) log=${OUT}/train.log"
+  done
+  for pid in "${pids[@]}"; do
+    wait "${pid}"
+    echo "  Finished PID=${pid} at $(date -Is)"
+  done
+  echo "-------- batch done $(date -Is) --------"
+done
+
+echo "======== $(date -Is) all modes finished ========"

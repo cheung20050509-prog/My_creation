@@ -1,0 +1,30 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented \textbf{PRISM}, a multimodal sentiment model that compresses
+each modality with variational information bottlenecks, routes a per-sample
+primary stream with a Gumbel--Softmax selector, and fuses auxiliaries through
+IB-guided cross-attention and adaptive gates---committing the final score to
+the \emph{enhanced primary} bottlenecks only, in the same spirit as
+primary-modality-centric designs in MODS \citep{mods2026align} and IB analyses
+in CyIN \citep{cyin2025align}, but with a concrete, code-matched
+implementation.
+IB confidence provides a direct, learnable handle on which key positions
+auxiliary modalities may attend to, while routing supervision in stage~2 keeps
+the selector tracking per-modality predictive error rather than freezing to a
+static ``language-first'' prior; the design also trades off full variational
+deep hierarchies (as might be inspired by ITHP-style fusion
+\citep{ithp2024align}) for a lighter diagonal Gaussian and a single fusion
+stack, favoring training stability on standard MSA budgets.
+On CMU-MOSI, CMU-MOSEI, and a large CH-SIMS v2 Optuna search, PRISM obtains
+competitive or improved MAE/accuracy operating points under complete-modality
+protocols, and MSA features can reflect demographic and channel bias so that
+high-stakes use (e.g., hiring or clinical screening) is \emph{not} supported
+by calibration of our objective alone---see \S\ref{sec:limitations}.
+
+\noindent \textbf{Future work}.
+We see three directions: (i) token-level reparameterized bottlenecks closer to
+CyIN's formulation \citep{cyin2025align} at the MSelector interface;
+(ii) missing-modality and OOD evaluation;
+(iii) joint scaling with stronger visual/acoustic backbones and fair comparison
+to causal IB baselines \citep{jiang2025towards}.

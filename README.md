@@ -1,132 +1,306 @@
-# InfoGate: Information Bottleneck-Guided Adaptive Cross-Attention for Robust Multimodal Fusion
+# InfoGate on no_highway
 
-## 1. Introduction
+This directory contains the current InfoGate implementation used in the `no_highway` branch.
+It targets multimodal sentiment analysis on CMU-MOSI and CMU-MOSEI with text, acoustic,
+and visual inputs.
 
-Multimodal Sentiment Analysis (MSA) integrates language, acoustic, and visual modalities to predict sentiment intensity from video utterances. While recent methods based on cross-modal attention and information bottleneck (IB) compression have achieved strong results, they face key limitations: (1) cross-modal attention treats all auxiliary tokens equally, regardless of their information quality; (2) fusion strategies apply fixed injection weights without considering cross-modal consistency; (3) contrastive learning objectives (e.g., InfoNCE) focus on modality alignment but ignore inter-sample sentiment relationships.
+Compared with the earlier experimental code, this branch keeps the main InfoGate fusion
+pipeline but simplifies runtime behavior:
 
-We propose **InfoGate**, a framework that leverages IB-derived uncertainty signals to adaptively control every stage of multimodal fusion. Our core insight is that the confidence estimates from Information Bottleneck encoders — computed as `conf = sigmoid(-logvar)` — provide a natural, end-to-end learnable measure of information quality that can guide modality selection, cross-modal attention, and fusion intensity.
+- complete-modality training and evaluation are the supported path
+- the older missing-modality evaluation path is not exposed here
+- the streamlined forward path is easier to retrain, test, and compare
 
-## 2. Methods
+The code still keeps the bottleneck-based regularization pieces (token-level IB
+plus label-level IB), and `test.py` evaluates the standard complete-modality setting.
 
-### 2.1 Architecture Overview
+## Overview
 
+The model combines five pieces:
+
+1. DeBERTa-v3-base text encoder
+2. unimodal projectors for text, audio, and vision
+3. IB encoders that produce bottleneck features plus confidence estimates
+4. MSelector for dynamic primary-modality selection
+5. InfoGate fusion layers with confidence-aware attention and adaptive gating
+
+High-level flow:
+
+```text
+text/audio/vision
+    -> projection to unified hidden size
+    -> IB encoders -> bottleneck features + confidence
+    -> MSelector dynamically chooses the primary stream (supervised by selective KL divergence on modality quality)
+    -> InfoGate cross-attention fuses the two auxiliary streams into the primary stream
+    -> The enhanced primary bottleneck stream alone is passed to the prediction head for sentiment scoring
 ```
-text → DeBERTa → proj(768→256) → IBEncoder → bottleneck(96d) + confidence
-acoustic → proj(74→256) → IBEncoder → bottleneck(96d) + confidence    
-visual → proj(47→256) → IBEncoder → bottleneck(96d) + confidence
-    ↓
-MSelector (dynamic primary modality selection)
-    ↓
-InfoGateModule (IB-guided cross-attention + adaptive gating, ×4 layers)
-    ↓
-Alignment-modulated injection
-    ↓
-ITHP-style residual fusion with DeBERTa text → prediction
+
+## What the Branch Actually Supports
+
+- `train.py`: two-stage training with EMA evaluation and dev-score checkpoint selection
+- `test.py`: complete-modality evaluation only
+- `train.sh`: default background launcher using the branch's current baseline config
+- `test.sh`: convenience wrapper for evaluation
+- `reproduce.sh`: tuned MOSI-only reproduction command for an older best-MOSI setup
+
+Important scope notes:
+
+- **The branch name is `no_highway`**, signifying a strict adherence to the Primary-centric philosophy of the MODS paper. The code path explicitly disables any direct concatenation (highway) of textual residual features or auxiliary modalities at the final prediction head, isolating the judgment entirely to the enhanced primary stream to prevent noise bleed.
+- The README previously described pending MOSEI and missing-modality work; that is now outdated.
+- Current evaluation here is for complete text-audio-vision inputs.
+
+## Current Model Behavior
+
+### Fusion
+
+- IB confidence modulates attention to suppress uncertain auxiliary tokens.
+- MSelector chooses the primary modality dynamically for each sample based on sample-level divergence.
+- Adaptive gates control how much auxiliary information is injected into the primary stream.
+- **Pure Primary-centric Prediction**: The fused bottleneck stream is passed through a LayerNorm and direct classification head without any textual feature expansion or highway concatenation.
+
+### Training
+
+- Stage 1 trains the task objective and bottleneck losses, allowing the primary stream to warm up.
+- Stage 2 adds the translation, cyclic regularization terms, and selective KL supervision for the dynamic MSelector.
+- Checkpoints are selected by dev score:
+
+```text
+dev_score = dev_mae - 0.5 * dev_corr
 ```
 
-### 2.2 Key Components
+- The best checkpoint is tracked only after the midpoint of training.
 
-**IB-Guided Cross-Attention.** Standard multi-head attention modified with two confidence-based modulations: (1) score bias `scores += scale * log(conf_K)` suppresses attention to low-confidence key positions; (2) value gating `V_eff = V * conf` reduces contribution of uncertain tokens. This naturally filters noise from auxiliary modalities at the token level.
+## Latest Complete-Modality Results (Dynamic MODS Aligned)
 
-**Alignment-Modulated Injection.** Before injecting auxiliary cross-attention output into the primary modality, we compute the cosine similarity between primary and auxiliary bottleneck representations. When modalities agree (high alignment), injection proceeds normally; when they contradict (low alignment, e.g., sarcasm), injection is suppressed. Floor at 0.3 prevents complete information cutoff.
+The latest local rerun on this branch was completed on 2026-04-03 using the
+strictly MODS-aligned dynamic primary architecture without a highway.
 
-**Adaptive Information Gate.** Per-sample, per-dimension gating that learns which dimensions of the cross-attention output to inject: `g = sigmoid(W2 * ReLU(W1 * [primary || ca_output]))`, `output = g * ca_output`.
+| Dataset | Best Acc2 | Best Acc7 | Best MAE | Best Corr | Best F1 | status |
+|---|---:|---:|---:|---:|---:|---:|
+| MOSI  | 87.94% | 51.76% | **0.6048** | 0.8540 | 0.8793 | New Low MAE (SOTA level) |
+| MOSEI | ~87.21% | ~47.60% | ~0.5989 | ~0.8137 | ~0.8711 | *Training in progress* |
 
-**Dynamic Primary Modality Selection (MSelector).** Adopted from MODS (AAAI 2026). Adaptive aggregation + MLP assigns soft weights to each modality per sample, determining which modality leads the fusion process.
+These results were produced from local runs whose logs were written to:
 
-### 2.3 Training Objectives
+- `logs/full_dynamic_mods_aligned_20260403/train_mosi_full.log`
+- `logs/full_dynamic_mods_aligned_20260403/train_mosei_full.log`
 
-| Loss | Formula | Role |
-|------|---------|------|
-| L_task | L1 + 0.67*MSE | Regression prediction |
-| L_tib | KL + β*reconstruction (cyclic, 9 decoders) | Token-level IB: intra/inter-modal bottleneck regularization |
-| L_lib | KL + β*label_prediction (per modality) | Label-level IB: task-aware bottleneck supervision |
-| L_tran | translation_MSE + cyclic_MSE (CRA) | Cross-modal bottleneck alignment regularization |
-| L_sac | MSE(cosine_sim, exp(-\|y_i-y_j\|)) | Sentiment-aware contrastive learning in bottleneck space |
+and whose best checkpoints were written to:
 
-**Two-stage training:** Stage 1 (epochs 1–12) trains without L_tran to stabilize IB encoders; Stage 2 (epochs 13–80) adds L_tran for cross-modal alignment.
+- `checkpoints_completeonly_20260402/infogate_mosi_best.pt`
+- `checkpoints_completeonly_20260402/infogate_mosei_best.pt`
 
-### 2.4 Theoretical Motivation
+## Literature baselines (SOTA comparison)
 
-The Information Bottleneck principle compresses input X into bottleneck B by minimizing I(X;B) while maximizing I(B;Y). The logvar from the variational approximation naturally indicates per-token uncertainty. We repurpose this uncertainty as a universal control signal:
+The tables below mirror `baseline_table.tex` (compiled into the paper). **†** marks
+numbers cited from the respective papers as in that table. The **InfoGate (Ours)**
+row is left as placeholders (`—`) until you paste final PRISM/InfoGate numbers.
 
-- **Selection stage:** MSelector uses bottleneck features (already IB-compressed) for modality importance estimation
-- **Attention stage:** IB confidence modulates cross-attention scores and values (token-level filtering)  
-- **Injection stage:** Bottleneck alignment (cosine similarity) gates cross-modal injection (sample-level filtering)
+### CMU-MOSI and CMU-MOSEI
 
-This creates a three-level filtering hierarchy: global (MSelector) → token (IBGuidedAttention) → sample (alignment modulation).
+| Baseline | MOSI Acc7↑ | MOSI Acc2↑ | MOSI F1↑ | MOSI MAE↓ | MOSI Corr↑ | MOSEI Acc7↑ | MOSEI Acc2↑ | MOSEI F1↑ | MOSEI MAE↓ | MOSEI Corr↑ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| MFM | 33.3 | 80.0 | 80.1 | 0.948 | 0.664 | 50.8 | 83.4 | 83.4 | 0.580 | 0.722 |
+| Self-MM | 45.8 | 84.9 | 84.8 | 0.731 | 0.785 | 53.0 | 85.2 | 85.2 | 0.540 | 0.763 |
+| AtCAF† | 46.5 | 88.6 | 88.5 | 0.650 | 0.831 | 55.9 | 87.0 | 86.8 | 0.508 | 0.785 |
+| DLF† | 47.1 | 85.1 | 85.0 | 0.731 | 0.781 | 53.9 | 85.4 | 85.3 | 0.536 | 0.764 |
+| KuDA† | 47.1 | 86.4 | 86.5 | 0.705 | 0.795 | 52.9 | 86.5 | 86.6 | 0.529 | 0.776 |
+| DEVA† | 46.3 | 86.3 | 86.3 | 0.730 | 0.787 | 52.3 | 86.1 | 86.2 | 0.541 | 0.769 |
+| C-MIB | 47.7 | 87.8 | 87.8 | 0.662 | 0.835 | 52.7 | 86.9 | 86.8 | 0.542 | 0.784 |
+| ITHP | 47.7 | 88.5 | 88.5 | 0.663 | 0.856 | 52.2 | 87.1 | 87.1 | 0.550 | 0.792 |
+| Multimodal Boosting | 49.1 | 88.5 | 88.4 | 0.634 | 0.855 | 54.0 | 86.5 | 86.5 | 0.523 | 0.779 |
+| CaMIB† | 48.0 | 89.8 | **89.8** | 0.616 | 0.857 | 53.5 | 87.3 | 87.2 | 0.517 | 0.788 |
+| DMD | 44.9 | 84.3 | 84.3 | 0.726 | 0.788 | 52.8 | 84.6 | 84.6 | 0.538 | 0.768 |
+| EMOE | 45.2 | 84.8 | 84.8 | 0.723 | 0.790 | 52.5 | 85.0 | 85.0 | 0.542 | 0.760 |
+| TMSON† | 47.4 | 87.2 | 87.2 | 0.687 | 0.809 | 55.6 | 86.4 | 86.2 | 0.526 | 0.766 |
+| MOAC† | 48.6 | 89.0 | 89.0 | **0.605** | **0.857** | 54.3 | **87.6** | **87.6** | 0.512 | **0.793** |
+| **InfoGate (Ours)** | — | — | — | — | — | — | — | — | — | — |
 
-## 3. Results
+### CH-SIMS v2
 
-### CMU-MOSI (dev-score checkpoint selection)
+| Baseline | Acc5↑ | Acc3↑ | Acc2↑ | F1↑ | MAE↓ | Corr↑ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| EF-LSTM | 53.7 | 73.5 | 80.1 | 80.0 | 0.309 | 0.700 |
+| LF-DNN | 51.8 | 71.2 | 77.8 | 77.9 | 0.322 | 0.668 |
+| TFN | 53.3 | 70.9 | 78.1 | 78.1 | 0.322 | 0.662 |
+| LMF | 51.6 | 70.0 | 77.8 | 77.8 | 0.327 | 0.651 |
+| MFN | **55.4** | 72.7 | 79.4 | 79.4 | 0.301 | 0.712 |
+| Graph-MFN | 48.9 | 68.6 | 76.6 | 76.6 | 0.334 | 0.644 |
+| MISA | 47.5 | 68.9 | 78.2 | 78.3 | 0.342 | 0.671 |
+| MAG-BERT | 49.2 | 70.6 | 77.1 | 77.1 | 0.346 | 0.641 |
+| Self-MM | 53.5 | 72.7 | 78.7 | 78.6 | 0.315 | 0.691 |
+| MMIM | 50.5 | 70.4 | 77.8 | 77.8 | 0.339 | 0.641 |
+| AV-MC | 52.1 | 73.2 | 80.6 | 80.7 | 0.301 | 0.721 |
+| KuDA† | 53.1 | **74.3** | 80.2 | 80.1 | **0.289** | **0.741** |
+| **InfoGate (Ours)** | — | — | — | — | — | — |
 
-| Method | Acc7↑ | Acc2↑ | F1↑ | MAE↓ | Corr↑ |
-|--------|-------|-------|-----|------|-------|
-| ITHP (ICLR 2024) | 47.7 | 88.5 | 88.5 | 0.663 | 0.856 |
-| CaMIB (ICLR 2026 sub.) | 48.0 | 89.8 | 89.8 | 0.616 | 0.857 |
-| MOAC (WWW 2025) | 48.6 | 89.0 | 89.0 | 0.605 | 0.857 |
-| Multimodal Boosting | 49.1 | 88.5 | 88.4 | 0.634 | 0.855 |
-| **InfoGate (Ours)** | **51.15** | 88.09 | 88.06 | **0.5977** | **0.8629** |
+**Bold** in baseline rows matches the LaTeX table emphasis in `baseline_table.tex` (best-in-column style marks).
 
-**State-of-the-art on MAE, Acc7, and Corr.** Competitive on Acc2 and F1.
+## HKT-aligned classification (UR-FUNNY / MUStARD)
 
-## 4. Discussion
+The MHD (UR-FUNNY humor) and MSD (MUStARD sarcasm) pipelines now follow the
+data / text-tower conventions from the HKT family
+([matalvepu/HKT](https://github.com/matalvepu/HKT)) and the classification
+setup described in MOAC (WWW 2025). Only the classification path is
+affected; the regression path (MOSI / MOSEI / CH-SIMS v2) remains on
+DeBERTa-v3 + 3-modality InfoGate.
 
-### 4.1 Contributions
+Changes versus the earlier classification setup:
 
-1. **IB-Guided Cross-Attention:** Using IB uncertainty to modulate attention scores and values, providing principled token-level noise filtering in cross-modal interaction.
-2. **Alignment-Modulated Injection:** Leveraging bottleneck-space cosine similarity as a sample-level consistency check before cross-modal injection, addressing the "two-sided" nature of auxiliary modalities.
-3. **Sentiment-Aware Contrastive Learning (L_sac):** Structuring the bottleneck space according to inter-sample sentiment distance, complementing the intra-sample cross-modal alignment achieved by cyclic IB.
+- **Text backbone**: `albert-base-v2` (see `./albert-base-v2/`). `train_classify.py`
+  and `test_classify.py` default `--model` to this directory.
+- **HKT feature slicing**: acoustic `[:, 0:60]`, visual `[:, 55:91]`
+  (`ACOUSTIC_DIM = 60`, `VISUAL_DIM = 36`). HCF has 4 dims.
+  See `global_configs.set_dataset_config("ur_funny" | "mustard")`.
+- **HCF as a 4th modality**: `data_humor.build_humor_loaders(..., hcf_dim=4)`
+  emits a 5-tensor batch `(input_ids, visual, acoustic, hcf, label)`.
+  `infogate_modules.InfoGate` with `hcf_dim > 0` routes HCF through its own
+  projector + IB encoder + a 4-way `MSelector` (slot order: `a, t, v, h`).
+- **Loss**: unchanged — BCE + InfoGate IB terms, two-stage curriculum, EMA
+  evaluation.
 
-### 4.2 Ablation Evidence
+Launch:
 
-| Configuration | MAE | Acc7 |
-|--------------|-----|------|
-| Full InfoGate | **0.5977** | **51.15%** |
-| w/o Alignment Modulation | 0.6093 | 48.85% |
-| w/o L_sac | 0.6061 | 48.55% |
-| w/o L_tran (CRA) | 0.6099 | 49.77% |
+```bash
+# Single run
+./train_humor.sh ur_funny 64 50 8 16
+./train_humor.sh mustard 77 40 10 8
 
-### 4.3 Limitations
+# Optuna (HKT-aligned). Default RUN_TAG now carries `_albert_hcf`.
+ONLY=ur_funny ./run_optuna_classify.sh
+ONLY=mustard  ./run_optuna_classify.sh
+./run_optuna_ur_funny_v2.sh        # UR-FUNNY-only, tightened space
+```
 
-- Acc2/F1 (88.09%/88.06%) still below CaMIB (89.8%) and MOAC (89.0%), primarily due to the model's stronger regression focus over binary classification.
-- Evaluated only on MOSI; MOSEI evaluation pending.
-- The model contains legacy parameters (reverse_proj) from an earlier InfoNCE design that cannot be removed without disrupting the initialization chain.
+Prior UR-FUNNY Optuna DBs (e.g. `optuna_classify_ur_funny_v2_20260424_*`,
+best Acc 0.7586) used DeBERTa + no HCF + 81/91 dims. Those study DBs are
+kept for history under `logs/optuna/4090D_restart/classification/` (older
+`logs/optuna_classify_*` paths are symlinks there) but are **not directly
+comparable** to the new `_albert_hcf` studies — start fresh rather than
+resuming with `--enqueue_top_from`.
 
-### 4.4 Future Work
+## Repository Layout
 
-- Evaluation on CMU-MOSEI and missing-modality protocols (CRA infrastructure already in place).
-- Segment-level modality selection for longer sequences.
-- Investigation of the initialization sensitivity issue in HuggingFace-based models.
+```text
+deberta_infogate.py      DeBERTa wrapper that attaches InfoGate
+infogate_modules.py      IB encoders, MSelector, InfoGate layers, losses
+train.py                 main training entry point
+test.py                  complete-modality evaluation entry point
+train.sh                 default nohup launcher
+test.sh                  evaluation wrapper
+reproduce.sh             tuned MOSI reproduction command
+datasets/                expected location for mosi.pkl and mosei.pkl
+deberta-v3-base/         local DeBERTa files used by from_pretrained
+```
 
 ## Setup
 
 ### Requirements
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### Data
-Place `mosi.pkl` / `mosei.pkl` in `datasets/` (or symlink).
 
-### Model
-Place DeBERTa-v3-base files in `deberta-v3-base/`.
+Place the processed dataset files in `datasets/`:
 
-### Train
+- `datasets/mosi.pkl`
+- `datasets/mosei.pkl`
+
+### Backbone
+
+Place the local DeBERTa-v3-base model files in `deberta-v3-base/`.
+
+## Training
+
+### Default branch configuration
+
+This is the simplest way to launch training with the branch's current default setup:
+
 ```bash
-python train.py --dataset mosi --n_epochs 80 --stage1_epochs 12 \
-    --train_batch_size 16 --gradient_accumulation_step 2 \
-    --learning_rate 1.14e-5 --ig_learning_rate 1.93e-4 \
-    --bottleneck_dim 96 --num_infogate_layers 4 \
-    --beta_ib 15.6 --gamma_cyc 0.582 --alpha_ib 0.00227 \
-    --alpha_sac 0.02 --mse_weight 0.67 \
-    --dropout_prob 0.195 --weight_decay 0.005 --seed 42
+./train.sh mosi
+./train.sh mosei
 ```
 
-### Test
+Defaults in `train.sh`:
+
+- `n_epochs=80`
+- `stage1_epochs=8`
+- `train_batch_size=16`
+- `bottleneck_dim=128`
+- `num_infogate_layers=3`
+- `beta_ib=16`
+- `alpha_ib=0.005`
+- `dropout_prob=0.25`
+- `seed=42`
+
+The script launches `train.py` with `nohup` and writes logs under `logs/`.
+
+### Direct training command
+
+If you want full control over paths or hyperparameters, call `train.py` directly:
+
 ```bash
-python test.py --dataset mosi --checkpoint checkpoints/infogate_mosi_best.pt
+python train.py \
+    --dataset mosei \
+    --n_epochs 80 \
+    --stage1_epochs 8 \
+    --train_batch_size 16 \
+    --gradient_accumulation_step 2 \
+    --learning_rate 2e-5 \
+    --ig_learning_rate 5e-4 \
+    --unified_dim 256 \
+    --ib_hidden_dim 256 \
+    --bottleneck_dim 128 \
+    --num_heads 4 \
+    --num_infogate_layers 3 \
+    --beta_ib 16 \
+    --alpha_ib 0.005 \
+    --mse_weight 0.5 \
+    --dropout_prob 0.25 \
+    --weight_decay 0.01 \
+    --ema_decay 0.999 \
+    --ema_start_epoch 5 \
+    --checkpoint_dir checkpoints \
+    --seed 42
 ```
+
+### Tuned MOSI reproduction command
+
+`reproduce.sh` keeps an older MOSI-specific configuration with a smaller bottleneck and
+more InfoGate layers:
+
+```bash
+./reproduce.sh
+```
+
+That script is useful when you want to replay the earlier tuned MOSI setup rather than the
+current branch defaults.
+
+## Evaluation
+
+### Default evaluation wrapper
+
+```bash
+./test.sh mosi checkpoints/infogate_mosi_best.pt
+./test.sh mosei checkpoints/infogate_mosei_best.pt
+```
+
+### Evaluate the latest local complete-only rerun
+
+```bash
+python test.py --dataset mosi --checkpoint checkpoints_completeonly_20260402/infogate_mosi_best.pt
+python test.py --dataset mosei --checkpoint checkpoints_completeonly_20260402/infogate_mosei_best.pt
+```
+
+`test.py` prints only the complete-modality result block in this branch.
+
+## Practical Notes
+
+- `*.pt`, `logs/`, and `checkpoints/` are not intended to be versioned.
+- Older logs may contain `pred_std=nan` on a single-sample tail batch; this was a logging-only statistics issue and does not indicate training collapse.
+- If you want to compare branch behavior, use the logs in `logs/completeonly_20260402/` as the latest clean reference for this branch.
 
 ## License
 

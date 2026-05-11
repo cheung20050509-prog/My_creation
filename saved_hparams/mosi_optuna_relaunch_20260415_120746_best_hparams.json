@@ -1,0 +1,60 @@
+{
+  "exported_at": "2026-04-18T03:43:20.866620+00:00",
+  "run_tag": "optuna_relaunch_20260415_120746",
+  "note": "Best dev-MAE trials before MOSI mse_weight upper bound extended to 3.5 (search code change).",
+  "optuna_dbs": {
+    "stage1": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/logs/optuna_relaunch_20260415_120746/db/mosi_infogate_mosi_optuna_relaunch_20260415_120746_s1_random.db",
+    "stage2": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/logs/optuna_relaunch_20260415_120746/db/mosi_infogate_mosi_optuna_relaunch_20260415_120746_s2_local.db"
+  },
+  "best_stage1": {
+    "study_name": "infogate_mosi_optuna_relaunch_20260415_120746_s1_random",
+    "trial_number": 32,
+    "dev_mae": 0.6069,
+    "params": {
+      "batch_config": 2,
+      "n_epochs": 115,
+      "learning_rate": 1.0593561668826041e-05,
+      "ig_learning_rate": 0.0001473369513612008,
+      "beta_ib": 38.499038084162706,
+      "num_infogate_layers": 5,
+      "bottleneck_dim": 96,
+      "mse_weight": 0.06368761169688675,
+      "dropout_prob": 0.14461880440428465,
+      "alpha_ib": 0.003407950325009392,
+      "stage1_epochs": 15,
+      "warmup_proportion": 0.03906440984467158,
+      "weight_decay": 0.0029318565168286056,
+      "ema_decay": 0.99
+    },
+    "user_attrs": {}
+  },
+  "best_stage2": {
+    "study_name": "infogate_mosi_optuna_relaunch_20260415_120746_s2_local",
+    "trial_number": 125,
+    "dev_mae": 0.6009,
+    "params": {
+      "batch_config": 2,
+      "n_epochs": 84,
+      "learning_rate": 2.2780012689502398e-05,
+      "ig_learning_rate": 0.0002085608088520646,
+      "beta_ib": 18.065708467207386,
+      "num_infogate_layers": 4,
+      "bottleneck_dim": 128,
+      "mse_weight": 1.98775896854932,
+      "dropout_prob": 0.28917300638144333,
+      "alpha_ib": 0.001504853326002874,
+      "stage1_epochs": 18,
+      "warmup_proportion": 0.056500335605821024,
+      "weight_decay": 0.004122525977063331,
+      "ema_decay": 0.995
+    },
+    "user_attrs": {}
+  },
+  "global_best_label": "stage2",
+  "global_best_trial_number": 125,
+  "global_best_dev_mae": 0.6009,
+  "train_log_guess": {
+    "stage1": ".../train_logs/mosi_s1_random_trial_32.log",
+    "stage2": ".../train_logs/mosi_s2_local_trial_125.log"
+  }
+}

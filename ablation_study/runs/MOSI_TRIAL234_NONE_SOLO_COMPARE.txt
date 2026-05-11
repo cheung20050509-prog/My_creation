@@ -1,0 +1,21 @@
+Solo none run (nohup): compare to frozen baseline log
+
+Frozen reference:
+  My_creation/fixed_experiment/runs/mosi_trial234/train.log
+
+Solo output (default from run_none_solo_frozen_align_nohup.sh):
+  My_creation/ablation_study/runs/mosi_trial234_none_solo/train.log
+
+Quick checks (run from My_creation/):
+
+  # Epoch 1 loss block (should match frozen line-by-line if code + env align)
+  sed -n '/^Epoch 1\/98/,/^Epoch 2\/98/p' fixed_experiment/runs/mosi_trial234/train.log | head -15
+  sed -n '/^Epoch 1\/98/,/^Epoch 2\/98/p' ablation_study/runs/mosi_trial234_none_solo/train.log | head -15
+
+  # Best Results block (frozen targets: Selection score 0.574584, Test MAE 0.5944, ...)
+  grep -A8 '^Best Results' fixed_experiment/runs/mosi_trial234/train.log
+  grep -A8 '^Best Results' ablation_study/runs/mosi_trial234_none_solo/train.log
+
+PID / meta:
+  ablation_study/runs/mosi_trial234_none_solo/nohup.pid
+  ablation_study/runs/mosi_trial234_none_solo/nohup.meta

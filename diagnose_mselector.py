@@ -108,7 +108,7 @@ def analyze_mselector(model, loader, dataset_name):
     original_forward = infogate.forward
 
     def hooked_forward(text, acoustic, visual, labels=None, stage=1,
-                       attention_mask=None, modality_mask=None):
+                       attention_mask=None):
         Bs, T = text.size(0), text.size(1)
         device = text.device
 
@@ -116,8 +116,6 @@ def analyze_mselector(model, loader, dataset_name):
             tok_mask = torch.ones(Bs, T, device=device, dtype=text.dtype)
         else:
             tok_mask = attention_mask.float()
-        if modality_mask is None:
-            modality_mask = torch.ones(Bs, 3, device=device, dtype=text.dtype)
 
         F_t = infogate.proj_t(text)
         F_a = infogate.proj_a(acoustic)
@@ -132,15 +130,17 @@ def analyze_mselector(model, loader, dataset_name):
 
         # MSelector
         B_a_w, B_l_w, B_v_w, weights, primary_idx = infogate.mselector(
-            B['a'], B['t'], B['v'])
+            B['a'], B['t'], B['v'], tok_mask)
 
         # Collect data
         all_weights.append(weights.detach().cpu())
         all_primary_idx.append(primary_idx.detach().cpu())
 
         # Continue with original logic
-        return original_forward(text, acoustic, visual, labels=labels, stage=stage,
-                                attention_mask=attention_mask, modality_mask=modality_mask)
+        return original_forward(
+            text, acoustic, visual, labels=labels, stage=stage,
+            attention_mask=attention_mask,
+        )
 
     infogate.forward = hooked_forward
 
@@ -215,10 +215,7 @@ def load_model_from_ckpt(ckpt_path, dataset_name):
         args.num_infogate_layers = 3
         args.dropout_prob = 0.1
         args.beta_ib = 32
-        args.gamma_cyc = 1.0
         args.alpha_ib = 0.01
-        args.cra_layers = 8
-        args.cra_dims = [64, 32, 16]
 
     model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
         MODEL_DIR, multimodal_config=args, num_labels=1)
