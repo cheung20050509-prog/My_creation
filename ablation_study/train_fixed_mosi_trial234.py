@@ -40,7 +40,7 @@ def main() -> int:
             "no_conf_gating",
             "no_adaptive_gate",
         ),
-        help="PRISM-style architectural switch (same trial234 knobs otherwise).",
+        help="PRISM ablation: ``no_mselector``=w/o DPR, ``no_ib``=w/o VTB (same trial234 knobs otherwise).",
     )
     ap.add_argument(
         "--checkpoint-dir",

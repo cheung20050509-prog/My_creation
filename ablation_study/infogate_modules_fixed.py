@@ -6,6 +6,10 @@ fixed run bit-for-bit at the module level. Re-sync from fixed_experiment when th
 InfoGate: Information Bottleneck-Guided Adaptive Cross-Attention
 for Robust Multimodal Fusion
 
+Paper terminology (PRISM): **VTB** — variational token bottleneck per modality
+(implemented by ``IBEncoder`` / ``ib_enc_*``). **DPR** — differentiable primary router
+(Gumbel routing on bottleneck sequences; class ``MSelector`` / attr ``mselector``).
+
 Addresses four limitations of PCCA (MODS, AAAI 2026):
 L1. Unfiltered cross-attention         -> IB bottleneck filtering
 L2. Equal-weight auxiliary fusion       -> Adaptive information gates
@@ -32,7 +36,7 @@ def masked_sequence_mean(tensor, mask=None):
 
 class IBEncoder(nn.Module):
     """
-    Information Bottleneck Encoder.
+    Variational token bottleneck (VTB) block: Information Bottleneck Encoder.
     F_u -> (mu, logvar) -> B via reparameterization.
     Additionally returns per-token confidence: conf = sigma(-logvar).
     """
@@ -110,8 +114,8 @@ class IBGuidedMultiHeadAttention(nn.Module):
       2. Value gating: V_eff = V * conf_V
          -> uncertain value positions contribute less to the output
 
-    The confidence signal conf = sigma(-logvar) comes from the IB encoder,
-    which is trained to minimize I(B; X) while maximizing I(B; Y).  Tokens
+    The confidence signal conf = sigma(-logvar) comes from the VTB (``IBEncoder``)
+    variance: trained to minimize I(B; X) while maximizing I(B; Y). Tokens
     with high logvar (high uncertainty) are therefore task-irrelevant.
     """
     def __init__(self, hidden_dim, num_heads=4, dropout=0.1):
@@ -134,7 +138,7 @@ class IBGuidedMultiHeadAttention(nn.Module):
             query:          [B, T_q, D]
             key:            [B, T_k, D]
             value:          [B, T_k, D]
-            key_confidence: [B, T_k, D] from IB encoder, or None for standard attention
+            key_confidence: [B, T_k, D] from VTB (IB encoder), or None for standard attention
         """
         B = query.size(0)
 
@@ -343,12 +347,13 @@ class InfoGateModule(nn.Module):
 
 
 # ============================================================
-# MSelector (from MODS)
+# DPR — Differentiable Primary Router (class name ``MSelector``; MODS-inspired)
 # ============================================================
 
 class MSelector(nn.Module):
-    """Dynamic primary modality selector with Gumbel-Softmax (Level 2).
+    """Differentiable Primary Router (DPR): dynamic primary modality with Gumbel-Softmax.
 
+    Operates on **VTB bottleneck** sequences (not raw MODS-style pooled features).
     Training: Gumbel-Softmax with straight-through hard samples → differentiable
     Inference: deterministic argmax
 
@@ -448,8 +453,8 @@ class InfoGate(nn.Module):
     Pipeline:
         text / acoustic / visual
           -> Unimodal Projectors  (unified space)
-          -> IB Encoders          (bottleneck + confidence)
-          -> MSelector            (dynamic primary selection)
+          -> VTB (``IBEncoder``)  (bottleneck + per-token confidence)
+          -> DPR (``MSelector``)  (sample-wise primary routing)
           -> InfoGate Module      (IB-guided cross-attention with adaptive gates)
           -> Aggregation + MLP    (sentiment prediction)
 
@@ -488,7 +493,7 @@ class InfoGate(nn.Module):
         self.use_hcf = hcf_dim > 0
         # Loop-order for decoders / label preds (matches original naming: t, a, v).
         self.modalities = ('t', 'a', 'v', 'h') if self.use_hcf else ('t', 'a', 'v')
-        # Slot-order for MSelector weights and routing (matches original: a, l, v).
+        # Slot-order for DPR (``MSelector``) weights and routing (matches original: a, l, v).
         self.modality_order = ('a', 't', 'v', 'h') if self.use_hcf else ('a', 't', 'v')
         num_modalities = len(self.modalities)
         num_aux = num_modalities - 1
@@ -507,7 +512,7 @@ class InfoGate(nn.Module):
                 nn.LayerNorm(hcf_dim),
                 nn.Linear(hcf_dim, unified_dim), nn.ReLU(), nn.Dropout(dropout))
 
-        # --- 2. IB encoders ---
+        # --- 2. VTB encoders (variational token bottleneck; ``IBEncoder``) ---
         self.ib_enc_t = IBEncoder(unified_dim, ib_hidden, bn_dim, dropout)
         self.ib_enc_a = IBEncoder(unified_dim, ib_hidden, bn_dim, dropout)
         self.ib_enc_v = IBEncoder(unified_dim, ib_hidden, bn_dim, dropout)
@@ -520,7 +525,7 @@ class InfoGate(nn.Module):
             for m in self.modalities
         })
 
-        # --- 5. MSelector ---
+        # --- 5. DPR router (``MSelector``; Gumbel on VTB sequences) ---
         self.gumbel_tau = args.get('gumbel_tau', 1.0)
         self.mselector = MSelector(bn_dim, num_modalities=num_modalities,
                                     gumbel_tau=self.gumbel_tau)
@@ -671,7 +676,7 @@ class InfoGate(nn.Module):
 
         The primary branch is a soft-weighted mix of all modalities via
         ``primary_onehot``. Auxiliary branches are the remaining ``N - 1``
-        streams, sorted by descending MSelector weight.
+        streams, sorted by descending DPR soft routing weight.
         """
         Bs = primary_idx.size(0)
         dev = primary_idx.device
@@ -747,7 +752,7 @@ class InfoGate(nn.Module):
             F_h = self.proj_h(hcf)
             F_dict['h'] = F_h
 
-        # 2. IB encode ------------------------------------------------
+        # 2. VTB encode (per-modality IB bottleneck) -----------------
         B_t, mu_t, lv_t, conf_t = self.ib_enc_t(F_t)
         B_a, mu_a, lv_a, conf_a = self.ib_enc_a(F_a)
         B_v, mu_v, lv_v, conf_v = self.ib_enc_v(F_v)
@@ -777,7 +782,7 @@ class InfoGate(nn.Module):
         else:
             L_lib = zero
 
-        # 7. MSelector (slot order = self.modality_order) -------------
+        # 7. DPR routing (``self.mselector``; slot order = self.modality_order) ---
         if self.use_hcf:
             _, _, _, _, weights, primary_onehot, primary_idx = self.mselector.forward4(
                 B['a'], B['t'], B['v'], B['h'], tok_mask)

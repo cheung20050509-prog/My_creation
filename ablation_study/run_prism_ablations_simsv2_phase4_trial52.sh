@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SIMSv2 phase4 trial 52: six PRISM --ablation modes, separate runs/*/ dirs.
-# Multi-GPU: each physical GPU can run a different number of concurrent trainings;
-# wait for the whole batch, then the next chunk (parallel within batch, ordered across batches).
+# Multi-GPU: **default = one training process per GPU** per wave; next wave after the wave
+# completes. Override JOBS_PER_GPU for multi-job-per-card.
 #
 # Baseline (--ablation none) certification vs Optuna gold log and fixed_experiment reproduce:
 #   logs/optuna/4090D_restart/phase4/train_logs/simsv2_phase4_trial_52.log
@@ -14,7 +14,7 @@
 #   GPU_LIST       "0,1" — if unset and nvidia-smi reports 2 GPUs, uses GPUs 0 and 1
 #   JOBS_PER_GPU   single int (same on every GPU), or per-GPU list matching GPU_LIST length,
 #                  e.g. "2,1" → two processes on GPU0, one on GPU1.
-#                  Unset with GPUs [0,1]: defaults to 2,1
+#                  Unset: **1 job per GPU** (1,1,…).
 #   EXCLUDE_GPUS   used only when auto-selecting GPUs on machines with != 2 GPUs (unset → default 1)
 set -euo pipefail
 MY_CREATION="$(cd "$(dirname "$0")/.." && pwd)"
@@ -88,7 +88,7 @@ if [[ "${JOBS_PER_GPU+x}" && "$JOBS_PER_GPU" == *","* ]]; then
     fi
   done
 elif [[ ! "${JOBS_PER_GPU+x}" ]] && [[ "$NUM_GPUS" -eq 2 ]] && [[ "${GPU_IDS[0]}" == "0" ]] && [[ "${GPU_IDS[1]}" == "1" ]]; then
-  JOBS_ARR=(2 1)
+  JOBS_ARR=(1 1)
 elif [[ "${JOBS_PER_GPU+x}" ]]; then
   j="${JOBS_PER_GPU}"
   if ! validate_int "$j"; then
@@ -99,7 +99,7 @@ elif [[ "${JOBS_PER_GPU+x}" ]]; then
     JOBS_ARR+=("$j")
   done
 else
-  j=2
+  j=1
   for ((i = 0; i < NUM_GPUS; i++)); do
     JOBS_ARR+=("$j")
   done

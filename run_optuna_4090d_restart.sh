@@ -38,7 +38,8 @@
 #
 # Optional env (defaults in-script): MOSI_N_EPOCHS_CAP, MOSI_EARLY_STOP_PATIENCE;
 # SIMSV2_N_EPOCHS_CAP, SIMSV2_EARLY_STOP_PATIENCE (phase4 / phase5_simsv2 only).
-# Resume trial budget: MOSI_MICRO_N_TRIALS (phase4_mosi|phase5_mosi), SIMSV2_N_TRIALS (phase4|phase5_simsv2).
+# Resume trial budget: MOSI_MICRO_N_TRIALS (phase4_mosi|phase5_mosi) and SIMSV2_N_TRIALS
+# are **target totals** (COMPLETE+PRUNED+FAIL+RUNNING in the study); set to (existing+N) to add N trials.
 # New Optuna study name (same DB file allows multiple studies): set MOSI_STUDY_NAME / SIMSV2_STUDY_NAME,
 # or MOSI_STUDY_SUFFIX / SIMSV2_STUDY_SUFFIX (appended to default name) when parameter distributions changed.
 # Parallel two drivers: wrap each in `( cd .../My_creation && ONLY=... ./run_optuna_4090d_restart.sh ... ) &`

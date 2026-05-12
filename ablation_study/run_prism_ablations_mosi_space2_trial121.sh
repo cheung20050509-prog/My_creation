@@ -2,8 +2,8 @@
 # MOSI phase4_mosi_space2 trial121 (Best Test MAE 0.5939): six PRISM --ablation modes.
 # Hyperparameters from Optuna study infogate_mosi_phase4_mosi_4090d_space2, trial 121.
 #
-# Same scheduling notes as run_prism_ablations_mosi_trial234.sh: use JOBS_PER_GPU=1 with
-# dual GPUs so baseline none does not share a card with another training in the same wave.
+# Same scheduling as run_prism_ablations_mosi_trial234.sh: default **one job per GPU** per wave
+# (unset JOBS_PER_GPU on two cards → 1,1). Set JOBS_PER_GPU explicitly to override.
 #
 # Env: GPU_LIST, JOBS_PER_GPU, EXCLUDE_GPUS — see run_prism_ablations_mosi_trial234.sh
 set -euo pipefail
@@ -78,7 +78,7 @@ if [[ "${JOBS_PER_GPU+x}" && "$JOBS_PER_GPU" == *","* ]]; then
     fi
   done
 elif [[ ! "${JOBS_PER_GPU+x}" ]] && [[ "$NUM_GPUS" -eq 2 ]] && [[ "${GPU_IDS[0]}" == "0" ]] && [[ "${GPU_IDS[1]}" == "1" ]]; then
-  JOBS_ARR=(2 1)
+  JOBS_ARR=(1 1)
 elif [[ "${JOBS_PER_GPU+x}" ]]; then
   j="${JOBS_PER_GPU}"
   if ! validate_int "$j"; then
@@ -89,7 +89,7 @@ elif [[ "${JOBS_PER_GPU+x}" ]]; then
     JOBS_ARR+=("$j")
   done
 else
-  j=2
+  j=1
   for ((i = 0; i < NUM_GPUS; i++)); do
     JOBS_ARR+=("$j")
   done

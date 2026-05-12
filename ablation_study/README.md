@@ -2,7 +2,7 @@
 
 Prepared by mirroring [`fixed_experiment/`](../fixed_experiment/) into this directory; launcher paths use `ablation_study/` so runs stay isolated under `ablation_study/runs/`. CLI float formatting matches `optuna_search_v2.objective()` so parsed learning rates match the gold Optuna train log headers.
 
-**Environment:** use conda env **`ITHP5090`** with **`transformers==4.29.2`** (same stack as `fixed_experiment`). DeBERTa loads via `from_pretrained` on `My_creation/deberta-v3-base` (no meta-tensor workarounds). **Parallel:** `run_prism_ablations_*.sh` scripts use `GPU_LIST` / `JOBS_PER_GPU` for wave scheduling across six PRISM `--ablation` modes.
+**Environment:** use conda env **`ITHP5090`** with **`transformers==4.29.2`** (same stack as `fixed_experiment`). DeBERTa loads via `from_pretrained` on `My_creation/deberta-v3-base` (no meta-tensor workarounds). **Parallel:** `run_prism_ablations_*.sh` use `GPU_LIST` and optional `JOBS_PER_GPU`. **Default:** one training process per listed GPU per wave (`1,1,…` on multi-GPU); each wave runs in parallel, then the next wave starts. Set `JOBS_PER_GPU=2,1` (etc.) only if you intentionally want multiple jobs on one card.
 
 ## CMU-MOSI — Optuna trial 234
 

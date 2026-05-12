@@ -550,6 +550,7 @@ def main():
         tau = tau_s + (tau_e - tau_s) * epoch / max(args.n_epochs - 1, 1)
         m = model.module if hasattr(model, 'module') else model
         ig = m.albert.infogate
+        # DPR Gumbel temperature (``mselector``)
         ig.mselector.gumbel_tau = tau
 
         ib_mult = ib_loss_multiplier(

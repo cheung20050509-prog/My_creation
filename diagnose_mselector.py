@@ -1,10 +1,10 @@
 """
-Diagnostic script: analyze MSelector primary modality distribution
-on MOSI and MOSEI test sets using saved checkpoints.
+Diagnostic script: analyze DPR (Differentiable Primary Router; ``mselector``)
+primary-modality distribution on MOSI and MOSEI test sets using saved checkpoints.
 
 Reports:
   - Per-sample primary_idx distribution (0=acoustic, 1=language, 2=visual)
-  - Mean MSelector weights [w_a, w_l, w_v]
+  - Mean DPR soft weights [w_a, w_l, w_v]
   - Per-sample weight statistics
 """
 
@@ -96,15 +96,14 @@ def load_data(dataset_name):
 
 
 def analyze_mselector(model, loader, dataset_name):
-    """Run inference and collect MSelector statistics."""
+    """Run inference and collect DPR (``mselector``) routing statistics."""
     model.eval()
     infogate = model.dberta.infogate  # access the InfoGate module
 
     all_weights = []
     all_primary_idx = []
 
-    # Hook into the forward to capture MSelector outputs
-    # We'll monkey-patch the forward temporarily
+    # Hook forward to capture DPR (``mselector``) outputs before full fusion.
     original_forward = infogate.forward
 
     def hooked_forward(text, acoustic, visual, labels=None, stage=1,
@@ -128,7 +127,7 @@ def analyze_mselector(model, loader, dataset_name):
         B = {'t': B_t, 'a': B_a, 'v': B_v}
         conf = {'t': conf_t, 'a': conf_a, 'v': conf_v}
 
-        # MSelector
+        # DPR routing on VTB bottlenecks
         B_a_w, B_l_w, B_v_w, weights, primary_idx = infogate.mselector(
             B['a'], B['t'], B['v'], tok_mask)
 
@@ -161,7 +160,7 @@ def analyze_mselector(model, loader, dataset_name):
     all_primary_idx = torch.cat(all_primary_idx, dim=0).numpy()  # [N]
 
     print(f"\n{'='*60}")
-    print(f"MSelector Analysis for {dataset_name.upper()} test set")
+    print(f"DPR (mselector) analysis for {dataset_name.upper()} test set")
     print(f"  Total samples: {len(all_primary_idx)}")
     print(f"{'='*60}")
 
@@ -176,7 +175,7 @@ def analyze_mselector(model, loader, dataset_name):
         print(f"  {names[idx]:20s}: {count:5d} ({pct:5.1f}%) {bar}")
 
     # Weight statistics
-    print(f"\nMSelector Weight Statistics [w_acoustic, w_language, w_visual]:")
+    print(f"\nDPR soft-weight statistics [w_acoustic, w_language, w_visual]:")
     print(f"  Mean:   [{all_weights[:, 0].mean():.4f}, {all_weights[:, 1].mean():.4f}, {all_weights[:, 2].mean():.4f}]")
     print(f"  Std:    [{all_weights[:, 0].std():.4f}, {all_weights[:, 1].std():.4f}, {all_weights[:, 2].std():.4f}]")
     print(f"  Min:    [{all_weights[:, 0].min():.4f}, {all_weights[:, 1].min():.4f}, {all_weights[:, 2].min():.4f}]")

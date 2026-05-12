@@ -78,6 +78,7 @@ parser.add_argument("--disable_l_lib", action="store_true",
                     help="Ablate the label-level IB loss.")
 parser.add_argument("--disable_l_rib", action="store_true",
                     help="Ablate the routing IB prior loss.")
+# Paper mapping: ``no_mselector`` -> w/o DPR; ``no_ib`` -> w/o VTB (identifiers kept for checkpoints/CLI).
 ABLATION_CHOICES = (
     "none",
     "no_infogate",
@@ -91,7 +92,7 @@ parser.add_argument(
     type=str,
     default="none",
     choices=ABLATION_CHOICES,
-    help="PRISM-style architectural ablation (frozen recipe otherwise).",
+    help="PRISM ablation: ``no_mselector``=w/o DPR, ``no_ib``=w/o VTB (frozen recipe otherwise).",
 )
 parser.add_argument("--mse_weight", type=float, default=0.5)
 
@@ -554,7 +555,7 @@ def main():
         tau_s = getattr(args, 'gumbel_tau_start', 1.0)
         tau_e = getattr(args, 'gumbel_tau_end', 0.5)
         tau = tau_s + (tau_e - tau_s) * epoch / max(args.n_epochs - 1, 1)
-        # Update tau on the model's MSelector
+        # Update tau on the model's DPR router (``mselector``)
         m = model.module if hasattr(model, 'module') else model
         ig = m.dberta.infogate if hasattr(m, 'dberta') else m.bert.infogate
         ig.mselector.gumbel_tau = tau
@@ -573,7 +574,7 @@ def main():
         detail_str = "  ".join(f"{k}={v:.4f}" for k, v in tr_detail.items()
                                 if k.startswith('L_'))
         print(f"  Detail  {detail_str}")
-        # Diagnostics: MSelector weights, primary selection, confidence, and prediction bounds
+        # Diagnostics: DPR weights, primary selection, confidence, and prediction bounds
         diag_keys = ['w_acoustic', 'w_language', 'w_visual',
                      'target_acoustic', 'target_language', 'target_visual',
                      'primary_a', 'primary_l', 'primary_v',

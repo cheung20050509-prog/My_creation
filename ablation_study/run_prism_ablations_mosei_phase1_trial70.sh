@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # MOSEI phase1 trial70: six PRISM --ablation modes, separate runs/*/ dirs.
-# Multi-GPU: each physical GPU can run a different number of concurrent trainings;
-# wait for the whole batch, then the next chunk (parallel within batch, ordered across batches).
-# Typical "one experiment per GPU": GPU_LIST=0,1 JOBS_PER_GPU=1,1
+# Multi-GPU: **default = one training process per GPU** (parallel within a wave); after the
+# wave finishes, the next wave starts (serial across waves). Override with JOBS_PER_GPU if
+# you want multiple jobs on one card (not recommended for baseline none vs gold).
+# Example two cards: unset JOBS_PER_GPU → uses GPUs 0,1 with 1+1 slots → 2 modes in parallel per wave.
 #
 # Baseline (--ablation none) certification vs frozen fixed_experiment/runs/mosei_phase1_trial70/train.log:
 #   Do NOT run none on a GPU shared with another training job in the same wave (e.g. avoid
@@ -13,8 +14,8 @@
 # Env:
 #   GPU_LIST       "0,1" — if unset and nvidia-smi reports 2 GPUs, uses GPUs 0 and 1
 #   JOBS_PER_GPU   single int (same on every GPU), or per-GPU list matching GPU_LIST length,
-#                  e.g. "2,1" → two processes on GPU0, one on GPU1.
-#                  Unset with GPUs [0,1]: defaults to 2,1
+#                  e.g. "2,1" → two processes on GPU0, one on GPU1 (legacy throughput layout).
+#                  Unset: defaults to **1 job per listed GPU** (1,1,…); two GPUs 0,1 → three waves of two.
 #   EXCLUDE_GPUS   used only when auto-selecting GPUs on machines with != 2 GPUs (unset → default 1)
 set -euo pipefail
 MY_CREATION="$(cd "$(dirname "$0")/.." && pwd)"
@@ -91,8 +92,8 @@ if [[ "${JOBS_PER_GPU+x}" && "$JOBS_PER_GPU" == *","* ]]; then
     fi
   done
 elif [[ ! "${JOBS_PER_GPU+x}" ]] && [[ "$NUM_GPUS" -eq 2 ]] && [[ "${GPU_IDS[0]}" == "0" ]] && [[ "${GPU_IDS[1]}" == "1" ]]; then
-  # Default when JOBS_PER_GPU unset and GPUs are 0,1: two ablations on GPU0, one on GPU1.
-  JOBS_ARR=(2 1)
+  # Default when JOBS_PER_GPU unset and GPUs are 0,1: **one ablation per GPU** (stable VRAM / reproducibility).
+  JOBS_ARR=(1 1)
 elif [[ "${JOBS_PER_GPU+x}" ]]; then
   j="${JOBS_PER_GPU}"
   if ! validate_int "$j"; then
@@ -103,7 +104,7 @@ elif [[ "${JOBS_PER_GPU+x}" ]]; then
     JOBS_ARR+=("$j")
   done
 else
-  j=2
+  j=1
   for ((i = 0; i < NUM_GPUS; i++)); do
     JOBS_ARR+=("$j")
   done

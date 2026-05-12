@@ -61,6 +61,10 @@ Full training is GPU-heavy—do not kick off long jobs unless the user asks.
 - Do **not** commit or rewrite massive logs/checkpoints; `.gitignore` already excludes typical artefacts.
 - For large refactors or ambiguous design, **explore/plan first**, then implement.
 
+## ACL / Overleaf 论文（兄弟目录）
+
+日常 cwd 在 **`My_creation`** 时，LaTeX 论文不在本目录，而在仓库同级的 **`../overleaf_69e83a58/`**（独立 git）。若任务涉及 **`acl_latex.tex` / `acl_lualatex.tex` / `custom.bib`** 或 ACL 排版，先阅读 **`../overleaf_69e83a58/CLAUDE.md`** 再改；必要时在该目录下执行编译，避免相对路径错乱。
+
 ## Model provider note
 
 Hosted LLM choice (e.g. DeepSeek) is configured in **your** Claude Code user/local settings, not in this file.

@@ -5,7 +5,7 @@ Independent from `optuna_search_v2.py` (which targets MOSI/MOSEI/SIMSV2 +
 
   - Drives `train_classify.py` (BCE + sigmoid) instead of `train.py`.
   - Selects on `binary_acc` (higher better); F1 used as secondary tiebreak.
-  - Drops regression-only `mse_weight`. MSelector Gumbel schedule (`gumbel_tau_*`)
+  - Drops regression-only `mse_weight`. DPR (``MSelector``) Gumbel schedule (`gumbel_tau_*`)
     is searched when ``search_tier >= 3`` (aligned with `optuna_search_v2.py`).
   - MUSTARD: two-stage Random -> TPE-local (small dev set, cheap trials).
   - UR-FUNNY: single-stage TPE (expensive trials, ~1-1.5h each).
@@ -14,7 +14,7 @@ HKT-aligned setup (as of the Albert+HCF migration):
   - Text backbone: ALBERT-base-v2 (see `train_classify.py --model` default,
     which points at `./albert-base-v2`).
   - Modalities fed to InfoGate: text + acoustic(60) + visual(36) + HCF(4),
-    i.e. the 4-modality InfoGate with MSelector + IB encoders.
+    i.e. the 4-modality InfoGate with DPR + per-modality VTB (``IBEncoder``).
   - HCF is routed as a 4th modality via `infogate_modules.InfoGate`
     (`hcf_dim=4`); dimensions come from `global_configs.set_dataset_config`.
 
@@ -97,7 +97,7 @@ LINEAR_FLOAT_BOUNDS = {
     "warmup_proportion":    (0.02, 0.25),
     "selector_target_temp": (0.30, 0.90),
     "selector_rib_weight":  (0.01, 0.15),
-    # Same as optuna_search_v2.py (Tier3 MSelector annealing endpoints).
+    # Same as optuna_search_v2.py (Tier3 DPR / ``MSelector`` annealing endpoints).
     "gumbel_tau_start":     (0.5, 2.0),
     "gumbel_tau_end":       (0.1, 1.0),
 }
