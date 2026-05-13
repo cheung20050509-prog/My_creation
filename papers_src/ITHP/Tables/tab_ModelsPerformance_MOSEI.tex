@@ -1,0 +1,29 @@
+\begin{wraptable}{r}{0.506\textwidth}
+\vspace{-0.26 cm}
+\setlength{\abovecaptionskip}{0.2 cm}
+\setlength{\belowcaptionskip}{-0.366 cm} 
+\centering
+\setlength\tabcolsep{5.06 pt}
+\begin{tabular}{lcccc}
+\multicolumn{5}{c}{\textbf{CMU-MOSEI}} \\
+\hline\hline
+\textbf{Task Metric} & $\textbf{BA}{\uparrow}$ & $\textbf{F1}{\uparrow}$ & $\textbf{MAE}{\downarrow}$ & $\textbf{Corr}{\uparrow}$ \\
+\midrule
+Self-MM$_b$ & 85.0 & 85.0 & 0.529 & 0.767 \\
+MMIM$_b$ & 86.0 & 86.0 & 0.526 & 0.772 \\
+MAG$_b$ & 84.8 & 84.7 & 0.543 & 0.755 \\
+
+Self-MM$_d$ & 65.3 & 65.4 & 0.813 & 0.208 \\
+MMIM$_d$ & 85.2 & 85.4 & 0.568 & 0.799 \\
+MAG$_d$ & 85.8 & 85.9 & 0.636 & 0.800 \\
+
+% \textcolor{blue}{UniMSE} & \textcolor{blue}{85.9} & \textcolor{blue}{85.8} & \textcolor{blue}{0.523} & \textcolor{blue}{0.773} \\
+% \textcolor{blue}{MIB} & \textcolor{blue}{86.2} & \textcolor{blue}{86.2} & \textcolor{blue}{0.584} & \textcolor{blue}{0.789} \\
+% \textcolor{blue}{BBFN} & \textcolor{blue}{86.2} & \textcolor{blue}{86.1} & \textcolor{blue}{0.529} & \textcolor{blue}{0.767} \\
+
+\textbf{ITHP} & \textbf{\uline{87.3}} & \textbf{\uline{87.4}} & \textbf{\uline{0.564}} & \textbf{\uline{0.813}} \\
+\hline\hline
+\end{tabular}
+\caption{\textbf{Model performance on CMU-MOSEI dataset.} Models developed by us are highlighted in bold, and optimal results are underlined.} %The metrics used include Binary Accuracy (BA), F1 Score (F1), Mean Absolute Error (MAE), and Pearson Correlation (Corr).}
+\label{tab:ModelsPerformance_MOSEI}
+\end{wraptable}

@@ -1,0 +1,20 @@
+\begin{table}[ht]
+
+\setlength\tabcolsep{12.06 pt}
+% \vspace{0.1 cm}
+\setlength{\abovecaptionskip}{0.2 cm}
+\setlength{\belowcaptionskip}{-.36 cm} 
+\renewcommand{\arraystretch}{1.36}
+\centering
+\begin{tabular}{cccc}
+    \toprule\toprule
+    \textbf{Model} & \textbf{Precision} & \textbf{Recall} & \textbf{F-Score} \\ 
+    \midrule
+    MSDM    & 71.9 & 71.4 & 71.5 \\
+    HFM     & 69.4 & 68.8 & 68.9 \\
+    ITHP    & \textbf{75.3} & \textbf{75.2} & \textbf{75.2} \\
+    \bottomrule\bottomrule
+\end{tabular}
+\caption{\textbf{Results of sarcasm detection on the MUStARD dataset.} This table displays the weighted Precision, Recall, and F-Score for the V-T-A (video, text, audio) modality, averaged across five folds. Bold figures represent the highest scores achieved.}
+\label{tab:sarcasm_addition}
+\end{table}

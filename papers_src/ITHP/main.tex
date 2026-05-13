@@ -1,0 +1,647 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2024_conference,times}
+\iclrfinalcopy
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{wrapfig}
+\usepackage{graphicx}
+% to include your custom packages and commands, add them here:
+\usepackage{amsmath,amsfonts,amsthm}       
+\usepackage{mathtools}      
+\usepackage{multirow}
+% \usepackage[inline]{enumitem}
+\usepackage{diagbox}
+\usepackage{array}
+% \usepackage{pifont}
+\PassOptionsToPackage{hyphens}{url}
+\usepackage{hyperref}
+\usepackage[capitalise]{cleveref}
+\usepackage{comment}
+\usepackage{etoolbox}
+\usepackage{graphicx}
+\usepackage{afterpage}
+\usepackage{placeins}
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+% \usepackage{float}
+%\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+%\usepackage{algorithmic}
+
+\usepackage[font=small]{caption}
+\usepackage{algorithm} 
+\usepackage{algpseudocode}  
+%\usepackage{amsmath}  
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}  
+\renewcommand{\algorithmicensure}{\textbf{Output:}} 
+
+\usepackage{tabularx} 
+\usepackage{authblk} 
+
+\usepackage{tikz}
+\usepackage{scalerel}
+\usetikzlibrary{patterns}
+\usepackage{bm}
+
+\usepackage{graphicx}
+\usepackage{booktabs} % for professional tables
+\usepackage{multirow} % for multirow command
+\usepackage{wrapfig}
+\usepackage{subcaption}
+\usepackage{svg}
+\usepackage{ulem}
+% \usepackage{subcaption}
+
+\newcommand{\colorsection}[2]{%
+  {\color{#1} \section{#2}}
+}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{remark}{Remark}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{property}{Property}
+\newtheorem{corollary}{Corollary}
+\newtheorem{assumption}{Assumption}
+
+
+\title{Neuro-Inspired Information-Theoretic Hierarchical Perception for Multimodal Learning}
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+\author[1*†]{\textbf{Xiongye Xiao}}
+\author[1*]{\textbf{Gengshuo Liu}}
+\author[1]{\textbf{Gaurav Gupta}}
+\author[1]{\textbf{Defu Cao}}
+\author[1]{\textbf{Shixuan Li}}
+\author[1]{\textbf{Yaxing Li}}
+\author[2]{\textbf{Tianqing Fang}}
+\author[1]{\textbf{Mingxi Cheng}}
+\author[1†]{\textbf{Paul Bogdan}}
+
+\affil[1]{\centering University of Southern California, Los Angeles, CA 90089, USA}
+\affil[2]{\centering Hong Kong University of Science and Technology, Hong Kong, China}
+
+\renewcommand\Authands{ \& }
+
+\begin{document}
+\maketitle
+
+\begingroup
+\renewcommand\thefootnote{}
+\footnotetext{\textsuperscript{*}Equal Contribution. \textsuperscript{†}Corresponding to: \texttt{xiongyex@usc.edu} and \texttt{pbogdan@usc.edu}.}
+\endgroup
+
+
+\begin{abstract}
+  % The abstract paragraph should be indented \nicefrac{1}{2}~inch (3~picas) on
+  % both the left- and right-hand margins. Use 10~point type, with a vertical
+  % spacing (leading) of 11~points.  The word \textbf{Abstract} must be centered,
+  % bold, and in point size 12. Two line spaces precede the abstract. The abstract
+  % must be limited to one paragraph.
+
+%Integrating and processing information from various sources or modalities is crucial for obtaining a comprehensive and accurate perception of the real world. This task presents significant challenges due to: $i)$ varying levels of noise or uncertainty across different modalities, which can impact the quality and usefulness of the integrated information, and $ii)$ the complexity of extracting relevant information from each modality and meaningfully fusing these distinct but complementary insights. To address such challenges, we design the Information-Theoretic Hierarchical Perception (ITHP), which utilizes the information bottleneck method. In contrast to existing fusion models that aim to combine all data and treat them as input, our model focuses on constructing a latent space that efficiently represents multimodal information for downstream tasks by balancing the maximization and minimization of mutual information between the latent space and different multimodalities. This approach leads to compact and meaningful representations that preserve relevant information while eliminating redundancy, ultimately enhancing the performance of downstream tasks. Experimental results with the CMU-MOSI dataset show that our model consistently extracts the most critical information in multimodal learning scenarios and outperforms state-of-the-art benchmarks.
+
+Integrating and processing information from various sources or modalities are critical for obtaining a comprehensive and accurate perception of the real world in autonomous systems and cyber-physical systems. Drawing inspiration from neuroscience, we develop the Information-Theoretic Hierarchical Perception (ITHP) model, which utilizes the concept of information bottleneck. Different from most traditional fusion models that incorporate all modalities identically in neural networks, our model designates a prime modality and regards the remaining modalities as detectors in the information pathway, serving to distill the flow of information. Our proposed perception model focuses on constructing an effective and compact information flow by achieving a balance between the minimization of mutual information between the latent state and the input modal state, and the maximization of mutual information between the latent states and the remaining modal states. This approach leads to compact latent state representations that retain relevant information while minimizing redundancy, thereby substantially enhancing the performance of multimodal representation learning. Experimental evaluations on the MUStARD, CMU-MOSI, and CMU-MOSEI datasets demonstrate that our model consistently distills crucial information in multimodal learning scenarios, outperforming state-of-the-art benchmarks. Remarkably, on the CMU-MOSI dataset, ITHP surpasses human-level performance in the multimodal sentiment binary classification task across all evaluation metrics (i.e., Binary Accuracy, F1 Score, Mean Absolute Error, and Pearson Correlation).
+ 
+\end{abstract}
+
+
+\allowdisplaybreaks
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Introduction}
+
+Perception represents the two-staged process of, first \textbf{(i)}, understanding, mining, identifying critical and essential cues, and translating multimodal noisy sensing (observations) into a world model. Second \textbf{(ii)}, defining the premises and foundations for causal reasoning, cognition, and decision-making in uncertain settings and environments. Consequently, a major focus in neuroscience refers to elucidating how the brain succeeds in quickly and efficiently mining and integrating information from diverse external sources and internal cognition to facilitate robust reasoning and decision-making~\citep{tononi1998complexity}.
+Promising breakthroughs in understanding this complex process have emerged from exciting advancements in neuroscience research. 
+Through a method of stepwise functional connectivity analysis \citep{Sepulcre10649}, the way the human brain processes multimodal data has been partially elucidated through recent research.
+The research outlined in \citet{pascual2001metamodal,meunier2009hierarchical,zhang2019discovering, raut2020hierarchical} suggests that information from different modalities forms connections in a specific order within the brain. This indicates that the brain processes multimodal information in a hierarchical manner, allowing for the differentiation between primary and secondary sources of information.
+Further research by \citep{Mesulam1998, Pierre2000} elucidates that synaptic connections between different modality-receptive areas are reciprocal. This reciprocity enables information from various modalities to reciprocally exert feedback, thereby influencing early processing outcomes. Such a sequential and hierarchical processing approach allows the brain to start by processing information in a certain modality, gradually linking and processing information in other modalities, and finally analyzing and integrating information effectively in a coordinated manner. 
+
+The brain selectively attends to relevant cues from each modality, extracts meaningful features, and combines them to form a more comprehensive and coherent representation of the multimodal stimulus. 
+To exemplify this concept, let us consider sarcasm, which is often expressed through multiple cues simultaneously, such as a straight-looking face, a change in tone, or an emphasis on a word \citep{castro2019towards}. In the context of human sarcasm detection, researchers have observed significant variation in sensitivity towards different modalities among individuals. Some are more attuned to auditory cues such as tone of voice, while others are more responsive to visual cues like facial expressions. This sensitivity establishes a primary source of information unique to each individual, creating a personalized perception of sarcasm. Simultaneously, other modalities aren't disregarded; instead, they reciprocally contribute, serving as supportive factors in the judgment process. In fact, researchers employ various experimental techniques, such as behavioral studies, neuroimaging (e.g., fMRI, \citealp{glover2011overview}; PET, \citealp{PRICE2012816}), and neurophysiological recordings, to investigate the temporal dynamics and neural mechanisms underlying multimodal processing in the human brain. The insights gained from these areas of neuroscience have been instrumental in guiding our novel approach to information integration within the scope of multimodal learning.
+
+In multimodal learning, integrating different information sources is crucial for a thorough understanding of the surrounding phenomena or the environment. Although highly beneficial for a wide variety of autonomous systems and cyber-physical systems (CPS)~\cite{xue2017constructing}, effectively understanding the complex interrelations among modalities is difficult due to their high-dimensionality and intricate correlations\citep{yin2023survey}. To tackle this challenge, advanced modeling techniques are needed to fuse information from different modalities, enabling the discovery and utilization of rich interactions among them. Existing works have employed various approaches to fuse information from different modalities, treating each modality separately and combining them in different ways \citep{castro2019towards, rahman2020integrating}. However, it has been seen that these fusion approaches deviate from the information-processing mechanism of neural synapses in the human brain. The above neuroscience research inspired us to devise a novel fusion method that constructs a hierarchical information perception model. Unlike conventional approaches that directly combine various modal information simultaneously, our method treats the prime modality as the input. We introduce a novel biomimetic model, referred to as Information-Theoretic Hierarchical Perception (ITHP), for effectively integrating and compacting multimodal information. Our objective is to distill the most valuable information from multimodal data, while also minimizing data dimensions and redundant information. Drawing inspiration from the information bottleneck (IB) principle proposed by Tishby et al. \citep{tishby2000information}, we propose a novel strategy involving the design of hierarchical latent states. This latent state serves to compress one modal state while retaining as much relevant information as possible about other modal states. By adopting the IB principle, we aim to develop compact representations that encapsulate the essential characteristics of multimodal data.
+
+\subsection{Our Contributions}
+In this paper, we propose the novel Information-Theoretic Hierarchical Perception (ITHP) model, which employs the IB principle to construct compact and informative latent states (information flow) for downstream tasks. The primary contributions of this research can be summarized as follows: 
+\begin{itemize}
+    \item We provide a novel insight into the processing of multimodal data by proposing a mechanism that designates the prime modality as the sole input, while linking it to other modal information using the IB principle. This approach offers a unique perspective on multimodal data fusion, reflecting a more neurologically-inspired model of information processing. 
+    \item We design ITHP model on top of recent neural network architectures, enhancing its accessibility and compatibility with most existing multimodal learning solutions. 
+    \item Remarkably, our ITHP-DeBERTa\footnote{DeBERTa is an advanced variant of the BERT model for natural language embedding.} framework outperforms human-level benchmarks in multimodal sentiment analysis tasks across multiple evaluation metrics. The model yields an 88.7$\%$ binary accuracy, 88.6$\%$ F1 score, 0.643 MAE, and 0.852 Pearson correlation, outstripping the human-level benchmarks of 85.7$\%$ binary accuracy, 87.5$\%$ F1 score, 0.710 MAE, and 0.820 Pearson correlation.
+\end{itemize}
+\subsection{Background and Related Work}
+\textbf{Information bottleneck.} Information bottleneck (IB) has emerged as a significant concept in the field of information theory and machine learning, providing a novel framework for understanding the trade-off between compression and prediction in an information flow. The IB principle formulates the problem of finding a compact representation of one given state while preserving its predictive power with respect to another state. This powerful approach has found numerous applications in areas such as speech recognition \citep{hecht2005extraction}, document classification \citep{slonim2000document}, and gene expression \citep{friedman2001multivariate}. Moreover, researchers have successfully applied the IB principle to deep learning architectures \citep{shwartz2017opening,tishby2015deep}, shedding light on the role of information flow and generalization in these networks. In this paper, we employ the principles of IB to construct an effective information flow by designing a hierarchical perception architecture, paving the way for enhanced performance in downstream tasks.
+
+\textbf{Multimodal learning.} Multimodal learning has been particularly instrumental in understanding language across various modalities - text, vision, and acoustic - and has been applied extensively to tasks such as sentiment analysis \citep{poria2018multimodal}, emotion recognition \citep{zadeh2018multimodal}, personality traits recognition \citep{park2014computational}, and chart understanding \citep{zhou2023enhanced}. Work in this domain has explored a range of techniques for processing and fusing multimodal data. These include tensor fusion methods \citep{liu2018efficient, zadeh2017tensor, zadeh2016mosi}, attention-based cross-modal interaction methods \citep{lv2021progressive, tsai2019multimodal}, and multimodal neural architectures \citep{pham2019found, hazarika2018conversational}, among others. Such explorations have given rise to advanced models like Tensor Fusion Networks \citep{zadeh2018memory}, Multi-attention Recurrent Network \citep{zadeh2018multi}, Memory Fusion Networks \citep{zadeh2018memory}, Recurrent Memory Fusion Network \citep{liang2018multimodal}, and Multimodal Transformers \citep{tsai2019multimodal}. These models utilize hierarchical fusion mechanisms, attention mechanisms, and separate modality-specific Transformers to selectively process information from multiple input channels. Despite significant strides in this domain, challenges persist, particularly when dealing with unaligned or limited and noisy multimodal data occurring in multi-agent systems navigating in uncertain unstructed environments. To surmount these obstacles, researchers have started exploring data augmentation methods and information-theoretic approaches to enrich multimodal representations and boost overall system performance.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Multimodal Learning based on Information Bottleneck}
+\label{sec:probForm}
+
+\input{Figures/Fig_state}
+
+In this section, we introduce a novel method, called Information-Theoretic Hierarchical Perception (ITHP), for integrating and compressing multimodal noisy data streams. Taking inspiration from neuroscience research, our approach models the fusion and distillation of the information from multimodal information sources as a hierarchical structure, with a designated prime modality serving as the input. To link the input information with information from other modalities, we apply the principle of Information Bottleneck (IB), ensuring an optimized compact representation of relevant information between modalities. Here, we begin by presenting a concise overview of the IB principle, followed by the construction of the hierarchical structure for multimodal information fusion. A typical example in multimodal information integration problems is the 3-modalities problem. We use this case as a practical illustration of the efficacy of our proposed model. To provide a detailed explanation, we initially formulate an optimization problem that delineates the specific question. Following this, we leverage the concept of the information bottleneck to build the structure of the ITHP model, which is then trained through the application of neural networks. Importantly, the ITHP model possesses the flexibility to be expanded to handle a multimodal context encompassing $N$ modalities. The exact model for this extension, along with a step-by-step derivation process, can be found in Appendix \ref{apsec:LossDerivation} for reference.
+
+
+
+\textbf{Information Bottleneck (IB) approach.} 
+The IB approach compresses a state $X$ into a new latent state $B$, while maintaining as much relevant information as possible about another state of interest $Y$ . The latent state $B$ operates to minimize the remaining information of the compression task and to maximize the relevant information. Provided that the relevance of one state to another is often measurable by an information-theoretic metric (i.e., mutual information), the trade-off can be written as the following variational problem:
+
+\vskip -.1 cm
+\begin{equation}
+\min_{p\left ( B|X \right ) } I\left ( X;B \right ) -\beta I\left ( B;Y \right ).\label{IB func}
+\end{equation}
+\vskip -.1 cm
+
+The trade-off between the tasks mentioned above is controlled by the parameter $\beta$. In our model of ITHP, the latent states, solving the minimization problem (\ref{IB func}), encodes the most informative part from the input states about the output states. Building upon this concept, we extend this one level of IB structure to create a hierarchy of bottlenecks, enabling the compact and accurate fusion of the most relevant information from multimodal data.
+
+%\subsection{Problem formulation on the 3-modalities setting}
+
+%From an intuitive perspective, fusing the multimodal information in a compact form is an optimization between separating the irrelevant or redundant information and preserving/extracting the most relevant information. The multimodal information integration problem for 3 modalities is shown in Figure (\ref{fig:states}). We consider a complex 3-modalities system for which we define ${X}_{0}$ with $d_{X_{0}}$-dimension as the input modal state, $B_{k}$ ($k = 0, 1$) with $d_{B_{k}}$-dimensional as the latent states, $X_{k}$ ($k = 1, 2 $) with $d_{X_{k}}$-dimensional as the other modal states and ${Y}$ be an output of the downstream task. A fundamental goal for decision-making or prediction is to learn a compressed representation of the most relevant information integrated from different modalities. To achieve this, we adopt the principles of the Information Bottleneck (IB) method.
+
+%We focus on fusing the most relevant information from different modalities by using the hierarchical IB structure to gradually compress the input modal state while retaining the information from other modal states. The ultimate goal is to derive the final latent state, denoted as ${B}_{2}$, where the dimensions have been compressed step-by-step while preserving the most pertinent information from all 3 modalities. Instead of directly fusing information based on the original 
+%$d_{X_{0}}$-dimensional data, we get the final latent state with a dimension of $d_{B_{1}}$ as the fused information, which is then used for accurate prediction of $Y$. Therefore, fusing the information from the compressed representation of modal states defines the ITHP architecture, which offers the advantage of compressing the data dimension while still ensuring accurate prediction of the output $Y$.
+
+\subsection{Problem formulation}
+\label{ssec:IntegrateMISetup}
+
+From an intuitive perspective, fusing the multimodal information in a compact form is an optimization between separating the irrelevant or redundant information and preserving/extracting the most relevant information. The multimodal information integration problem for 3 modalities is shown in Fig. \ref{fig:states}. In the information flow, we can think that $X_{0}$, $X_{1}$ and $X_{2}$ are three random variables that are not independent. We assume that the redundancy or richness of the information contained in the three modal states $X_{0}$, $X_{1}$, and $X_{2}$ is decreasing. Therefore, the system can start with the information of $X_{0}$ and gradually integrate the relevant information of $X_{1}$ and $X_{2}$ according to the hierarchical structure. In this configuration, we aim to determine the latent state $B_{0}$ that efficiently compresses the information of $X_{0}$ while retaining the relevant information of $X_{1}$. Moreover, $B_{0}$ acts as a pathway for conveying this information to $B_{1}$. Next, ${B_{1}}$ quantifies the meaningful information derived from ${B_{0}}$, representing the second-level latent state that retains the relevant information of $X_{2}$. Instead of directly fusing information based on the original $d_{X_{0}}$-dimensional data, we get the final latent state with a dimension of $d_{B_{1}}$ as the integration of the most relevant parts of multimodal information, which is then used for accurate prediction of $Y$. 
+
+The trade-off between compactly representing the primal modal states and preserving relevant information is captured by minimizing the mutual information while adhering to specific information processing constraints. Formally, we formulate this as an optimization problem:
+%By construction, in the first-level latent state, the latent state $B_{0}$ is designed from $X_{0}$ to preserve the consistent information about $X_{1}$. Similarly, in the second-level latent state, the mapping $B_{1}$ is designed from $B_{0}$ to preserve the relevant information about $X_{2}$. 
+%$B_{0}$ is a representation of $X_{0}$ that has the ability to preserve the relevant information between $X_{0}$ and $X_{1}$.
+%The trade-off between compressing the data and preserving relevant information is captured by minimizing the mutual information $I(X_{0};B_{0} )$ while adhering to specific information processing constraints. Formally, we formulate this as an optimization problem:
+
+\input{Equations/eqn_optimProb}
+
+\noindent  
+%We aim to lower bound (to guarantee) the prediction accuracy by lower bounding the mutual information $I(B_{0};X_{1})$ and $I(B_{1};X_{2})$ (constraints $1$ and $3$), and upper bound (to limit) the second level degree of compression via $I(B_{0};B_{1})$ (constraint $2$). For further explaination, $\epsilon_1$ sets a lower bound on the accuracy of predicting ${ X}_{1}$ from ${B}_{0}$. The information flow through the latent state is controlled by $\epsilon_2$. Lastly, $\epsilon_3$ defines closeness of prediction of ${ X}_{2}$ by ${ B}_{1}$. We show in the next section that such trade-off and optimization can be alternatively studied by a deep variational information bottleneck approach, which we refer to as the ITHP.
+where $\epsilon_1, \epsilon_2, \epsilon_3 > 0$. Our goal is to create hidden states, like ${B}_{0}$ and ${B}_{1}$, that condense the data from the primary modal state while preserving as much pertinent information from other modal states as possible. %At the same time, we also introduced three parameters, $\epsilon_1$, $\epsilon_2$, and $\epsilon_3$, to limit the values of the three mutual information. 
+Specifically, we hope that the constructed hidden state ${B}_{0}$ covers as much relevant information in ${X}_{1}$ as possible, so $I(X_{0};X_{1})-\epsilon_1$ is a lower bound of $I(B_{0};X_{1})$. Similarly, ${B}_{1}$ is constructed to retains as much relevant information in ${X}_{2}$ as possible, with $I(X_{0};X_{2})-\epsilon_3$ as a lower bound. Additionally, we want to minimize $I(B_{0};B_{1})$ to ensure that we can further compress the information of ${B}_{0}$ into ${B}_{1}$.
+
+\input{Figures/Fig_Model}
+
+\subsection{Information-theoretic hierarchical perception (ITHP)}
+\label{sec:learnCompactPer}
+
+This section takes the 3-modalities information integration problem as an example to illustrate ITHP as shown in Fig. \ref{fig:model}. It introduces a hierarchical structure of IB levels combined with a multimodal representation learning task. Inspired by the deep variational IB approach proposed in \citet{lee2021variational}, we formulate the loss function incorporating the IB principle. %Throughout the rest of the paper, we denote the true and deterministic distribution as $p$ and the random probability distribution fitted by the neural network as $q$. 
+
+%Taking the 3-modalities learning problem as an example, our goal is to build the $B_{0}$ and $B_{1}$ as the latent states representation, as described in the optimization problem (\ref{eqn:optimProb}). 
+To address the optimization problem (\ref{eqn:optimProb}), we construct a Lagrangian function, incorporating the balancing parameters $\beta$, $\lambda$, and $\gamma$ to impose information processing constraints. Consequently, we solve the problem by minimizing the following function, which serves as the overall system loss function for training the network:
+
+\input{Equations/eqn_lagrangeFunctional}
+
+We derive the loss function in Eqn. (\ref{eqn:lagrangeFunctional}) based on the IB principle expressed in Eqn. (\ref{IB func}) as a two-level structure of the Information Bottleneck. By minimizing the mutual information $I(X_{0};B_{0})$ and $I(B_{0};B_{1})$, and maximizing the mutual information $I(B_{0};X_{1})$ and $I(B_{1};X_{2})$, based on the optimization setup in Eqn. (\ref{eqn:optimProb}) and given balancing parameters, we ensure that this loss function is minimized during the neural network training process.
+
+The ITHP model dealing with 3-modalities problems contains two levels of information bottleneck structures. We define ${B}_{0}$ as a latent state that compactly represents the information of the input ${X}_{0}$ while capturing the relevant information contained in ${X}_{1}$. The latent state ${B}_{0}$ is obtained through a stochastic encoding with a Neural Network, denoted as $q_{\theta_{0}} \left ( B_{0}|X_{0} \right ) $, aiming to minimize the mutual information between $X_{0}$ and $B_{0}$. Given the latent state representation $B_{0}$ obtained from the encoding Neural Network, the outputting MLP plays the role of capturing the relevant information of $X_{1}$ through $q_{\psi_{0} } \left ( X_{1}|B_{0} \right ) $. Similarly, we have the latent state ${B}_{1}$ as a stochastic encoding of ${B}_{0}$, achieved through $q_{\theta_{1} } \left ( B_{1}|B_{0} \right ) $, and an output predictor to ${X}_{2}$ through $q_{\psi_{1} } \left ( X_{2}|B_{1} \right ) $. Throughout the rest of the paper, we denote the true and deterministic distribution as $p$ and the random probability distribution fitted by the neural network as $q$. Here, $\theta_{0}$ and $\theta_{1}$ denote the parameters of encoding neural networks while $\psi_{0}$ and $\psi_{1}$ denote the parameters of the output predicting neural networks. The following loss functions are defined based on the IB principle:
+
+\input{Equations/Tlossfunc1_Tlossfunc2}
+
+where $\beta , \gamma \geq 0$ are balancing coefficients chosen to reflect the trade-off between two information quantities. Here, $KL\left ( p\left ( X \right ) || q\left ( X \right )\right ) $ is the Kullback-Leibler (KL) divergence between the two distributions $p\left ( X \right )$ and $q\left ( X \right )$. Detailed derivations of the Eqns. (\ref{Tlossfunc1}) and (\ref{Tlossfunc2}) are presented in Appendix \ref{apsec:3-hop}, while the extension from the 3-modalities problem to $N$-modalities has been elaborated in Appendix \ref{apsec:general}.
+
+\subsection{Training method of ITHP}
+We train the consecutive two-level hierarchy ITHP with an overall loss function labeled with $X_0$ and $X_2$. To minimize the overall loss, we introduce the hyper-parameter $\lambda > 0$ that balances the trade-off between the losses of the two-level hierarchy:
+
+\input{Equations/totalloss}
+
+In the context of multimodal learning, we apply the final fused latent state $B_{k+1}$ to the processing of representation learning tasks. Specifically, the final loss function combines the two-level hierarchy loss with a task-related loss function:
+
+\input{Equations/taskloss}
+
+The Eqn. (\ref{taskloss}) introduces a new parameter $\alpha \ge 0$ to weigh the loss function of multimodal information integration and the loss function of processing downstream tasks. The pseudo-code of the ITHP algorithm is provided in Appendix \ref{apsec:algorithm}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Experiments}
+\label{sec:experiments}
+
+In this section, we evaluate our proposed Information-Theoretic Hierarchical Perception (ITHP) model on three popular multimodal datasets: the Multimodal Sarcasm Detection Dataset (\textbf{MUStARD}; \citealp{castro2019towards}), the Multimodal Opinion-level Sentiment Intensity dataset (\textbf{MOSI}; \citealp{zadeh2016mosi}), and the Multimodal Opinion Sentiment and Emotion Intensity (\textbf{CMU-MOSEI}; \citealp{zadeh2018multimodal}). Detailed descriptions of the datasets can be found in Appendix \ref{apsec:AdditionalRes}. We demonstrate that the ITHP model is capable of constructing efficient and compact information flows. In the sentiment analysis task, we show that the ITHP-DeBERTa framework outperforms human-level benchmarks across multiple evaluation metrics, including binary accuracy, F1 score, MAE, and Pearson correlation. All experiments were conducted on Nvidia $A$100 40GB GPUs. Detailed information regarding the model architecture and training parameters used in each experiment can be found in Appendix \ref{apsec:model_archi}.
+
+\subsection{Sarcasm detection}
+In the sarcasm detection task, to ensure a fair comparison, we utilize the same embedding data as provided in \citet{castro2019towards}. The embedding data was produced through multiple methods. Textual utterance features were derived from sentence-level embeddings using a pre-trained BERT model \citep{devlin2018bert}, which provides a representation of size $d_t = 768$. For audio features, the Librosa library \citep{mcfee2018wzy} was utilized to extract low-level features such as MFCCs, Mel spectrogram, spectral centroid, and their deltas \citep{brian_mcfee_2018_1342708}, which are concatenated together to compose a $d_a = 283$ dimensional joint representation. For video features, the frames in the utterance are processed using a \texttt{pool5} layer of an ImageNet \citep{deng2009imagenet} pre-trained ResNet-152 model \citep{he2016deep}, which provides a representation of size $d_v=2048$.
+
+\input{Figures/Fig_sarcasmDetection}
+
+In addition to providing the multimodal embedding data, \citet{castro2019towards} also conducted experiments using their own fine-tuned multimodal sarcasm detection model (referred to as ``MSDM'' in this paper). These experiments demonstrated that the integration of multimodal information can enhance the automatic classification of sarcasm. The results of their sarcasm detection task, as reported in Table \ref{tab:ITH-NNSarcasmDetection} (MSDM), serve as a benchmark for comparing the performance of our proposed model. The classification results for sarcasm detection, obtained with different combinations of modalities (Text - $T$, Audio - $A$, Video - $V$), provide a basis for the comparative analysis conducted in our study. 
+
+\input{Tables/tab_ITH-NNSarcasmDetection}
+
+\textbf{Varying combinations of modalities:} To test for the unimodal data, we initially established a two-layer neural network to serve as a predictor for the downstream task. The binary classification results are evaluated by weighted precision, recall, and F-score across both sarcastic and non-sarcastic classes. The evaluation is performed using a 5-fold cross-validation approach to ensure robustness and reliability. When evaluating each individual modality using the predictor, the results are comparable to those of the MSDM, with metrics hovering around 65$\%$. This finding indicates that the embedding data from each modality contains relevant information for sarcasm detection. However, depending solely on a single modality appears to restrict the capacity for more accurate predictions. Considering the binary classification results across the three modalities and taking into account the size of the embedding features for each modality ($d_v=2048, d_t=768, d_a=283$), we designate $V$ as the prime modality and construct the consecutive modality states of $V (X_0)-T (X_1) - A (X_2)$. During the evaluation of two-modal combinations, MSDM utilizes concatenated data to represent the combination, whereas we employ the single-stage information theoretical perception (ITP) approach, which involves only one latent state, denoted as $B_0$. 
+
+For the two-modal learning, there are three different combinations $T (X_0)-A (X_1)$, $V (X_0)-T (X_1)$, and $V (X_0)-A (X_1)$. In the case of $T (X_0)-A (X_1)$ and $V (X_0)-T (X_1)$, both MSDM and ITHP improved performance compared to using a single modality, indicating the advantages of leveraging multimodal information. However, it is worth noting that the result of the combination $V (X_0)-A (X_1)$ is even lower than the result on $V (X_0)$ from MSDM, suggesting that the model struggled to effectively extract meaningful information by combining the embedding features from video and audio. 
+In contrast, ITP successfully extracts valuable information from these two modalities, resulting in higher metric values. For the combination $V (X_0)-T (X_1) - A (X_2)$, when considering the metrics of weighted precision, recall, and F-score, compared to the best-performing unimodal learning, MSDM's improvements are 5.58$\%$, 5.93$\%$, and 6.08$\%$, respectively; whereas our ITHP model shows the improvements of 11.39$\%$, 11.41$\%$ and 11.41$\%$ respectively. These results indicate that our ITHP model succeeds to construct the effective information flow among the multimodality states for the sarcasm detection task. Compared to the best-performing 2-modal learning, MSDM shows lower performance in the 3-modal learning setting, while our ITHP model demonstrates improvements of 4.44$\%$ in precision, 4.88$\%$ in the recall, and 5.03$\%$ in F-score, highlighting the advantages of the hierarchical architecture employed in our ITHP model as shown in Fig. \ref{fig:sarcasmDetection}.
+
+\textbf{Varying Lagrange multiplier:} To conduct a comprehensive analysis, we explore the mutual information among these modalities. In the IB method, the Lagrange multiplier controls the trade-off between two objectives: (i) maximizing the mutual information between the compressed representation $B$ and the relevant variable $Y$ to ensure that the pertinent information about $Y$ is retained in $B$, and (ii) minimizing the mutual information between the compressed representation $B$ and the original data $X$ to eliminate redundant details in $X$. 
+
+A high value of the Lagrange multiplier encourages the model to retain more relevant information about $Y$. 
+In our ITHP model learning for 3 modalities, we have two Lagrange multipliers $\beta$ and $\gamma$ to regulate the balance between the mutual information of the latent states and multimodal states. Here, we adjust the values of the Lagrange multipliers to observe their influence on the overall performance of the ITHP model for the sarcasm detection task, and the results are shown in Fig. \ref{fig:beta_dim}.
+When $\beta = 2$ and $\gamma = 2$, the model shows the worst performance with a weighted precision of $0.619$ and a recall of $0.607$, which indicates that the model cannot retain the relevant information from the other modalities while losing the information from the input state with a low Lagrange multiplier, leading to even worse performance than the unimodal learning. 
+
+\input{Figures/Fig_beta_dim}
+
+The best performance with a precision of $0.753$ and recall of $0.752$ comes when $\beta = 32$ and $\gamma = 8$. The region around the point is also the brightest $3 \times 3$ square with all values above $0.74$, which indicates an optimal balance to construct the most effective information flow among the varying values of $\beta$ and $\gamma$. It is worth noting that the upper right triangular part is brighter than the lower left triangular part, which shows that the model benefits more from a higher $\beta$ than a higher $\gamma$. It suggests that retaining more relevant information from Text ($X_1$) is more important for sarcasm detection, which is also verified by the best performance of the combination $V (X_0)-T (X_1)$ among all the two modality combinations.
+
+\subsection{Sentiment analysis}
+\input{Tables/tab_ModelsPerformance_MOSI}
+Sentiment Analysis (SA) has undergone substantial advancements with the introduction of multimodal datasets, incorporating text, images, and videos \cite{gandhi2022multimodal}. Our study concentrates on two pivotal datasets: the Multimodal Corpus of Sentiment Intensity (MOSI) and Multimodal Opinion Sentiment and Emotion Intensity (MOSEI). Notably, the MOSI dataset employs a unique feature extraction process compared to sarcasm detection, with embedding feature sizes of $d_t=768$, $d_a=74$, and $d_v=47$ for text, audio, and video, respectively. We hypothesize that the text embedding features $T$ hold the most substantial information, followed by $A$, leading to the formulation of consecutive modality states of $T (X_0)- A (X_1) - V (X_2)$ for this task.  
+
+In evaluating the versatility of our approach across diverse multimodal language datasets, experiments are also conducted on the CMU-MOSEI dataset \citep{zadeh2018multimodal}. The CMU-MOSEI dataset, while resembling MOSI in annotating utterances with sentiment intensity, places a greater emphasis on positive sentiments. Additionally, it provides annotations for nine discrete and three continuous emotions, expanding its applicability for various affective computing tasks \cite{das2023multimodal, liang2023multiviz}. 
+
+% A comprehensive comparison is made against several leading models such as BERT \citep{devlin2018bert}, Self-MM \citep{yu2021learning}, MMIM \citep{han2021improving}, and MAG \citep{rahman2020integrating}, employing various strategies across both CMU-MOSI and CMU-MOSEI datasets. For instance, Self-MM adopts a self-supervised method for learning accurate unimodal labels, while MMIM leverages the mutual information of paired modalities to deduce sentiment information. 
+
+Our analysis encompasses a range of prominent models, including Self-MM \citep{yu2021learning}, MMIM \citep{han2021improving}, MAG \citep{rahman2020integrating}, MIB \citep{mai2022multimodal}, BBFN \citep{han2021bi}, and UniMSE \citep{hu2022unimse}. Please refer to Appendix \ref{apsec:related_work} for details.
+
+Delving into framework integration, this research incorporates ITHP with pre-trained DeBERTa models, optimizing textual data processed by DeBERTa's Embedding and Encoder layers, unlike the MAG model which utilizes embedding data from BERT’s middle layer. A significant development introduced is ITHP-DeBERTa, integrating the Decoding-enhanced BERT with Disentangled Attention (DeBERTa; \citealp{he2020deberta, he2021debertav3}). This advanced model enhances BERT and RoBERTa \citep{liu2019roberta} through disentangled attention and a sophisticated mask decoder.
+
+The results on the CMU-MOSI dataset are reported in Table \ref{tab:ModelsPerformance_MOSI}. Additionally, Table \ref{tab:SentimentAnalysisPerformance} in Appendix \ref{apsec: MOSI1} provides reference results for more DeBERTa-based baseline models. As shown in the results, our ITHP model outperforms all the SOTA models in both BERT and DeBERTa incorporation settings.
+\input{Tables/tab_ModelsPerformance_MOSEI}
+It is noteworthy that significant strides in performance were observed with the integration of DeBERTa with the ITHP model, surpassing even human levels. This integration with DeBERTa resulted in a $3.5\%$ increase in Binary Classification Accuracy (BA), $1.3\%$ improvement in F1 Score (F1), a reduction of $9.4\%$ in Mean Absolute Error (MAE), and a $3.9\%$ increase in Pearson Correlation (Corr). To explore the applicability of our approach to various datasets, we perform experiments on the extensive CMU-MOSEI dataset. The results in Table \ref{tab:ModelsPerformance_MOSEI} demenstrate that our ITHP model consistently surpasses the SOTA, thereby confirming its robustness and generalizability. In contrast, it is worth noting that Self-MM itself heavily relies on the feature extraction process performed by BERT, resulting in a significant degradation of DeBERTa-based Self-MM on both CMU-MOSI and CMU-MOSEI datasets, which restricts its applicability in certain scenarios. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusion}
+Drawing inspiration from neurological models of information processing, we build the links between different modalities using the information bottleneck (IB) method. By leveraging the IB principle, our proposed ITHP constructs compact and informative latent states for information flow. The hierarchical architecture of ITHP enables incremental distillation of useful information with applications in perception of autonomous systems and cyber-physical systems. 
+% This demonstrates superior performance compared to human-level benchmarks on multimodal sentiment analysis tasks, as per the metrics used in our study. 
+The empirical results emphasize the potential value of the advanced pre-trained large language models and the innovative data fusion techniques in multimodal learning tasks. When combined with DeBERTa, our proposed ITHP model is the first work, based on our knowledge, to outperform human-level benchmarks on all evaluation metrics (i.e., BA, F1, MAE, Corr).
+% The idea of the systematic fusion of modalities will open promising trajectories for future exploration in the field of .
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Limitations and Future Work}
+A potential challenge of our model is its reliance on a preset order of modalities. We've illustrated this aspect with experiments showcasing various modalities' orders in Appendix Table \ref{tab:modalities_order} in Appendix \ref{apsec:Orders}. Typically, prior knowledge is utilized to select the primary modality and rank others. Without any knowledge, addressing this challenge by adjusting the Lagrange multipliers or iterating through all possible modality orders can be very time-consuming. Another potential challenge emerges when the primary modality lacks sufficient information independently, necessitating complementary information from other modalities for optimized performance. Nonetheless, we believe that the integration of deep learning architecture into the hierarchical perception can mitigate this issue. For a more detailed discussion, please refer to Appendix \ref{apsec:limits}. Future work will focus on addressing the identified challenges by exploring how to utilize deep learning frameworks to achieve efficient neuro-inspired modality ordering.
+
+\clearpage
+
+\section*{Acknowledgement}
+The authors acknowledge the support by the U.S. Army Research Office (ARO) under Grant No. W911NF-23-1-0111, the National Science Foundation (NSF) under the Career Award CPS-1453860, CCF-1837131, MCB-1936775, CNS-1932620 and the NSF award No. 2243104 under the Center for Complex Particle Systems (COMPASS), the Defense Advanced Research Projects Agency (DARPA) Young Faculty Award and DARPA Director Award under Grant Number N66001-17-1-4044, an Intel faculty award and a Northrop Grumman grant. The authors are deeply grateful to Nian Liu, Ruicheng Yao, and Xin Ren from Tuyou Travel AI for their efforts in promoting industry integration and providing both computing support and helpful feedback. The views, opinions, and/or findings in this article are those of the authors and should not be interpreted as official views or policies of the Department of Defense or the National Science Foundation. 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% References follow the acknowledgments in the camera-ready paper. Use unnumbered first-level heading for
+% the references. Any choice of citation style is acceptable as long as you are
+% consistent. It is permissible to reduce the font size to \verb+small+ (9 point)
+% when listing the references.
+% Note that the Reference section does not count towards the page limit.
+\medskip
+
+\clearpage
+{
+\small
+% \bibliographystyle{plainnat}
+%\bibliographystyle{unsrt}
+%\bibliography{compactPerception(NeurIPS)}
+\bibliography{iclr2024_conference}
+\bibliographystyle{iclr2024_conference}
+% 3, 7, 17, 24, 32 did not appear in the assay
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Supplementary
+\clearpage
+% \clearpage
+
+\appendix
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Code Availability}
+\label{apsec:code}
+Our codebase can be found in [\href{https://github.com/joshuaxiao98/ITHP}{https://github.com/joshuaxiao98/ITHP}]. Our code uses assets from MAG-BERT \citep{rahman2020integrating}, BERT \citep{devlin2018bert} [\href{https://github.com/google-research/bert}{https://github.com/google-research/bert}, Apache License 2.0], and DeBERTa \citep{he2020deberta, he2021debertav3} [\href{https://github.com/microsoft/DeBERTa, MIT License}{https://github.com/microsoft/DeBERTa}, MIT License].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Related work}
+\label{apsec:related_work}
+
+Multimodal sentiment analysis has been a prominent research area, focusing on the integration of verbal and nonverbal information across different modalities such as text, acoustics, and vision. Prior studies in this field have primarily concentrated on representation learning and multimodal fusion approaches. For representation learning, Wang et al. \citep{wang2019words} proposed a recurrent attended variation embedding network to learn the shifted word representations, while Hazarika et al. \citep{hazarika2020misa} introduced modality-invariant and modality-specific representations. In terms of multimodal fusion, models can be categorized into early fusion and late fusion methods. Early fusion models incorporate delicate attention mechanisms for cross-modal fusion, as demonstrated by Zadeh et al. \citep{zadeh2018memory} who developed a memory fusion network for cross-view interactions, and Tsai et al. \citep{tsai2019multimodal} who proposed cross-modal transformers to enhance a target modality through cross-modal attention. Late fusion methods, on the other hand, prioritize intra-modal representation learning before inter-modal fusion. For instance, Zadeh et al. \citep{zadeh2017tensor} utilized a tensor fusion network to compute the outer product between unimodal representations, while Liu et al. \citep{liu2018efficient} introduced a low-rank multimodal fusion method to reduce computational complexity.
+
+In recent years, the fusion methods, combined with advanced Transformer-based large language models such as BERT \citep{devlin2018bert} and XLNet \citep{yang2019xlnet}, have achieved remarkable progress in multimodal sentiment analysis. These methods have reached near-human level performance on the CMU-MOSI dataset in the task of multimodal sentiment binary classification \citep{rahman2020integrating}. Innovations such as Self-MM \citep{yu2021learning} have introduced self-supervised strategies that refine unimodal label learning, while MMIM \citep{han2021improving} utilizes mutual information to enhance sentiment discernment from multimodal data. The MAG approach \citep{rahman2020integrating} integrates affective gaps between modalities, and MIB \citep{mai2022multimodal} focuses on isolating essential data features, filtering out the extraneous for purer multimodal fusion. BBFN \citep{han2021bi} reimagines the fusion process by merging and differentiating between modal inputs. The current SOTA model presents novel insights, UniMSE \citep{hu2022unimse}  innovatively integrates multimodal sentiment analysis and emotion recognition in conversations into a unified framework, enhancing prediction accuracy by leveraging the synergies and complementary aspects of sentiments and emotions. The SPECTRA\citep{yu2023speechtext} is pioneering in spoken dialog understanding by pre-training on speech and text, featuring a unique temporal position prediction task for precise speech-text alignment.The DynMM \citep{Xue_2023_CVPR} creates the possibility of reducing computing resource consumption. By introducing dynamic multi-modal fusion, which fuses input data from multiple modalities adaptively, leading to reduced computation, improved representation power, and enhanced robustness. 
+
+Additionally, the latest work in the field of sarcasm detection has expanded our research horizons. The HFM \citep{cai-etal-2019-multi} utilizes early fusion and representation fusion techniques to refine feature representations for each modality. It integrates information from various modalities to better utilize the available data and enhance sarcasm detection performance. The DIP\citep{wen2023dip} creatively adopts dual incongruity perception at factual and affective levels, enabling effective detection of sarcasm in multi-modal data. Aside from multimodal sentiment analysis, numerous applications involve the integration of multiple modal inputs \citep{recipe2vec,tinyllm,huang2023lvlms, huang2024pixels,xiao2022coupled}, making the management of inter-modal interactions a significant area of ongoing research interest.
+
+
+% In recent years, the fusion methods \citep{rahman2020integrating,han2021improving,yu2021learning}, combined with advanced Transformer-based \citep{vaswani2017attention} large language models such as BERT \citep{devlin2018bert} and XLNet \citep{yang2019xlnet}, have achieved remarkable progress in multimodal sentiment analysis, reaching near-human level performance on the CMU-MOSI dataset in the task of multimodal sentiment binary classification \citep{rahman2020integrating}. Self-MM \citep{yu2021learning} introduces a self-supervised strategy to sharpen unimodal label learning. MMIM \citep{han2021improving} harnesses mutual information to enhance sentiment discernment from multimodal data. MAG \citep{rahman2020integrating} integrates affective gaps between modalities. MIB \citep{mai2022multimodal} concentrates on essential data features, filtering out the extraneous for purer multimodal fusion. BBFN reimagines \citep{han2021bi} the fusion process by simultaneously merging and differentiating between modal inputs. Finally, UniMSE\citep{hu2022unimse} merges multimodal sentiment analysis with emotion recognition and exploits contrastive learning to bridge sentiments and emotions.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Derivation of the variational IB loss for ITHP}
+\label{apsec:LossDerivation}
+
+\subsection{3-modalities scenario}
+\label{apsec:3-hop}
+In the realm of multimodal learning, which usually involves three useful modalities, we outline a loss function for a 3-modalities setting in our study. This scenario incorporates three consecutive modalities, $X_0$, $X_{1}$, and $X_{2}$, these three modalities are ranked according to the richness of main information. In this section, we derive the formula of the two-level information bottleneck hierarchy in the three-modal problem in detail, as shown in Eqn. (\ref{Tlossfunc1}) and Eqn. (\ref{Tlossfunc2}).
+%By utilizing $k$, $k+1$, and $k+2$ as the order of these modalities, we highlight our ability to flexibly select any sequence of accessible modalities as needed. Consistently, we use the modality with the smallest order as our input. For instance, we use a $T(X_1)-A(X_2)$ combination in our sarcasm detection experiments, where $T(X_1)$ serves as input ($k=1$). It's worth noting that the order $k$ can seamlessly transition to $0$ once we've determined the consecutive states that will be used in the model.
+
+Equation (\ref{Tlossfunc1}) represents the loss of the input-level Information Bottleneck as ($X_{0}-B_{0}-X_{1}$) in the system, while the Eqn. (\ref{Tlossfunc2}) represents a general expression of the subsequent-level Information Bottleneck as ($B_{0}-B_{1}-X_{2}$), as shown in Fig. (\ref{fig:states}) . In this section, we first show the detailed derivation of the IB loss function (\ref{Tlossfunc1}) and then give the derivation of Eqn. (\ref{Tlossfunc2}) in a concise manner. Firstly, the loss function of the first input-level Information Bottleneck can be given as:
+
+\input{Equations/appeq1_IB_lossfunc1_lossfunc2}
+
+where $H\left (X_{1} \right )$ is the entropy of $X_{1}$, which is determined only by the distribution of $X_{1}$ itself, so this can be ignored in the loss function. Since we cannot derive the distribution of $p\left ( B_0|X_{1} \right ) $ directly, we have to introduce the modal $X_{0}$ with the relationship that $B_{0}$ is independent of $X_{1}$ given $X_{0}$ :
+
+\input{Equations/introduceX0_AAlossfunc1_appeq2_IB}
+
+\input{Equations/I_Bk_k_1_AAlossfunc2}
+
+
+\subsection{General scenario for N modalities}
+\label{apsec:general}
+
+\input{Figures/Fig_statesk}
+
+In what follows, we present the loss function for scenarios involving more than 3 modalities, thus, a framework for a more general multimodal learning case. Let's consider a multi-modalities learning system with $N$ informative modalities, as shown in Fig. \ref{fig:statesk}. According to the difference in information richness in $N$ modalities, we sort the information of these $N$ modalities, and ranked from high to low according to information richness as $X_{0}, X_{1},\cdots\cdots,X_{N-1} ,X_{N}$. Therefore, we start integrating the multimodal information from the modal state $X_{0}$ with the highest information richness. The input level Information Bottleneck loss can be derived from Eqn. (\ref{Tlossfunc1}), which is the same as 3-modalities scenario. The loss function is shown as:
+
+\input{Equations/C1_firstlevel_C1_subseqlevel}
+
+Then, we train the overall network using $N$ modal states. It is worth mentioning that in our model (ITHP), only $X_{0}$ with the highest information richness is used as the model input, and $X_{1},\cdots\cdots,X_{N-1} ,X_{N}$ act as detectors in the information flow. To minimize the overall loss, we introduce a series of Lagrange multipliers $\lambda_{k}$ > 0 that balance the trade-off between the losses of the input-level IB and all subsequent IB levels in the whole hierarchical structure. Therefore, the overall loss function mentioned in Eqn. (\ref{totalloss}) can be generalized to the form with $N$ modal states as:
+
+\input{Equations/C1_totalloss_C1_taskloss}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Algorithm: Pseudo-code for training ITHP}
+\label{apsec:algorithm}
+
+\subsection{3-modalities scenario}
+\label{apsec:D-3-hop}
+We provide the pseudo-code for ITHP in a 3-modalities problem (please refer to Algorithm \ref{alg:alg3modalities}), which we used in our experiments including both sarcasm detection and sentiment analysis. As mentioned in \ref{apsec:3-hop}, we have $(X_{0} - X_{1} - X_{2} )$ as the three modal states. Here, we present the algorithm for training ITHP in a 3-modalities scenario.
+
+\input{Equations/alg_alg3modalities}
+
+
+\subsection{General scenario for N modalities}
+\label{apsec:D-general-scenario}
+We additionally provide the pseudo-code and the training method for ITHP in a general form involving $N$ modalities (please refer to Algorithm \ref{alg:algITHP}). This broader algorithmic representation extends from the 3-modalities example delineated in \ref{apsec:D-3-hop}.
+
+% \clearpage
+
+\input{Equations/alg_algITHP}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Model architecture and hyperparameters}
+\label{apsec:model_archi}
+
+% \input{Tables/deberta_on_mosi}
+
+In this section, we provide a detailed description of our model architecture and the hyperparameter selection in different tasks for reproducibility purposes. For the ITHP, as depicted in Figure ~\ref{fig:model}, to get the latent state's distribution of $B_0$, we directly use two fully connected linear layers to build the encoder, where the first layer extracts the feature vectors of input $X_0$ and the second layer outputs parameters for a latent Gaussian distribution - a mean vector and the logarithm of the variance vector. By sampling from this distribution, we obtain a latent state that represents the input state further used to (1) feed into the multilayer perceptron (MLP) layer to predict $X_1$; (2) feed into the next hierarchical layer for another modality information. Note that this is a serial structure, and the remaining layers share the same design. The predictor is chosen specifically by the downstream tasks. For the task of sarcasm detection, we elect to use an MLP with two layers as the predictor. For the sentiment analysis task, the model ITHP-DeBERTa is trained in an end-to-end manner. The raw features of acoustic and visual modalities are pre-extracted from CMU-MOSI \citep{zadeh2016mosi}. The textual features are extracted by pre-trained DeBERTa \citep{he2020deberta, he2021debertav3}. The textual features serve as input to our ITHP module while the pre-extracted acoustic and visual act as the detectors. The distilled representations that capture the information from multimodalities are generated from the ITHP module. Additionally, we incorporate residual connections for enhanced information flow. Finally, a 1-layer Transformer encoder and several fully-connected layers are designed as predictor to make sentiment predictions.
+
+For the task of sarcasm detection, unless otherwise specified, we set the  hyperparameters as follows: $\beta=32, \gamma=8, \lambda=1$. We perform a 5-fold cross-validation, and for each experiment, we train the ITHP model for 200 epochs using an Adam optimizer with a learning rate of $10^{-3}$. For the task of sentiment analysis, unless otherwise specified, we set the  hyperparameters as follows: $\beta=8, \gamma=32, \lambda=1$. We run each experiment for 40 epochs using an Adam optimizer with a learning rate of $10^{-5}$. We repeat each experiment 5 times to calculate the mean value of the metrics. All experiments are done on an Nvidia $A$100 40GB GPUs.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Datasets Description and Additional Results}
+\label{apsec:AdditionalRes}
+
+By integrating DeBERTa into the highly successful fusion models of recent years, we establish new baselines for DeBERTa-based models on both the CMU-MOSI and CMU-MOSEI datasets. Our ITHP-DeBERTa model achieves state-of-the-art (SOTA) performance on both datasets. In the case of Self-MM, we utilize the raw data and codebase provided in the self-mm repository [\href{https://github.com/thuiar/Self-MM}{https://github.com/thuiar/Self-MM}, MIT License] and modify the feature extraction method to employ DeBERTa, replacing the original requirement for BERT. However, we note that Self-MM itself heavily relies on the feature extraction process performed by BERT, resulting in a significant degradation of DeBERTa-based Self-MM, which restricts the applicability of Self-MM in certain scenarios.
+
+\input{Tables/tab_SentimentAnalysisPerformance}
+
+\subsection{CMU-MOSI}
+\label{apsec: MOSI1}
+
+The MOSI dataset comprises 2,199 video clips from YouTube movie reviews, annotated with sentiment intensity on a -3 to +3 scale. This multimodal dataset integrates transcriptions, visual gestures, and audio-visual features, facilitating comprehensive sentiment analysis research. Its unique structuring allows nuanced sentiment interpretation at opinion level \cite{gandhi2022multimodal}.
+
+\subsection{CMU-MOSEI}
+\label{apsec: MOSEI1}
+
+\input{Tables/tab_PerformanceMOSEIDetails}
+
+The CMU Multimodal Opinion Sentiment and Emotion Intensity (CMU-MOSEI) dataset stands as the most extensive dataset available for multimodal sentiment analysis and emotion recognition. It encompasses over 23,500 sentence utterance videos derived from more than 1000 YouTube speakers, ensuring a diverse and gender-balanced collection. The sentence utterances, sourced from a variety of topics and monologue videos, are randomly selected, transcribed, and appropriately punctuated. This dataset represents an expanded version of MOSI, which contained 3,228 videos and 23,453 utterances, offering a richer resource for research and development in sentiment analysis and emotion recognition.
+
+\subsection{MUStARD}
+
+MUStARD is a dataset constructed to support the exploration of automated sarcasm detection. Comprised of 690 annotated video utterances from various TV shows like Friends and The Big Bang Theory, it offers a diverse range of sarcastic and non-sarcastic instances. The utterances, spanning video, audio, and text modalities, are each associated with speaker identifiers and contextual information.
+
+
+We benchmarked against another state-of-the-art (SOTA) Hierarchical Fusion Model (HFM) \citep{cai2019multi}, which employs a task-oriented hierarchical fusion approach. This approach integrates early fusion, representation fusion, and modality fusion techniques to augment the understanding and representation of individual modalities. To maintain consistency in our comparative framework, we integrated HFM's modality fusion module into our experimental setup. The subsequent tests on our dataset yielded results that facilitate a direct performance comparison between HFM and our proposed model.
+
+
+\input{Tables/tab_Sarcasm_Addition}
+
+\subsection{Varying Hyperparameters}
+
+The sizes of the latent states ($B_0$ and $B_1$) have an impact on the performance of the model. The small size may not capture sufficient information, whereas a large size may introduce redundancy and hinder the goal of compactness. To investigate the impact of different sizes, we vary the dimensions of the latent states and evaluate the model's performance. The results are depicted in Fig. \ref{fig:b_dim}.
+
+In Table \ref{tab:sarcasm_addition}, we present the comparative results of ITHP, MSDM, and HFM for sarcasm detection on the MUStARD dataset. For the HFM model, we adopted the Modality Fusion structure mentioned in its original publication to facilitate multimodal integration. As stated in the HFM paper, the modalities they employed were image, attribute, and text modalities. In our implementation, these were substituted with video, audio, and text modalities, corresponding to the MUStARD dataset's specifications. Regarding parameter settings, we retained all original configurations of the HFM model, making adjustments only to the input channel numbers of certain layers to align with the input data requirements of the MUStARD dataset. 
+
+\input{Figures/fig_b_dim}
+
+The results indicate that when the sizes of $B_0$ and $B_1$ are both set to 8, the model exhibits the poorest performance, suggesting that this size may be insufficient for effectively capturing and conveying the information. On the other hand, when $B_0$ size is set to 128 and $B_1$ size is set to 64, we observe optimal performance with a weighted precision of 0.754. This finding suggests that a latent space dimension of 64 is adequate for representing the multimodal information, while the dimensions of the embedding features of the modalities are $d_v=2048$, $d_t=768$, and $d_a=283$. 
+
+The specific values of the weighted precision and recall shown in Fig. \ref{fig:beta_dim} are provided in Table \ref{table:gamma_beta_precision} and Table \ref{table:gamma_beta_recall}, respectively. Similarly, the specific values of the weighted precision and recall shown in Fig. \ref{fig:b_dim} are presented in Table \ref{table:B0_B1_precision} and Table \ref{table:B0_B1_recall}, respectively.
+\FloatBarrier
+
+
+\input{Tables/table_gamma_beta_precision}
+
+\input{Tables/table_gamma_beta_recall}
+
+\input{Tables/table_B0_B1_precision}
+
+\input{Tables/table_B0_B1_recall}
+
+\FloatBarrier
+\subsection{Varying Orders of Modalities}
+\label{apsec:Orders}
+
+Our research includes varying the order of modalities to assess the impact on our model's performance. The detailed results are catalogued in Table \ref{tab:modalities_order}, which shows the effects of different modality sequences on weighted precision, recall, and F-score.
+
+The results reveals that the modality sequence significantly affects performance metrics. Specifically, positioning video as the primary modality (V→T→A) yielded the highest scores, with all metrics around 75\%. In contrast, sequences starting with audio (A→T→V) registered the lowest, with scores near 71\%. This evidence underscores the importance of strategic modality ordering, which can be guided by domain expertise to enhance model efficiency for specific tasks.
+
+
+\input{Tables/tab_modalities_order}
+
+\FloatBarrier
+% \subsection{Assessment of Noise Resilience}
+
+
+% In the sarcasm detection dataset analysis, we investigate the model's robustness against noise by administering Gaussian noise to the normalized data of the primary and secondary modalities, as indicated in Tables \ref{tab:noise_addition_text} and \ref{tab:noise_addition_video}, respectively. This noise has a zero mean and its standard deviation ranges from 0.05 to 0.3, increasing by increments of 0.05. To validate the consistency of the results, we replicate the experiment 50 times for each specified noise level.
+
+% The findings suggest that our model exhibits a notable resilience to noise when compared to the baseline. It is also apparent that the primary modality is more affected by noise than the secondary modality, highlighting a differential susceptibility to noise within the modalities.
+
+
+% \input{Tables/tab_NoiseAdditionText}
+
+% \input{Tables/tab_NoiseAdditionVideo}
+% \FloatBarrier
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Assessment of Inference Latency}
+
+Our study included a comparative analysis of inference latency, utilizing a simplified multi-layer perceptron (MLP) as a benchmark. The MLP head, consisting of 64 neurons, served as the predictor within our ITHP model framework. In this setup, we concatenated modalities M0, M1, and M2 and subjected them to the MLP head. The resulting inference latency was approximately 0.00221 milliseconds (ms) per sample. By comparison, the complete ITHP model, which features a more complex hierarchical structure, exhibited an inference latency of 0.0120 ms per sample.
+
+It is important to note that the detectors within our ITHP model remain inactive during the inference phase, which contributes to the model's efficiency. Despite the inherent latency increment attributable to the hierarchical design, the ITHP model demonstrates commendable performance efficiency. The observed slight increase in latency is a testament to the model's capability to balance the demands of complex multimodal learning tasks with the necessity for swift processing times.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Learning complementary information from secondary modalities}
+\label{apsec:limits}
+Here, we provide additional elaboration on the potential limitations that may arise when the primary modality lacks sufficient information. It's essential to highlight that our selection criteria for determining the primary modality have been designed to encapsulate the most pertinent information. However, it's equally vital to acknowledge that depending solely on the primary modality might not always suffice, necessitating the inclusion of information from secondary modalities. By harnessing the capabilities of our deep learning framework, our model has a certain ability to learn the complementary information from auxiliary modalities. To achieve a harmonious representation, we've incorporated specific terms in the loss function. Specifically, taking the 3-modalities learning problem in Eqn. (\ref{eqn:lagrangeFunctional}) as an example, term $L_1=- \beta I \left (B_{0};X_{1} \right )$ is tasked with supervising the knowledge transfer from $X_1$ to $B_0$, while term $L_2=- \gamma I \left(B_{1};X_{2} \right)$ is responsible for supervising the knowledge dissemination from $X_2$ to $B_1$. Through this framework, the ITHP model is primed to discern and incorporate complementary information from non-input modalities. Our model, therefore, endeavors to strike a balance between mutual information, irrelevant data, and task-essential information, ensuring an optimized flow of information.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Metrics for Evaluation}
+We employ a variety of metrics for evaluating the performance of models in binary classification: weighted precision for different tasks. These metrics include weighted precision, weighted recall, weighted F score, Binary Accuracy (BA), F1-Score (F1), Mean Absolute Error (MAE), and Pearson Correlation (Corr). We consider the following notations: $TP$ (True Positive); $TN$ (True Negative); $FP$ (False Positive); and $FN$ (False Negative).
+
+%For the evaluation, we consider the following notations:$TP$ (True Positive); $TN$ (True Negative); $FP$ (False Positive); and $FN$ (False Negative).
+%Here, we show the formulas for these metrics:
+
+\subsection{Sarcasm detection}
+To ensure a fair comparison with the model performance outlined in \citep{castro2019towards}, we have utilized the same evaluation metrics: weighted precision, weighted recall, and weighted F-score, following the guidelines provided by \citep{castro2019towards}. The weighted average precision, recall, and F-score are determined by incorporating the support (number of true instances for each label) as weights. The support for class $i$ is denoted as $S_i$. Here are the calculations for these metrics:
+
+\textbf{Weighted Precision $P_w$:}  It measures the proportion of correct positive predictions, adjusting for class prevalence. The formula is given as: 
+\begin{equation}
+P_w = \frac{\sum_{i=1}^{n} (S_i * precision_i)}{\sum_{i=1}^{n} S_i}, \label{Pw}
+\end{equation}
+
+where $precision_i = \frac{TP_i}{(TP_i + FP_i)}$.
+
+\textbf{Weighted Recall $R_w$:} This metric estimates the model's ability to identify all positive instances, accounting for the frequency of each class. It is computed as: 
+\begin{equation}
+R_w = \frac{\sum_{i=1}^{n} (S_i * recall_i)}{\sum_{i=1}^{n} S_i}, \label{Rw}
+\end{equation}
+
+where $recall_i = \frac{TP_i}{(TP_i + FN_i)}$.
+
+\textbf{Weighted F-score $F_w$:} This balances precision and recall, weighting based on the true instances for each label. The formula for this metric is:
+
+\begin{equation}
+F_w = \frac{\sum_{i=1}^{n} (S_i * F_i)}{\sum_{i=1}^{n} S_i}, \label{Fw}
+\end{equation}
+
+where $F_i = \frac{ 2 * (precision_i * recall_i)}{(precision_i + recall_i)}$.
+
+In these formulas, $TP_i$ represents the true positives for class $i$, $FP_i$ represents the false positives for class $i$, $FN_i$ represents the false negatives for class $i$, and $S_i$ represents the number of true instances for each label (class $i$).
+
+\subsection{Sentiment analysis}
+
+We adopt the well-acknowledged metrics in sentiment analysis, specifically, Binary Accuracy (BA), F1-Score (F1), Mean Absolute Error (MAE), and Pearson Correlation (Corr), to evaluate our model's performance and contrast it with the benchmark models on CMU-MOSI and CMU-MOSEI datasets. The formulas for these metrics are as follows:
+
+\textbf{Binary Accuracy (BA):}  It's a straightforward measure calculated as the number of correct predictions divided by the total number of predictions. Here's the formula: 
+\begin{equation}
+BA = \frac{TP + TN}{TP + TN + FP + FN}.\label{BA}
+\end{equation}
+%Precision = $ \frac{TP}{TP + FP}$;\\
+%Recall = $\frac{TP}{TP + FN}$;\\
+%F1-Score (F1) = $2\cdot \frac{Precision\cdot Recall}{Precision+ Recall} $;\\
+\textbf{F1-Score (F1):}   The F1 Score is a metric that seeks to strike a balance between Precision and Recall. Here's the formula:
+\begin{equation}
+F1 = 2 * \frac{(Precision * Recall)} {(Precision + Recall)},\label{F1}
+\end{equation}
+where $Precision=\frac{TP}{TP + FP}$ and $Recall = \frac{TP}{TP + FN}$.
+
+\textbf{Mean Absolute Error (MAE):} The MAE quantifies the average magnitude of errors in a set of predictions, disregarding their direction. Here's the formula: 
+\begin{equation}
+ \text{MAE}(\hat{y}, y) = \frac{ {\textstyle \sum_{i=1}^{n}}\left | \hat{y}_i-y_i \right |  }{n},  \label{MAE}
+\end{equation}
+where $y_i$ is the true label, $\hat{y}_i$ is the predictive value and $n$ is the total number of predictions.
+
+\textbf{Pearson Correlation (Corr):} Pearson Correlation (Corr) assesses the linear association between predicted probabilities and true labels. Here's the formula:
+\begin{equation}
+\text{Corr}(x, y)=\frac{ {\textstyle \sum_{i=1}^{n}}\left ( x_i-\bar{x} \right )\left ( y_i-\bar{y} \right )  }{\sqrt{ {\textstyle \sum_{i=1}^{n}}\left ( x_i-\bar{x} \right )^2{\textstyle \sum_{i=1}^{n}}\left ( y_i-\bar{y} \right )^2  } },\label{Corr}
+\end{equation}
+
+where $x_i$ refers to predicted probabilities for the positive class, and $y_i$ is the true label. The $\bar{x}$ and $\bar{y}$ are the means of the predicted probabilities and actual labels, respectively.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Algorithms for ranking modalities}
+\subsection{Adapting Sample Entropy (SampEn) for Datasets}
+
+Sample Entropy (SampEn) is a method traditionally used for time-series data to quantify their complexity by evaluating the predictability of patterns within the data. When adapting SampEn for feature datasets, especially those resembling time-series data in structure, the same principles are used to analyze the distribution and regularity of features within individual samples in a multidimensional feature space.
+
+For a dataset represented as a set of feature vectors, where each vector can be considered as a sequence, the information richness can be quantified by measuring the regularity and unpredictability of these sequences. SampEn in this context measures the likelihood that subsequences of features within a given vector that are close (within a certain tolerance) remain close when one additional dimension is considered. This approach evaluates the diversity and distribution of the patterns within each individual sample, reflecting the intrinsic information richness of the feature data.
+
+The SampEn of a dataset is calculated as follows:
+\begin{enumerate}
+    \item Choose an embedding dimension \( m = 2 \) and a tolerance \( r = 0.2 \times \text{standard deviation of the data} \).
+    \item For each sample in the dataset, form vectors \( U^m_i \) for \( i = 1, \ldots, D-m \) where \( D \) is the number of features.
+    \item Define \( B^m(r) \) as the count of times when two vectors \( U^m_i \) and \( U^m_{i+1} \) within the same sample are within \( r \) of each other.
+    \item Define \( A^m(r) \) similarly for \( m+1 \).
+    \item SampEn is given by:
+    \[ \text{SampEn}(m, r, N) = -\ln\left(\frac{A^m(r)}{B^m(r)}\right) \]
+\end{enumerate}
+
+\input{Equations/alg_sample_rank}
+
+\clearpage
+\subsection{Ranking Modalities Using Submodular Functions}
+
+Given a set of \( N \) different modalities \( M = \{m_1, m_2, \ldots, m_N\} \), the goal is to find a subset of modalities \( S \subseteq M \) that maximizes the predictive performance in a given downstream task.
+
+\textbf{Submodular Function Definition:} Let \( f: 2^M \rightarrow \mathbb{R} \) be a submodular function that maps a set of modalities to a real number indicating their performance in a predictive task. For any \( A \subseteq B \subseteq M \) and \( x \notin B \), the function \( f \) satisfies:
+
+\[ f(A \cup \{x\}) - f(A) \geq f(B \cup \{x\}) - f(B) \]
+
+\textbf{Greedy Algorithm:} The greedy algorithm starts with an empty set and iteratively adds a modality that maximizes the function \( f(S) \):
+
+\[ S_{i+1} = S_i \cup \{\arg\max_{x \notin S_i} f(S_i \cup \{x\})\} \]
+
+
+\textbf{Performance Guarantee:} The greedy algorithm provides an approximation guarantee of \( (1 - \frac{1}{e}) \) for maximizing a submodular function, where \( e \) is the base of the natural logarithm.
+
+% \subsection*{Pseudocode}
+
+
+Assuming a function `$evaluatePerformance$' that assesses the performance of a given set of modalities.
+
+\input{Equations/alg_greedy}
+
+\section{Default Notation}
+
+\def\arraystretch{1.5}
+\begin{center}
+\begin{tabular}{p{1.5in}p{3.5in}}
+
+$\displaystyle X_{0}$ & The input modal state with the highest information richness\\
+$\displaystyle \left \{ X_{k} \right \} _{k=1}^{N} $ & The other modal states for information fusion \\
+$\displaystyle \left \{ B_{k} \right \} _{k=0}^{N-1} $ & Latent states constructed for ITHP\\
+$\displaystyle Y$ & Task-related labels or values \\
+$\displaystyle d_{X_{k}} /d_{B_{k}}$ & The dimensions for modal states/ latent states \\
+$\displaystyle p\left ( \cdot  \right ) $ & Deterministic distribution of random variables\\
+$\displaystyle q\left ( \cdot  \right ) $ & Random probability distribution fitted by the neural network\\
+$\displaystyle N$ & Total number of modal states \\
+$\displaystyle \beta$ & Lagrange multiplier for the first level IB \\
+$\displaystyle \gamma_{k}$ & Lagrange multipliers for the subsequent level IBs\\
+$\displaystyle \lambda_{k}$ & Coefficients for integrating the first and sebsequent level IBs\\
+$\displaystyle \alpha$ & Coefficient for balancing the ITHP loss and the task-related loss\\
+$\displaystyle \theta_{k}$ &  Parameters for the encoding-level Neural Networks\\
+$\displaystyle \psi_{k}$ & Parameters for the predicting-level Neural Networks\\
+$\displaystyle \mu_{k}$ & Mean value learned by the encoding neural networks\\
+$\displaystyle \Sigma_{k}$ & Covariance value learned by the encoding neural networks \\
+$\displaystyle \varepsilon $ & Assumed distribution of latent states\\
+$\displaystyle n_{mb}$ & Mini-batch size for training the ITHP\\
+$\displaystyle \eta$ & Learning rate for training the ITHP\\
+\end{tabular}
+\end{center}
+
+
+
+
+
+
+\end{document}

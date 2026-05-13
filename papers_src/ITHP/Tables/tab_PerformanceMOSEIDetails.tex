@@ -1,0 +1,29 @@
+\begin{table}[!htb]
+\vspace{0.2 cm}
+\setlength{\abovecaptionskip}{0.3 cm}
+\setlength{\belowcaptionskip}{0.3 cm} 
+\renewcommand{\arraystretch}{1.26}
+\centering
+\setlength\tabcolsep{15.6 pt}
+\begin{tabular}{@{}lcccc@{}}
+    \toprule\toprule
+    \textbf{Task Metric} & $\textbf{BA}{\uparrow}$ & $\textbf{F1}{\uparrow}$ & $\textbf{MAE}{\downarrow}$ & $\textbf{Corr}{\uparrow}$ \\
+    \hline
+    \multicolumn{5}{c}{\textbf{BERT}} \\
+    \hline
+    Self-MM$_b$ \citep{han2021improving} & 85.0 & 85.0 & 0.529 & 0.767 \\
+    MMIM$_b$ \citep{han2021improving} & 86.0 & 86.0 & 0.526 & 0.772 \\
+    MAG$_b$ \citep{han2021improving} & 84.8 & 84.7 & 0.543 & 0.755 \\
+    \hline
+    \multicolumn{5}{c}{\textbf{DeBERTa}} \\
+    \hline
+    % DeBERTa & 84.8 & 84.9 & 0.614 & 0.788 \\
+    Self-MM$_d$ & 65.3 & 65.4 & 0.813 & 0.208 \\
+    MMIM$_d$ & 85.2 & 85.4 & 0.568 & 0.799 \\
+    MAG$_d$ & 85.8 & 85.9 & 0.636 & 0.800 \\
+    \textbf{ITHP} & \textbf{\uline{87.3}} & \textbf{\uline{87.4}} & \textbf{\uline{0.564}} & \textbf{\uline{0.813}} \\
+    \bottomrule\bottomrule
+\end{tabular}
+\caption{\textbf{Model performance on CMU-MOSEI dataset.} Models developed by us are highlighted in bold, and optimal results are underlined. The metrics used include Binary Accuracy (BA), F1 Score (F1), Mean Absolute Error (MAE), and Pearson Correlation (Corr).}
+\label{tab:perMOSEIdet}
+\end{table}

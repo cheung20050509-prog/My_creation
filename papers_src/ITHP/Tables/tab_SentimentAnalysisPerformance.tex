@@ -1,0 +1,37 @@
+\begin{table}[!htb]
+\vspace{0.2 cm}
+\setlength{\abovecaptionskip}{0.3 cm}
+\setlength{\belowcaptionskip}{-0.3 cm} 
+\renewcommand{\arraystretch}{1.26}
+\centering
+\setlength\tabcolsep{15.6 pt}
+\begin{tabular}{@{}lcccc@{}}
+    \toprule\toprule
+    \textbf{Task Metric} & $\textbf{BA}{\uparrow}$ & $\textbf{F1}{\uparrow}$ & $\textbf{MAE}{\downarrow}$ & $\textbf{Corr}{\uparrow}$ \\
+    \hline
+    \multicolumn{5}{c}{\textbf{BERT}} \\
+    \hline
+    TFN \citep{zadeh2017tensor}             & 74.8 & 74.1 & 0.955 & 0.649 \\
+    MARN \citep{zadeh2018multiattention}    & 77.7 & 77.9 & 0.938 & 0.691 \\
+    MFN \citep{zadeh2018memory}             & 78.2 & 78.1 & 0.911 & 0.699 \\
+    RMFN \citep{liang2018multimodal}        & 79.6 & 78.9 & 0.878 & 0.712 \\
+    LMF \citep{liu2018efficient}            & 79.1 & 77.3 & 0.899 & 0.701 \\
+    MulT \citep{tsai2019multimodal}         & 81.5 & 80.6 & 0.861 & 0.711 \\
+    % BERT \citep{devlin2018bert}             & 83.5 & 83.4 & 0.739 & 0.782 \\
+    Self-MM$_b$ \citep{yu2021learning}          & 84.0 & 84.4 & 0.713 & 0.798 \\
+    MMIM$_b$ \citep{han2021improving}           & 84.1 & 84.0 & 0.700 & 0.800 \\
+    MAG$_b$ \citep{rahman2020integrating}   & 84.2 & 84.1 & 0.712 & 0.796 \\
+    % \textbf{ITHP$_b$}                      & \textbf{85.3} & \textbf{85.3} & \textbf{0.708} & \textbf{0.801} \\
+    \hline
+    \multicolumn{5}{c}{\textbf{DeBERTa}} \\
+    \hline
+    % DeBERTa     & 84.7 & 84.8 & 0.709 & 0.817 \\
+    MAG$_d$    & 86.1 & 86.0 & 0.690 & 0.831 \\
+    \textbf{ITHP} & \textbf{\uline{88.7}} & \textbf{\uline{88.6}} & \textbf{\uline{0.643}} & \textbf{\uline{0.852}} \\
+    \midrule 
+    Human   & 85.7 & 87.5 & 0.710 & 0.820 \\
+    \bottomrule\bottomrule
+\end{tabular}
+\caption{\textbf{Model performance on CMU-MOSI.} The table presents the performance of different BERT-based pre-trained models. Models developed by us are highlighted in bold, and optimal results are underlined. ITHP$_d$ consistently outperforms other models. The metrics used include Binary Accuracy (BA), F1 Score (F1), Mean Absolute Error (MAE), and Pearson Correlation (Corr).}
+\label{tab:SentimentAnalysisPerformance}
+\end{table}

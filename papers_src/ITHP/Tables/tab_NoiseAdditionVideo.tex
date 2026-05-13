@@ -1,0 +1,26 @@
+\begin{table}[thbp]
+% \vspace{0.2 cm}
+\setlength{\abovecaptionskip}{0.2 cm}
+\setlength{\belowcaptionskip}{-0.26 cm} 
+\renewcommand{\arraystretch}{1.36}
+\centering
+\newcolumntype{M}[1]{>{\centering\arraybackslash}m{#1}}
+\setlength\tabcolsep{4pt}
+    \begin{tabular}{M{1.36 cm}cM{0.86cm}M{1.26cm}M{1.26cm}M{1.26cm}M{1.26cm}M{1.26cm}M{1.26cm}}
+    \hline
+    \hline
+    \textbf{Model} &
+    \diagbox[width=1.86 cm]{\hspace{-5 pt}\raisebox{0.1ex}{$\boldsymbol{\textbf{Metrics}}$}}{\hspace{-16 pt}\lower0.2ex\hbox{$\boldsymbol{\sigma}$}} &
+    - & 0.05 & 0.1 & 0.15 & 0.2 & 0.25 & 0.3 \\ 
+    \hline
+    \multirow{2}[4]{*}{\textbf{MSDM}} & \textbf{Precision} & 0.719 & 0.709 (-1.39\%) & 0.705 (-1.95\%) & 0.702 (-2.36\%) & 0.698 (-2.92\%) & 0.692 (-3.76\%) & 0.683 (-5.01\%) \\
+     & \textbf{Recall} & 0.714 & 0.703 (-1.54\%) & 0.700 (-1.96\%) & 0.694 (-2.80\%) & 0.689 (-3.50\%) & 0.678 (-5.04\%) & 0.668 (-6.44\%) \\
+     \hline
+    \multirow{2}[4]{*}{\textbf{ITHP}} & \textbf{Precision} & 0.753 & 0.748 (-0.66\%) & 0.745 (-1.06\%) & 0.743 (-1.33\%) & 0.742 (-1.46\%) & 0.739 (-1.86\%) & 0.735 (-2.39\%) \\
+     & \textbf{Recall} & 0.752 & 0.745 (-0.93\%) & 0.741 (-1.46\%) & 0.740 (-1.60\%) & 0.738 (-1.86\%) & 0.733 (-2.53\%) & 0.730 (-2.93\%) \\
+    \hline
+    \hline
+    \end{tabular}
+\caption{\textbf{Evaluating Gaussian Noise Impact on Sarcasm Detection in Video Modality.} The table presents the weighted precision and recall for sarcasm detection on the MUStARD dataset, with an analysis of Gaussian noise addition to the video modality. Results are averaged over five cross-validation folds and 50 trials for each level of noise intensity. Each column indicates the standard deviation (represented by $\sigma$) of the introduced Gaussian noise with a mean of 0. Changes in performance metrics relative to the noise-free baseline are expressed as percentages.}
+\label{tab:noise_addition_video}
+\end{table}

@@ -1,0 +1,37 @@
+\begin{algorithm}[htb]
+    \caption{Pseudo-code for training ITHP in general scenario }
+    \label{alg:algITHP}
+    \begin{algorithmic}
+      \Require Dataset $\mathcal{D}$ = $\left \{ \left ( X_{0}, X_{1},\dots \dots ,X_{N} \right ) ,Y \right \} $; Coefficient: $\alpha $, $\beta$, $\left \{ \gamma _{k}  \right \} _{k=0}^{N-2} $, $\left \{ \lambda _{k}  \right \} _{k=0}^{N-2} $; Learning rate $\eta$; Mini-batch size $n_{mb}$; Assumed distribution of latent states : $\left \{ B_{k}  \right \} _{k=0}^{N-1} = \varepsilon \sim \mathcal{N} \left ( 0,1 \right )$;
+      \Ensure ITHP parameters $(\left \{ \theta _{k}  \right \} _{k=0}^{N-2} ,\left \{ \psi _{k}  \right \} _{k=0}^{N-2} )$; Task-related prediction $\hat{y}$;
+      \\Initialize the parameters in the Neural Networks $(\left \{ \theta _{k}  \right \} _{k=0}^{N-2} ,\left \{ \psi _{k}  \right \} _{k=0}^{N-2} )$
+    \Repeat
+        \State Sample a mini-batch: $\left \{ \left ( X_{0}^{n} , X_{1}^{n},\dots \dots ,X_{N}^{n} \right ) ,Y^{n} \right \} _{n=1}^{n_{mb} }\sim \mathcal{D } $
+    \For{$n = 1,2,\dots \dots, n_{mb} $}
+      \State $\mu_{0}^{n} ,\Sigma_{0}^{n}\longleftarrow f_{\theta _{0} } \left ( X_{0}^{n} \right ) $
+      \State $z_{0}^{n} \longleftarrow \mu _{0}^{n}+  \varepsilon \cdot \Sigma  _{0}^{n}$
+      \State $\hat{X}_{1}^{n} \longleftarrow f_{\psi _{0}}\left (Z_{0}^{n}\right ) $
+      \For{$k = 0,1,2,\dots \dots, N-2 $}
+        \State $\mu_{k+1}^{n} ,\Sigma_{k+1}^{n}\longleftarrow f_{\theta _{k+1} } \left ( z_{k}^{n} \right ) $
+        \State $z_{k+1}^{n} \longleftarrow \mu _{k+1}^{n}+  \varepsilon \cdot \Sigma  _{k+1}^{n}$
+        \State $\hat{X}_{k+2}^{n} \longleftarrow f_{\psi _{k+1}}\left (Z_{k+1}^{n}\right ) $
+      \EndFor
+    \EndFor 
+    \If {$ X_{0}, X_{1},\dots \dots ,X_{N} $ are categorical data} 
+        \State $\mathcal{L} _{IB_{0} }^{\theta _{0},\psi _{0} } =KL\left ( \mathcal{N}\left ( \mu _{0}^{n} ,\Sigma _{0}^{n}  \right )|| \mathcal{N}\left ( 0,1  \right )  \right )+\beta \cdot \frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( -\sum_{C=1}^{C}X_{1}^{n} \left [ C \right ] \cdot \log_{}{\left ( \hat{X} _{1}^{n} \left [ C\right ] \right ) }\right )  $
+        \For{$k = 0,1,2,\dots \dots, N-2 $}
+            \State $\mathcal{L} _{IB_{k+1} }^{\theta _{k+1},\psi _{k+1} } =KL\left ( \mathcal{N}\left ( \mu _{k+1}^{n} ,\Sigma _{k+1}^{n}  \right )|| \mathcal{N}\left ( 0,1  \right )  \right )+$ 
+            \State$\gamma_{k}  \cdot \frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( -\sum_{C=1}^{C}X_{k+2}^{n} \left [ C \right ] \cdot \log_{}{\left ( \hat{X} _{k+2}^{n} \left [ C\right ] \right ) }\right ) $
+        \EndFor
+    \ElsIf{$ X_{0}, X_{1},\dots \dots ,X_{N} $ are continuous data}
+         \State $\mathcal{L} _{IB_{0} }^{\theta _{0},\psi _{0} } =KL\left ( \mathcal{N}\left ( \mu _{0}^{n} ,\Sigma _{0}^{n}  \right )|| \mathcal{N}\left ( 0,1  \right )  \right )+\beta \cdot \frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( X_{1}^{n}-\hat{X}_{1}^{n}  \right )^{2}$
+         \For{$k = 0,1,2,\dots \dots, N-2 $}
+            \State $\mathcal{L} _{IB_{k+1} }^{\theta _{k+1},\psi _{k+1} } =KL\left ( \mathcal{N}\left ( \mu _{k+1}^{n} ,\Sigma _{k+1}^{n}  \right )|| \mathcal{N}\left ( 0,1  \right )  \right )+\gamma_{k}  \cdot \frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( X_{k+2}^{n}-\hat{X}_{k+2}^{n}  \right )^{2}$
+        \EndFor
+    \EndIf
+   \State $\mathcal{L} _{overall}^{\theta ,\psi }  = \mathcal{L}_{IB_{0}}^{\theta _{0},\psi _{0} } + \sum_{k=0}^{N-2} \lambda_{k} \cdot \mathcal{L}_{IB_{k+1}}^{\theta _{k+1},\psi _{k+1} } $
+   \State $\mathcal{L} _{task-related}  =\frac{N-1}{\beta +\sum_{k=0}^{N-2} \gamma_{k}  } \cdot \mathcal{L}_{IB_{overall}}^{\theta ,\psi} + \alpha\cdot\frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( z_{k+1}^{n}-Y^{n}  \right )^{2}  $
+   \State $( \theta _{k} ,\psi _{k} ) \longleftarrow ( \theta _{k} ,\psi _{k} ) -\eta\cdot \bigtriangledown _( \theta _{k} ,\psi _{k} )\mathcal{L} _{task-related}$, $(k = 0,1,2,\dots \dots, N-2 )$
+   \Until{convergence} 
+    \end{algorithmic}
+\end{algorithm}

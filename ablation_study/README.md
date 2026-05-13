@@ -13,8 +13,11 @@ Single run (and PRISM ablations) frozen to **study `infogate_mosi_phase4_mosi_40
 | [`mosi_trial234_hparams.py`](mosi_trial234_hparams.py) | Params + `build_train_argv()` |
 | [`train_fixed_mosi_trial234.py`](train_fixed_mosi_trial234.py) | Python launcher → this folder’s [`train.py`](train.py), `cwd` = `My_creation/` |
 | [`run_mosi_trial234.sh`](run_mosi_trial234.sh) | Shell entry (`CUDA_VISIBLE_DEVICES`, log tee) |
+| [`run_mosi_trial234_prism_serial_gpu1.sh`](run_mosi_trial234_prism_serial_gpu1.sh) | **Serial** PRISM ablations `none` → `no_ib` (w/o VTB) → `no_mselector` (w/o DPR) → `no_infogate` on **GPU 1** by default (`CUDA_VISIBLE_DEVICES=1`); append logs with `tee`. Override `MODES` / `CUDA_VISIBLE_DEVICES` / `PYTHON`. Use `DRY_RUN=1` to print argv only. |
 
 Outputs: `My_creation/ablation_study/runs/mosi_trial234/` (`train.log`, `checkpoints/`).
+
+Serial GPU1 example (full runs): `bash ablation_study/run_mosi_trial234_prism_serial_gpu1.sh` from `My_creation/`.
 
 ## CMU-MOSI — Optuna trial 220
 
@@ -46,7 +49,25 @@ Frozen to **study `infogate_mosei_phase1_4090d`, trial 70** (Tier 1). Optuna-rep
 
 Outputs: `My_creation/ablation_study/runs/mosei_phase1_trial70/`.
 
-MOSEI ablation t-SNE over checkpoint `h_p` (facet or joint): [`../visualize/tsne_mosei_ablation.py`](../visualize/tsne_mosei_ablation.py).
+MOSEI ablation t-SNE over checkpoint ``h_p`` (facet, PRISM / w/o VTB / w/o DPR / w/o InfoGate). **Default:** Acc-7 **discrete** 7 solid colors (same binning as ``train.py`` ``score()``), **small** markers (``--marker-size``, default 4), **▼ / ● / ▲** for negative / neutral / positive Acc-7 bins, per-panel **n / P(y<0) / bins −3..−1** text box + subtitle bin counts + bottom legend — no ``viridis``, no continuous gradient. Writes **``.png`` and ``.pdf``** (vector for LaTeX).
+
+From ``My_creation/``::
+
+    python ablation_study/tsne_mosei_prism_ablation.py --output ablation_study/runs/mosei_phase1_trial70_tsne/ablation_tsne_prism_mosei.png
+
+Optional diagnostics::
+
+    python ablation_study/tsne_mosei_prism_ablation.py --verbose \\
+      --dump-label-stats ablation_study/runs/mosei_phase1_trial70_tsne/label_stats.csv
+
+Paper-style **ternary** (ordinal-learning figure look): ``--color-mode ternary`` — Acc-7 collapsed to negative / neutral / positive, teal ``+`` / dark blue ``o`` / magenta ``x``, axes min–max to ``[0,1]`` with 0.2 ticks, **per-panel** legend lower-right. Example::
+
+    python ablation_study/tsne_mosei_prism_ablation.py --color-mode ternary \\
+      --output ablation_study/runs/mosei_phase1_trial70_tsne/ablation_tsne_prism_mosei_fig3style.png
+
+Debug-only continuous colormap: ``--color-mode continuous`` (RdBu_r + colorbar; not the paper default).
+
+See ``ablation_study/tsne_mosei_prism_ablation.py`` (requires checkpoints under ``runs/mosei_phase1_trial70*`` for each requested ``--variants``).
 
 Gold Optuna log: [`logs/optuna/4090D_restart/phase1/train_logs/mosei_phase1_trial_70.log`](../logs/optuna/4090D_restart/phase1/train_logs/mosei_phase1_trial_70.log).
 

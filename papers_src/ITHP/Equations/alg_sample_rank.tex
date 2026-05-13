@@ -1,0 +1,34 @@
+\begin{algorithm}
+
+\caption{ Ranking Modalities Based on SampEn}
+\begin{algorithmic}
+\Function{SampleEntropy}{$data, m, r$}
+    \State $N \gets \text{number of samples in } data$
+    \State $B^m \gets 0$
+    \State $A^m \gets 0$
+    \For{each sample in data}
+        \For{$i \gets 1 \text{ to number of features } - m$}
+            \If{$\text{norm}(\text{sample}[i:i+m] - \text{sample}[i+1:i+m+1]) < r$}
+                \State $B^m \gets B^m + 1$
+                \If{$i < \text{number of features } - m - 1$ and $\text{norm}(\text{sample}[i:i+m+1] - \text{sample}[i+1:i+m+2]) < r$}
+                    \State $A^m \gets A^m + 1$
+                \EndIf
+            \EndIf
+        \EndFor
+    \EndFor
+    \State \Return $-\log(A^m / B^m)$ \Comment{SampEn value}
+\EndFunction
+
+\Statex
+
+\Function{RankModalities}{$modalities, m, r$}
+    \State $ModalityList \gets \text{[ ]}$
+    \For{each $modality$ in $modalities$}
+        \State $entropy \gets \Call{SampleEntropy}{modality, m, r}$
+        \State Append $(modality, entropy)$ to $ModalityList$
+    \EndFor
+    \State Sort $ModalityList$ based on entropy in descending order
+    \State \Return $ModalityList$ \Comment{List of modalities ranked by entropy}
+\EndFunction
+\end{algorithmic}
+\end{algorithm}

@@ -1,0 +1,21 @@
+\begin{align}
+\begin{aligned}
+\mathcal{L}_{IB_{0}}^{\theta _{0},\psi _{0} } \left ( X_{0}; X_{1} \right ) = I\left ( X_{0}; B_{0} \right )-\beta I\left ( B_{0}; X_{1} \right ),
+\end{aligned}
+\label{appeq1_IB}
+\end{align}
+where $\beta > 0$ is a trading-off parameter chosen to balance between the two mutual information quantities. Here, $I\left ( X_{0}; B_{0} \right )$ and $I\left ( B_{0}; X_{1} \right )$ can be derived using variational approximations, i.e., $q_{\theta _{0}}\left ( B_{0}|X_{0} \right )$ and $q_{\psi _{0}}\left ( X_{1}|B_{0} \right )$, as follows:
+\begin{align}
+\begin{aligned}
+I\left ( X_{0}; B_{0} \right ) =& \int dX_{0}dB_{0} p\left (X_{0},B_{0} \right )\cdot \log_{}{\frac{p\left (X_{0},B_{0} \right )}{p\left (X_{0}\right )\cdot p\left (B_{0}\right )} } \\=& \int dX_{0}dB_{0} p\left (X_{0},B_{0} \right )\cdot \log_{}{\frac{p\left (B_{0}|X_{0} \right )}{ p\left (B_{0}\right )} }\\=
+&\int dX_{0}dB_{0} p\left (X_{0},B_{0} \right )\cdot \log_{}{p\left (B_{0}|X_{0} \right )} - \int dB_{0} p\left (B_{0} \right )\cdot \log_{}{p\left (B_{0}\right )}  \\\leq & \int dX_{0}dB_{0} p\left (X_{0},B_{0} \right )\cdot \log_{}{q_{\theta _{0} } \left (B_{0}|X_{0} \right )} - \int dB_{0} p\left (B_{0} \right )\cdot \log_{}{q\left (B_{0}\right )}\\\approx  & \int dX_{0}dB_{0} p\left ( X_{0}  \right )\cdot q_{\theta _{0} } \left ( B_{0}|X_{0} \right )\cdot \log_{}{\frac{q_{\theta _{0} } \left (B_{0}|X_{0} \right )}{ q\left (B_{0}\right )} }\\=& \mathbb{E} _{X_0\sim p\left ( X_0 \right ) } \left [ KL\left ( q_{\theta _{0} } \left ( B_0|X_0 \right )||q\left ( B_0 \right )   \right )  \right ], 
+\end{aligned}
+\label{lossfunc1}
+\end{align}
+where $q_{\theta _{0} } \left ( B_{0}|X_{0}\right )$ is used as the variational approximation for $p\left ( B_{0}|X_{0}\right )$ and $q \left ( B_{0}\right )\sim \mathcal{N} \left ( 0,1 \right ) $ is the probability distribution over the latent states based on the assumption.
+\begin{align}
+\begin{aligned}
+I\left ( B_{0}; X_{ 1} \right ) =& \int dB_{0}dX_{ 1} p\left (X_{ 1},B_{0} \right )\cdot \log_{}{\frac{p\left (X_{ 1},B_{0} \right )}{p\left (X_{ 1}\right )\cdot p\left (B_{0}\right )} } \\=& \int dB_{0}dX_{ 1} p\left (X_{ 1},B_{0} \right )\cdot \log_{}{\frac{p\left (X_{ 1}|B_{0} \right )}{ p\left (X_{ 1}\right )} } \\ \geq & \int dB_{0}dX_{ 1} p\left (X_{ 1},B_{0} \right )\cdot \log_{}{\frac{q_{\psi _{0} } \left (X_{ 1}|B_{0} \right )}{ p\left (X_{ 1}\right )} } \\\approx& \int dB_{0}dX_{ 1} p\left (X_{ 1},B_{0} \right )\cdot \log_{}{q_{\psi _{0} }\left (X_{ 1}|B_{0} \right ) } - \int dX_{ 1} p\left (X_{ 1} \right )\cdot \log_{}{q\left (X_{ 1}\right ) } \\ = & \int dB_{0}dX_{ 1} p\left (X_{ 1},B_{0} \right )\cdot \log_{}{q_{\psi _{0} }\left (X_{ 1}|B_{0} \right ) } + H\left (X_{ 1} \right ),
+\end{aligned}
+\label{lossfunc2}
+\end{align}

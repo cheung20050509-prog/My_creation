@@ -1,0 +1,21 @@
+\begin{table}[htb]
+% \vspace{0.2 cm}
+\setlength{\abovecaptionskip}{0.3 cm}
+\setlength{\belowcaptionskip}{-0.3 cm} 
+\renewcommand{\arraystretch}{1.26}
+\centering
+\setlength\tabcolsep{9.36 pt}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule\toprule
+\multirow{2}{*}{\textbf{Metrics}} & \multicolumn{6}{c}{\textbf{Order of Modalities}} \\ 
+\cmidrule(lr){2-7} 
+& \textbf{V$\rightarrow$T$\rightarrow$A} & \textbf{V$\rightarrow$A$\rightarrow$T} & \textbf{T$\rightarrow$V$\rightarrow$A} & \textbf{T$\rightarrow$A$\rightarrow$V} & \textbf{A$\rightarrow$V$\rightarrow$T} & \textbf{A$\rightarrow$T$\rightarrow$V} \\
+\midrule
+Precision & \uline{75.3} & 73.7 & 73.0 & 72.0 & 71.4 & 70.8 \\
+Recall & \uline{75.2} & 73.5 & 72.8 & 71.8 & 71.2 & 70.6 \\
+F-Score & \uline{75.2} & 73.4 & 72.9 & 71.7 & 71.5 & 70.6 \\
+\bottomrule\bottomrule
+\end{tabular}
+\caption{\textbf{Varying Orders of Modalities.} The table showcases the impact of changing the order of modalities on the weighted Precision, Recall, and F-Score across both sarcastic and non-sarcastic classes, averaged across five folds. Underlined values highlight the best results for each metric. The modalities are denoted as: $T$ for text, $A$ for audio, and $V$ for video.}
+\label{tab:modalities_order}
+\end{table}

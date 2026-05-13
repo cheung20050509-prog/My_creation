@@ -1,0 +1,24 @@
+\begin{table}[t]
+\setlength\tabcolsep{10.06 pt}
+\setlength{\abovecaptionskip}{0.2 cm}
+\setlength{\belowcaptionskip}{-.36 cm} 
+\setlength\tabcolsep{1.16 em}
+\centering
+\begin{tabular}{@{}ccccccccc@{}}
+    \toprule\toprule
+    \multirow{2}{*}{\textbf{Algorithm}} & \multirow{2}{*}{\textbf{Metrics}} &  \multicolumn{7}{c}{\textbf{Modalities}} \\ 
+    \cmidrule(lr){3-9} 
+    & & \textbf{T}  & \textbf{A}   & \textbf{V} & \textbf{T-A} & \textbf{V-T} & \textbf{V-A} & \textbf{V-T-A} \\ 
+    \midrule
+    \multirow{3}{*}{MSDM}   & Precision & 65.1 & 65.9 & 68.1 & 66.6 & \uline{72.0} & 66.2 & 71.9 \\ 
+                            & Recall    & 64.6 & 64.6 & 67.4 & 66.2 & \uline{71.6} & 65.7 & 71.4 \\ 
+                            & F-Score   & 64.6 & 64.6 & 67.4 & 66.2 & \uline{71.6} & 65.7 & 71.5 \\ 
+    \midrule
+    \multirow{3}{*}{ITHP}   & Precision & 65.0 & 65.1 & 67.6 & 69.7 & 72.1 & 70.5 & \uline{\textbf{75.3}} \\ 
+                            & Recall    & 64.8 & 64.9 & 67.5 & 69.1 & 71.7 & 70.3 & \uline{\textbf{75.2}} \\ 
+                            & F-Score   & 64.7 & 64.8 & 67.5 & 69.1 & 71.6 & 70.3 & \uline{\textbf{75.2}} \\
+    \bottomrule\bottomrule
+\end{tabular}
+\caption{\textbf{Results of sarcasm detection on the MUStARD dataset.} The table presents the weighted Precision, Recall, and F-Score across both sarcastic and non-sarcastic classes, averaged across five folds. Underlined values indicate the best results for each row, while bold data represents the optimal results overall. The modalities are denoted as follows: $T$ represents text, $A$ stands for audio, and $V$ signifies video.}
+\label{tab:ITH-NNSarcasmDetection}
+\end{table}

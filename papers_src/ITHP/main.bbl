@@ -1,0 +1,337 @@
+\begin{thebibliography}{65}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Cai et~al.(2019{\natexlab{a}})Cai, Cai, and Wan]{cai-etal-2019-multi}
+Yitao Cai, Huiyu Cai, and Xiaojun Wan.
+\newblock Multi-modal sarcasm detection in {T}witter with hierarchical fusion model.
+\newblock In Anna Korhonen, David Traum, and Llu{\'\i}s M{\`a}rquez (eds.), \emph{Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics}, pp.\  2506--2515, Florence, Italy, July 2019{\natexlab{a}}. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/P19-1239}.
+\newblock URL \url{https://aclanthology.org/P19-1239}.
+
+\bibitem[Cai et~al.(2019{\natexlab{b}})Cai, Cai, and Wan]{cai2019multi}
+Yitao Cai, Huiyu Cai, and Xiaojun Wan.
+\newblock Multi-modal sarcasm detection in twitter with hierarchical fusion model.
+\newblock In \emph{Proceedings of the 57th annual meeting of the association for computational linguistics}, pp.\  2506--2515, 2019{\natexlab{b}}.
+
+\bibitem[Castro et~al.(2019)Castro, Hazarika, P{\'e}rez-Rosas, Zimmermann, Mihalcea, and Poria]{castro2019towards}
+Santiago Castro, Devamanyu Hazarika, Ver{\'o}nica P{\'e}rez-Rosas, Roger Zimmermann, Rada Mihalcea, and Soujanya Poria.
+\newblock Towards multimodal sarcasm detection (an \_obviously\_ perfect paper).
+\newblock \emph{arXiv preprint arXiv:1906.01815}, 2019.
+
+\bibitem[Das \& Singh(2023)Das and Singh]{das2023multimodal}
+Ringki Das and Thoudam~Doren Singh.
+\newblock Multimodal sentiment analysis: A survey of methods, trends and challenges.
+\newblock \emph{ACM Computing Surveys}, 2023.
+
+\bibitem[Deng et~al.(2009)Deng, Dong, Socher, Li, Li, and Fei-Fei]{deng2009imagenet}
+Jia Deng, Wei Dong, Richard Socher, Li-Jia Li, Kai Li, and Li~Fei-Fei.
+\newblock Imagenet: A large-scale hierarchical image database.
+\newblock In \emph{2009 IEEE conference on computer vision and pattern recognition}, pp.\  248--255. Ieee, 2009.
+
+\bibitem[Devlin et~al.(2018)Devlin, Chang, Lee, and Toutanova]{devlin2018bert}
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova.
+\newblock Bert: Pre-training of deep bidirectional transformers for language understanding.
+\newblock \emph{arXiv preprint arXiv:1810.04805}, 2018.
+
+\bibitem[Friedman et~al.(2001)Friedman, Mosenzon, Slonim, and Tishby]{friedman2001multivariate}
+Nir Friedman, Ori Mosenzon, Noam Slonim, and Naftali Tishby.
+\newblock Multivariate information bottleneck.
+\newblock In \emph{Proceedings of the Seventeenth conference on Uncertainty in artificial intelligence}, pp.\  152--161. Morgan Kaufmann Publishers Inc., 2001.
+
+\bibitem[Gandhi et~al.(2022)Gandhi, Adhvaryu, Poria, Cambria, and Hussain]{gandhi2022multimodal}
+Ankita Gandhi, Kinjal Adhvaryu, Soujanya Poria, Erik Cambria, and Amir Hussain.
+\newblock Multimodal sentiment analysis: A systematic review of history, datasets, multimodal fusion methods, applications, challenges and future directions.
+\newblock \emph{Information Fusion}, 2022.
+
+\bibitem[Glover(2011)]{glover2011overview}
+Gary~H Glover.
+\newblock Overview of functional magnetic resonance imaging.
+\newblock \emph{Neurosurgery Clinics}, 22\penalty0 (2):\penalty0 133--139, 2011.
+
+\bibitem[Han et~al.(2021{\natexlab{a}})Han, Chen, Gelbukh, Zadeh, Morency, and Poria]{han2021bi}
+Wei Han, Hui Chen, Alexander Gelbukh, Amir Zadeh, Louis-philippe Morency, and Soujanya Poria.
+\newblock Bi-bimodal modality fusion for correlation-controlled multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 2021 International Conference on Multimodal Interaction}, pp.\  6--15, 2021{\natexlab{a}}.
+
+\bibitem[Han et~al.(2021{\natexlab{b}})Han, Chen, and Poria]{han2021improving}
+Wei Han, Hui Chen, and Soujanya Poria.
+\newblock Improving multimodal fusion with hierarchical mutual information maximization for multimodal sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:2109.00412}, 2021{\natexlab{b}}.
+
+\bibitem[Hazarika et~al.(2018)Hazarika, Poria, Zadeh, Cambria, Morency, and Zimmermann]{hazarika2018conversational}
+Devamanyu Hazarika, Soujanya Poria, Amir Zadeh, Erik Cambria, Louis-Philippe Morency, and Roger Zimmermann.
+\newblock Conversational memory network for emotion recognition in dyadic dialogue videos.
+\newblock In \emph{Proceedings of the conference. Association for Computational Linguistics. North American Chapter. Meeting}, volume 2018, pp.\  2122. NIH Public Access, 2018.
+
+\bibitem[Hazarika et~al.(2020)Hazarika, Zimmermann, and Poria]{hazarika2020misa}
+Devamanyu Hazarika, Roger Zimmermann, and Soujanya Poria.
+\newblock Misa: Modality-invariant and-specific representations for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 28th ACM International Conference on Multimedia}, pp.\  1122--1131, 2020.
+
+\bibitem[He et~al.(2016)He, Zhang, Ren, and Sun]{he2016deep}
+Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun.
+\newblock Deep residual learning for image recognition.
+\newblock In \emph{Proceedings of the IEEE conference on computer vision and pattern recognition}, pp.\  770--778, 2016.
+
+\bibitem[He et~al.(2020)He, Liu, Gao, and Chen]{he2020deberta}
+Pengcheng He, Xiaodong Liu, Jianfeng Gao, and Weizhu Chen.
+\newblock Deberta: Decoding-enhanced bert with disentangled attention.
+\newblock \emph{arXiv preprint arXiv:2006.03654}, 2020.
+
+\bibitem[He et~al.(2021)He, Gao, and Chen]{he2021debertav3}
+Pengcheng He, Jianfeng Gao, and Weizhu Chen.
+\newblock Debertav3: Improving deberta using electra-style pre-training with gradient-disentangled embedding sharing, 2021.
+
+\bibitem[Hecht \& Tishby(2005)Hecht and Tishby]{hecht2005extraction}
+Ron~M Hecht and Naftali Tishby.
+\newblock Extraction of relevant speech features using the information bottleneck method.
+\newblock In \emph{Ninth European Conference on Speech Communication and Technology}, 2005.
+
+\bibitem[Hu et~al.(2022)Hu, Lin, Zhao, Lu, Wu, and Li]{hu2022unimse}
+Guimin Hu, Ting-En Lin, Yi~Zhao, Guangming Lu, Yuchuan Wu, and Yongbin Li.
+\newblock Unimse: Towards unified multimodal sentiment analysis and emotion recognition.
+\newblock \emph{arXiv preprint arXiv:2211.11256}, 2022.
+
+\bibitem[Huang et~al.(2023)Huang, Zhou, Chan, Fung, Wang, Zhang, Chang, and Ji]{huang2023lvlms}
+Kung-Hsiang Huang, Mingyang Zhou, Hou~Pong Chan, Yi~R. Fung, Zhenhailong Wang, Lingyu Zhang, Shih-Fu Chang, and Heng Ji.
+\newblock Do lvlms understand charts? analyzing and correcting factual errors in chart captioning, 2023.
+
+\bibitem[Huang et~al.(2024)Huang, Chan, Fung, Qiu, Zhou, Joty, Chang, and Ji]{huang2024pixels}
+Kung-Hsiang Huang, Hou~Pong Chan, Yi~R. Fung, Haoyi Qiu, Mingyang Zhou, Shafiq Joty, Shih-Fu Chang, and Heng Ji.
+\newblock From pixels to insights: A survey on automatic chart understanding in the era of large foundation models, 2024.
+
+\bibitem[Lavenex \& Amaral(2000)Lavenex and Amaral]{Pierre2000}
+Pierre Lavenex and David~G. Amaral.
+\newblock Hippocampal-neocortical interaction: A hierarchy of associativity.
+\newblock \emph{Hippocampus}, 10\penalty0 (4):\penalty0 420--430, 2000.
+\newblock \doi{https://doi.org/10.1002/1098-1063(2000)10:4<420::AID-HIPO8>3.0.CO;2-5}.
+
+\bibitem[Lee \& van~der Schaar(2021)Lee and van~der Schaar]{lee2021variational}
+Changhee Lee and Mihaela van~der Schaar.
+\newblock A variational information bottleneck approach to multi-omics data integration, 2021.
+
+\bibitem[Liang et~al.(2018)Liang, Liu, Zadeh, and Morency]{liang2018multimodal}
+Paul~Pu Liang, Ziyin Liu, Amir Zadeh, and Louis-Philippe Morency.
+\newblock Multimodal language analysis with recurrent multistage fusion, 2018.
+
+\bibitem[Liang et~al.(2023)Liang, Lyu, Chhablani, Jain, Deng, Wang, Morency, and Salakhutdinov]{liang2023multiviz}
+Paul~Pu Liang, Yiwei Lyu, Gunjan Chhablani, Nihal Jain, Zihao Deng, Xingbo Wang, Louis-Philippe Morency, and Ruslan Salakhutdinov.
+\newblock Multiviz: Towards visualizing and understanding multimodal models.
+\newblock In \emph{The Eleventh International Conference on Learning Representations}, 2023.
+
+\bibitem[Liu et~al.(2019)Liu, Ott, Goyal, Du, Joshi, Chen, Levy, Lewis, Zettlemoyer, and Stoyanov]{liu2019roberta}
+Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov.
+\newblock Roberta: A robustly optimized bert pretraining approach, 2019.
+
+\bibitem[Liu et~al.(2018)Liu, Shen, Lakshminarasimhan, Liang, Zadeh, and Morency]{liu2018efficient}
+Zhun Liu, Ying Shen, Varun~Bharadhwaj Lakshminarasimhan, Paul~Pu Liang, Amir Zadeh, and Louis-Philippe Morency.
+\newblock Efficient low-rank multimodal fusion with modality-specific factors.
+\newblock \emph{arXiv preprint arXiv:1806.00064}, 2018.
+
+\bibitem[Lv et~al.(2021)Lv, Chen, Huang, Duan, and Lin]{lv2021progressive}
+Fengmao Lv, Xiang Chen, Yanyong Huang, Lixin Duan, and Guosheng Lin.
+\newblock Progressive modality reinforcement for human multimodal emotion recognition from unaligned multimodal sequences.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pp.\  2554--2562, 2021.
+
+\bibitem[Mai et~al.(2022)Mai, Zeng, and Hu]{mai2022multimodal}
+Sijie Mai, Ying Zeng, and Haifeng Hu.
+\newblock Multimodal information bottleneck: Learning minimal sufficient unimodal and multimodal representations.
+\newblock \emph{IEEE Transactions on Multimedia}, 2022.
+
+\bibitem[McFee et~al.(2018{\natexlab{a}})McFee, McVicar, Balke, Thom{\'e}, Lostanlen, Raffel, Lee, Nieto, Battenberg, Ellis, et~al.]{mcfee2018wzy}
+Brian McFee, Matt McVicar, Stefan Balke, Carl Thom{\'e}, Vincent Lostanlen, Colin Raffel, Dana Lee, Oriol Nieto, Eric Battenberg, Dan Ellis, et~al.
+\newblock Wzy.
+\newblock \emph{Rachel Bittner, Keunwoo Choi, Pius Friesch, Fabian-Robert Stter, Matt Vollrath, Siddhartha Kumar, nehz, Simon Waloschek, Seth, Rimvydas Naktinis, Douglas Repetto, Curtis” Fjord” Hawthorne, CJ Carr, Joo Felipe Santos, JackieWu, Erik, and Adrian Holovaty,“librosa/librosa: 0.6}, 2, 2018{\natexlab{a}}.
+
+\bibitem[McFee et~al.(2018{\natexlab{b}})McFee, McVicar, Balke, Thomé, Lostanlen, Raffel, Lee, Nieto, Battenberg, Ellis, Yamamoto, Moore, WZY, Bittner, Choi, Friesch, Stöter, Vollrath, Kumar, nehz, Waloschek, Seth, Naktinis, Repetto, Hawthorne, Carr, Santos, JackieWu, Erik, and Holovaty]{brian_mcfee_2018_1342708}
+Brian McFee, Matt McVicar, Stefan Balke, Carl Thomé, Vincent Lostanlen, Colin Raffel, Dana Lee, Oriol Nieto, Eric Battenberg, Dan Ellis, Ryuichi Yamamoto, Josh Moore, WZY, Rachel Bittner, Keunwoo Choi, Pius Friesch, Fabian-Robert Stöter, Matt Vollrath, Siddhartha Kumar, nehz, Simon Waloschek, Seth, Rimvydas Naktinis, Douglas Repetto, Curtis~"Fjord" Hawthorne, CJ~Carr, João~Felipe Santos, JackieWu, Erik, and Adrian Holovaty.
+\newblock librosa/librosa: 0.6.2, August 2018{\natexlab{b}}.
+\newblock URL \url{https://doi.org/10.5281/zenodo.1342708}.
+
+\bibitem[Mesulam(1998)]{Mesulam1998}
+M~M Mesulam.
+\newblock {From sensation to cognition.}
+\newblock \emph{Brain}, 121\penalty0 (6):\penalty0 1013--1052, 06 1998.
+\newblock ISSN 0006-8950.
+\newblock \doi{10.1093/brain/121.6.1013}.
+
+\bibitem[Meunier et~al.(2009)Meunier, Lambiotte, Fornito, Ersche, and Bullmore]{meunier2009hierarchical}
+David Meunier, Renaud Lambiotte, Alex Fornito, Karen Ersche, and Edward~T Bullmore.
+\newblock Hierarchical modularity in human brain functional networks.
+\newblock \emph{Frontiers in neuroinformatics}, 3:\penalty0 571, 2009.
+
+\bibitem[Park et~al.(2014)Park, Shim, Chatterjee, Sagae, and Morency]{park2014computational}
+Sunghyun Park, Han~Suk Shim, Moitreya Chatterjee, Kenji Sagae, and Louis-Philippe Morency.
+\newblock Computational analysis of persuasiveness in social multimedia: A novel dataset and multimodal prediction approach.
+\newblock In \emph{Proceedings of the 16th International Conference on Multimodal Interaction}, pp.\  50--57, 2014.
+
+\bibitem[Pascual-Leone \& Hamilton(2001)Pascual-Leone and Hamilton]{pascual2001metamodal}
+Alvaro Pascual-Leone and Roy Hamilton.
+\newblock The metamodal organization of the brain.
+\newblock \emph{Progress in brain research}, 134:\penalty0 427--445, 2001.
+
+\bibitem[Pham et~al.(2019)Pham, Liang, Manzini, Morency, and Póczos]{pham2019found}
+Hai Pham, Paul~Pu Liang, Thomas Manzini, Louis-Philippe Morency, and Barnabás Póczos.
+\newblock Found in translation: Learning robust joint representations by cyclic translations between modalities.
+\newblock \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, 33\penalty0 (01):\penalty0 6892--6899, Jul. 2019.
+\newblock \doi{10.1609/aaai.v33i01.33016892}.
+\newblock URL \url{https://ojs.aaai.org/index.php/AAAI/article/view/4666}.
+
+\bibitem[Poria et~al.(2018)Poria, Hussain, and Cambria]{poria2018multimodal}
+Soujanya Poria, Amir Hussain, and Erik Cambria.
+\newblock \emph{Multimodal sentiment analysis}.
+\newblock Springer, 2018.
+
+\bibitem[Price(2012)]{PRICE2012816}
+Cathy~J Price.
+\newblock A review and synthesis of the first 20 years of pet and fmri studies of heard speech, spoken language and reading.
+\newblock \emph{Neuroimage}, 62\penalty0 (2):\penalty0 816--847, 2012.
+
+\bibitem[Rahman et~al.(2020)Rahman, Hasan, Lee, Zadeh, Mao, Morency, and Hoque]{rahman2020integrating}
+Wasifur Rahman, Md~Kamrul Hasan, Sangwu Lee, Amir Zadeh, Chengfeng Mao, Louis-Philippe Morency, and Ehsan Hoque.
+\newblock Integrating multimodal information in large pretrained transformers.
+\newblock In \emph{Proceedings of the conference. Association for Computational Linguistics. Meeting}, volume 2020, pp.\  2359. NIH Public Access, 2020.
+
+\bibitem[Raut et~al.(2020)Raut, Snyder, and Raichle]{raut2020hierarchical}
+Ryan~V Raut, Abraham~Z Snyder, and Marcus~E Raichle.
+\newblock Hierarchical dynamics as a macroscopic organizing principle of the human brain.
+\newblock \emph{Proceedings of the National Academy of Sciences}, 117\penalty0 (34):\penalty0 20890--20897, 2020.
+
+\bibitem[Sepulcre et~al.(2012)Sepulcre, Sabuncu, Yeo, Liu, and Johnson]{Sepulcre10649}
+Jorge Sepulcre, Mert~R. Sabuncu, Thomas~B. Yeo, Hesheng Liu, and Keith~A. Johnson.
+\newblock Stepwise connectivity of the modal cortex reveals the multimodal organization of the human brain.
+\newblock \emph{Journal of Neuroscience}, 32\penalty0 (31):\penalty0 10649--10661, 2012.
+\newblock ISSN 0270-6474.
+\newblock \doi{10.1523/JNEUROSCI.0759-12.2012}.
+
+\bibitem[Shwartz-Ziv \& Tishby(2017)Shwartz-Ziv and Tishby]{shwartz2017opening}
+Ravid Shwartz-Ziv and Naftali Tishby.
+\newblock Opening the black box of deep neural networks via information.
+\newblock \emph{arXiv preprint arXiv:1703.00810}, 2017.
+
+\bibitem[Slonim \& Tishby(2000)Slonim and Tishby]{slonim2000document}
+Noam Slonim and Naftali Tishby.
+\newblock Document clustering using word clusters via the information bottleneck method.
+\newblock In \emph{Proceedings of the 23rd annual international ACM SIGIR conference on Research and development in information retrieval}, pp.\  208--215. ACM, 2000.
+
+\bibitem[Tian et~al.(2022)Tian, Zhang, Guo, Ma, Metoyer, and Chawla]{recipe2vec}
+Yijun Tian, Chuxu Zhang, Zhichun Guo, Yihong Ma, Ronald Metoyer, and Nitesh~V Chawla.
+\newblock Recipe2vec: Multi-modal recipe representation learning with graph neural networks.
+\newblock In \emph{IJCAI}, 2022.
+
+\bibitem[Tian et~al.(2024)Tian, Han, Chen, Wang, and Chawla]{tinyllm}
+Yijun Tian, Yikun Han, Xiusi Chen, Wei Wang, and Nitesh~V Chawla.
+\newblock Tinyllm: Learning a small student from multiple large language models.
+\newblock \emph{arXiv preprint arXiv:2402.04616}, 2024.
+
+\bibitem[Tishby \& Zaslavsky(2015)Tishby and Zaslavsky]{tishby2015deep}
+Naftali Tishby and Noga Zaslavsky.
+\newblock Deep learning and the information bottleneck principle.
+\newblock In \emph{Information Theory Workshop (ITW)}, pp.\  1--5. IEEE, 2015.
+
+\bibitem[Tishby et~al.(2000)Tishby, Pereira, and Bialek]{tishby2000information}
+Naftali Tishby, Fernando~C Pereira, and William Bialek.
+\newblock The information bottleneck method.
+\newblock \emph{arXiv preprint physics/0004057}, 2000.
+
+\bibitem[Tononi et~al.(1998)Tononi, Edelman, and Sporns]{tononi1998complexity}
+Giulio Tononi, Gerald~M Edelman, and Olaf Sporns.
+\newblock Complexity and coherency: integrating information in the brain.
+\newblock \emph{Trends in cognitive sciences}, 2\penalty0 (12):\penalty0 474--484, 1998.
+
+\bibitem[Tsai et~al.(2019)Tsai, Bai, Liang, Kolter, Morency, and Salakhutdinov]{tsai2019multimodal}
+Yao-Hung~Hubert Tsai, Shaojie Bai, Paul~Pu Liang, J~Zico Kolter, Louis-Philippe Morency, and Ruslan Salakhutdinov.
+\newblock Multimodal transformer for unaligned multimodal language sequences.
+\newblock In \emph{Proceedings of the conference. Association for Computational Linguistics. Meeting}, volume 2019, pp.\  6558. NIH Public Access, 2019.
+
+\bibitem[Wang et~al.(2019)Wang, Shen, Liu, Liang, Zadeh, and Morency]{wang2019words}
+Yansen Wang, Ying Shen, Zhun Liu, Paul~Pu Liang, Amir Zadeh, and Louis-Philippe Morency.
+\newblock Words can shift: Dynamically adjusting word representations using nonverbal behaviors.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, volume~33, pp.\  7216--7223, 2019.
+
+\bibitem[Wen et~al.(2023)Wen, Jia, and Yang]{wen2023dip}
+Changsong Wen, Guoli Jia, and Jufeng Yang.
+\newblock Dip: Dual incongruity perceiving network for sarcasm detection.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, pp.\  2540--2550, 2023.
+
+\bibitem[Xiao et~al.(2022)Xiao, Cao, Yang, Gupta, Liu, Yin, Balan, and Bogdan]{xiao2022coupled}
+Xiongye Xiao, Defu Cao, Ruochen Yang, Gaurav Gupta, Gengshuo Liu, Chenzhong Yin, Radu Balan, and Paul Bogdan.
+\newblock Coupled multiwavelet operator learning for coupled differential equations.
+\newblock In \emph{The Eleventh International Conference on Learning Representations}, 2022.
+
+\bibitem[Xue \& Bogdan(2017)Xue and Bogdan]{xue2017constructing}
+Yuankun Xue and Paul Bogdan.
+\newblock Constructing compact causal mathematical models for complex dynamics.
+\newblock In \emph{Proceedings of the 8th International Conference on Cyber-Physical Systems}, pp.\  97--107, 2017.
+
+\bibitem[Xue \& Marculescu(2023)Xue and Marculescu]{Xue_2023_CVPR}
+Zihui Xue and Radu Marculescu.
+\newblock Dynamic multimodal fusion.
+\newblock In \emph{Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Workshops}, pp.\  2575--2584, June 2023.
+
+\bibitem[Yang et~al.(2019)Yang, Dai, Yang, Carbonell, Salakhutdinov, and Le]{yang2019xlnet}
+Zhilin Yang, Zihang Dai, Yiming Yang, Jaime Carbonell, Russ~R Salakhutdinov, and Quoc~V Le.
+\newblock Xlnet: Generalized autoregressive pretraining for language understanding.
+\newblock \emph{Advances in neural information processing systems}, 32, 2019.
+
+\bibitem[Yin et~al.(2023)Yin, Fu, Zhao, Li, Sun, Xu, and Chen]{yin2023survey}
+Shukang Yin, Chaoyou Fu, Sirui Zhao, Ke~Li, Xing Sun, Tong Xu, and Enhong Chen.
+\newblock A survey on multimodal large language models.
+\newblock \emph{arXiv preprint arXiv:2306.13549}, 2023.
+
+\bibitem[Yu et~al.(2023)Yu, Gao, Lin, Yang, Wu, Ma, Wang, Huang, and Li]{yu2023speechtext}
+Tianshu Yu, Haoyu Gao, Ting-En Lin, Min Yang, Yuchuan Wu, Wentao Ma, Chao Wang, Fei Huang, and Yongbin Li.
+\newblock Speech-text dialog pre-training for spoken dialog understanding with explicit cross-modal alignment, 2023.
+
+\bibitem[Yu et~al.(2021)Yu, Xu, Yuan, and Wu]{yu2021learning}
+Wenmeng Yu, Hua Xu, Ziqi Yuan, and Jiele Wu.
+\newblock Learning modality-specific representations with self-supervised multi-task learning for multimodal sentiment analysis.
+\newblock \emph{Proceedings of the AAAI conference on artificial intelligence}, 35\penalty0 (12):\penalty0 10790--10797, 2021.
+
+\bibitem[Zadeh et~al.(2016)Zadeh, Zellers, Pincus, and Morency]{zadeh2016mosi}
+Amir Zadeh, Rowan Zellers, Eli Pincus, and Louis-Philippe Morency.
+\newblock Mosi: multimodal corpus of sentiment intensity and subjectivity analysis in online opinion videos.
+\newblock \emph{arXiv preprint arXiv:1606.06259}, 2016.
+
+\bibitem[Zadeh et~al.(2017)Zadeh, Chen, Poria, Cambria, and Morency]{zadeh2017tensor}
+Amir Zadeh, Minghai Chen, Soujanya Poria, Erik Cambria, and Louis-Philippe Morency.
+\newblock Tensor fusion network for multimodal sentiment analysis, 2017.
+\newblock arXiv:1707.07250.
+
+\bibitem[Zadeh et~al.(2018{\natexlab{a}})Zadeh, Liang, Mazumder, Poria, Cambria, and Morency]{zadeh2018memory}
+Amir Zadeh, Paul~Pu Liang, Navonil Mazumder, Soujanya Poria, Erik Cambria, and Louis-Philippe Morency.
+\newblock Memory fusion network for multi-view sequential learning, 2018{\natexlab{a}}.
+\newblock arXiv:1802.00927.
+
+\bibitem[Zadeh et~al.(2018{\natexlab{b}})Zadeh, Liang, Poria, Vij, Cambria, and Morency]{zadeh2018multi}
+Amir Zadeh, Paul~Pu Liang, Soujanya Poria, Prateek Vij, Erik Cambria, and Louis-Philippe Morency.
+\newblock Multi-attention recurrent network for human communication comprehension.
+\newblock \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, 32\penalty0 (1), Apr. 2018{\natexlab{b}}.
+\newblock \doi{10.1609/aaai.v32i1.12024}.
+\newblock URL \url{https://ojs.aaai.org/index.php/AAAI/article/view/12024}.
+
+\bibitem[Zadeh et~al.(2018{\natexlab{c}})Zadeh, Liang, Poria, Vij, Cambria, and Morency]{zadeh2018multiattention}
+Amir Zadeh, Paul~Pu Liang, Soujanya Poria, Prateek Vij, Erik Cambria, and Louis-Philippe Morency.
+\newblock Multi-attention recurrent network for human communication comprehension, 2018{\natexlab{c}}.
+\newblock arXiv:1802.00923.
+
+\bibitem[Zadeh et~al.(2018{\natexlab{d}})Zadeh, Liang, Poria, Cambria, and Morency]{zadeh2018multimodal}
+AmirAli~Bagher Zadeh, Paul~Pu Liang, Soujanya Poria, Erik Cambria, and Louis-Philippe Morency.
+\newblock Multimodal language analysis in the wild: Cmu-mosei dataset and interpretable dynamic fusion graph.
+\newblock In \emph{Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pp.\  2236--2246, 2018{\natexlab{d}}.
+
+\bibitem[Zhang et~al.(2019)Zhang, Dong, Zhang, Huang, Zhu, and Liu]{zhang2019discovering}
+Shu Zhang, Qinglin Dong, Wei Zhang, Heng Huang, Dajiang Zhu, and Tianming Liu.
+\newblock Discovering hierarchical common brain networks via multimodal deep belief network.
+\newblock \emph{Medical image analysis}, 54:\penalty0 238--252, 2019.
+
+\bibitem[Zhou et~al.(2023)Zhou, Fung, Chen, Thomas, Ji, and Chang]{zhou2023enhanced}
+Mingyang Zhou, Yi~R Fung, Long Chen, Christopher Thomas, Heng Ji, and Shih~Fu Chang.
+\newblock Enhanced chart understanding in vision and language task via cross-modal pre-training on plot table pairs.
+\newblock In \emph{61st Annual Meeting of the Association for Computational Linguistics, ACL 2023}, pp.\  1314--1326. Association for Computational Linguistics (ACL), 2023.
+
+\end{thebibliography}

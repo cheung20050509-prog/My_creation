@@ -1,0 +1,14 @@
+\begin{align}
+\begin{aligned}
+I\left ( B_{ 1}; X_{ 2} \right ) =& \int dB_{ 1}dX_{ 2} p\left (X_{ 2},B_{ 1} \right )\cdot \log_{}{\frac{p\left (X_{ 2},B_{ 1} \right )}{p\left (X_{ 2}\right )\cdot p\left (B_{ 1}\right )} } \\\approx &  \int dB_{ 1}dX_{ 2} p\left (X_{ 2},B_{ 1} \right )\cdot \log_{}{q_{\psi _{ 1} }\left (X_{ 2}|B_{ 1} \right ) } + H\left (X_{ 2} \right )  \\=& \mathbb{E} _{B_{ 1}\sim p(B_{ 1}|B_{0})}\mathbb{E} _{B_{0}\sim p(B_{0}) }\left [ \log_{}{q_{\psi _{ 1} } \left ( X_{ 2}|B_{ 1}  \right )  }   \right ].
+\end{aligned}
+\label{I_Bk_k+1}
+\end{align}
+Then we have the derivation of the Eqn. (\ref{Tlossfunc2}) as
+\begin{align}
+\begin{aligned}
+\mathcal{L}_{IB_{ 1}}^{\theta _{ 1},\psi _{ 1} } \left ( B_{0}; X_{ 2} \right ) &= I\left ( B_{0}; B_{ 1} \right )-\gamma I\left ( B_{ 1}; X_{ 2} \right ) \\
+&\approx \mathbb{E} _{B_{0}\sim p(B_{0}) } KL\left ( q_{\theta _{ 1}}\left ( B_{ 1}|B_{0} \right ) ||q\left ( B_{ 1} \right ) \right )  \\& -\gamma\cdot \mathbb{E} _{B_{ 1}\sim p(B_{ 1}|B_{0})}\mathbb{E} _{B_{0}\sim p(B_{0}) }\left [ \log_{}{q_{\psi _{ 1} } \left ( X_{ 2}|B_{ 1}  \right )  }   \right ].
+\end{aligned}
+\label{AAlossfunc2}
+\end{align}

@@ -1,0 +1,24 @@
+\begin{table}[ht]
+\vspace{-0.2 cm}
+\setlength{\abovecaptionskip}{0.1 cm}
+\setlength{\belowcaptionskip}{-0.3 cm} 
+\setlength\tabcolsep{9 pt}
+\renewcommand{\arraystretch}{1.26}
+\centering
+\begin{tabular}{c|cccccc}
+\multicolumn{7}{c}{\textbf{Recall}} \\
+\hline\hline
+\diagbox{\raisebox{0.2ex}{$\boldsymbol{B_0}$ size}}{\lower0.2ex\hbox{$\boldsymbol{B_1}$ size}} & \textbf{8} & \textbf{16} & \textbf{32} & \textbf{64} & \textbf{128} & \textbf{256} \\
+
+\hline
+\textbf{8} & 0.605 & - & - & - & - & - \\
+\textbf{16} & 0.624 & 0.631 & - & - & - & - \\
+\textbf{32} & 0.643 & 0.678 & 0.711 & - & - & - \\
+\textbf{64} & 0.649 & 0.701 & 0.725 & 0.733 & - & - \\
+\textbf{128} & 0.678 & 0.714 & 0.745 & \uline{0.749} & 0.725 & - \\
+\textbf{236} & 0.711 & 0.723 & 0.730 & 0.732 & 0.740 & 0.735 \\
+\hline\hline
+\end{tabular}
+\caption{\textbf{Weighted recall for the binary classification task under varying sizes of latent states $\boldsymbol{B_0}$ and $\boldsymbol{B_1}$.} The table shows the corresponding values of weighted recall for different combinations of $B_0$ and $B_1$. The optimal result is underlined.}
+\label{table:B0_B1_recall}
+\end{table}

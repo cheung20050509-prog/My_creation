@@ -1,0 +1,23 @@
+\begin{table}[ht]
+\vspace{-0.2 cm}
+\setlength{\abovecaptionskip}{0.3 cm}
+\setlength{\belowcaptionskip}{-0.2 cm} 
+\setlength\tabcolsep{9 pt}
+\renewcommand{\arraystretch}{1.26}
+\centering
+\begin{tabular}{c|cccccc}
+\multicolumn{7}{c}{\textbf{Precision}} \\
+\hline\hline
+\diagbox{\raisebox{0.2ex}{$\boldsymbol{\gamma}$}}{\lower0.2ex\hbox{$\boldsymbol{\beta}$}} & \textbf{2} & \textbf{4} & \textbf{8} & \textbf{16} & \textbf{32} & \textbf{64} \\
+\hline
+\textbf{2} & 0.619 & 0.632 & 0.702 & 0.735 & 0.742 & 0.739 \\
+\textbf{4} & 0.621 & 0.655 & 0.715 & 0.742 & 0.749 & 0.744 \\
+\textbf{8} & 0.637 & 0.658 & 0.734 & 0.745 & \uline{0.753} & 0.746 \\
+\textbf{16} & 0.693 & 0.686 & 0.736 & 0.746 & 0.749 & 0.740 \\
+\textbf{32} & 0.705 & 0.714 & 0.734 & 0.747 & 0.746 & 0.748 \\
+\textbf{64} & 0.710 & 0.728 & 0.729 & 0.743 & 0.747 & 0.741 \\
+\hline\hline
+\end{tabular}
+\caption{\textbf{Weighted precision for the binary classification task under varying Lagrange multipliers.} The table shows the corresponding values of weighted precision of Lagrange multipliers ($\beta$ and $\gamma$). The optimal result is underlined.}
+\label{table:gamma_beta_precision}
+\end{table}

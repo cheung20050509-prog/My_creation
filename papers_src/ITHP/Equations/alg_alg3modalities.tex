@@ -1,0 +1,31 @@
+\begin{algorithm}[htb]
+    \caption{Pseudo-code for training ITHP in 3-modalities scenario }
+    \label{alg:alg3modalities}
+    \begin{algorithmic}
+      \Require Dataset $\mathcal{D}$ = $\left \{ \left ( X_{0}, X_{1},X_{2} \right ) ,Y \right \} $; Coefficient: $\alpha $, $\beta$, $\gamma$, $\lambda$; Learning rate $\eta$; Mini-batch size $n_{mb}$; Assumed distribution of latent states : $\left \{ B_{0},  B_{1} \right \}= \varepsilon \sim \mathcal{N} \left ( 0,1 \right )$;
+      \Ensure ITHP parameters $(\left \{ \theta _{k}  \right \} _{k=0,1} ,\left \{ \psi _{k}  \right \} _{k=0,1} )$; Task-related prediction $\hat{y}$;
+      \\Initialize the parameters in the Neural Networks $(\left \{ \theta _{k}  \right \} _{k=0,1},\left \{ \psi _{k}  \right \} _{k=0,1})$
+    \Repeat
+        \State Sample a mini-batch: $\left \{ \left ( X_{0}^{n} , X_{1}^{n},X_{2}^{n} \right ) ,Y^{n} \right \} _{n=1}^{n_{mb} }\sim \mathcal{D } $
+    \For{$n = 1,2,\dots \dots, n_{mb} $}
+      \State $\mu_{0}^{n} ,\Sigma_{0}^{n}\longleftarrow f_{\theta _{0} } \left ( X_{0}^{n} \right ) $
+      \State $z_{0}^{n} \longleftarrow \mu _{0}^{n}+  \varepsilon \cdot \Sigma  _{0}^{n}$
+      \State $\hat{X}_{1}^{n} \longleftarrow f_{\psi _{0}}\left (Z_{0}^{n}\right ) $
+      \State $\mu_{1}^{n} ,\Sigma_{1}^{n}\longleftarrow f_{\theta _{1} } \left ( z_{0}^{n} \right ) $
+      \State $z_{1}^{n} \longleftarrow \mu _{1}^{n}+  \varepsilon \cdot \Sigma  _{1}^{n}$
+      \State $\hat{X}_{2}^{n} \longleftarrow f_{\psi _{1}}\left (Z_{1}^{n}\right ) $
+    \EndFor 
+    \If {$ X_{0}, X_{1} ,X_{2} $ are categorical data} 
+        \State $\mathcal{L} _{IB_{0} }^{\theta _{0},\psi _{0} } =KL\left ( \mathcal{N}\left ( \mu _{0}^{n} ,\Sigma _{0}^{n}  \right )|| \mathcal{N}\left ( 0,1  \right )  \right )+\beta \cdot \frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( -\sum_{C=1}^{C}X_{1}^{n} \left [ C \right ] \cdot \log_{}{\left ( \hat{X} _{1}^{n} \left [ C\right ] \right ) }\right )  $
+        \State $\mathcal{L} _{IB_{1} }^{\theta _{1},\psi _{1} } =KL\left ( \mathcal{N}\left ( \mu _{1}^{n} ,\Sigma _{1}^{n}  \right )|| \mathcal{N}\left ( 0,1  \right )  \right )+\gamma \cdot \frac{1}{n_{mb}}\sum_{n=1}^{n_{mb}}\left ( -\sum_{C=1}^{C}X_{2}^{n} \left [ C \right ] \cdot \log_{}{\left ( \hat{X} _{2}^{n} \left [ C\right ] \right ) }\right ) $
+
+    \ElsIf{$ X_{0}, X_{1} ,X_{2} $ are continuous data}
+         \State $\mathcal{L} _{IB_{0} }^{\theta _{0},\psi _{0} } =KL\left ( \mathcal{N}\left ( \mu _{0}^{n} ,\Sigma _{0}^{n}  \right )|| \mathcal{N}\left ( 0,1  \right )  \right )+\beta \cdot \frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( X_{1}^{n}-\hat{X}_{1}^{n}  \right )^{2}$
+        \State $\mathcal{L} _{IB_{1} }^{\theta _{1},\psi _{1} } =KL\left ( \mathcal{N}\left ( \mu _{1}^{n} ,\Sigma _{1}^{n}  \right )|| \mathcal{N}\left ( 0,1  \right )  \right )+\gamma  \cdot \frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( X_{2}^{n}-\hat{X}_{2}^{n}  \right )^{2}$
+    \EndIf
+   \State $\mathcal{L} _{overall}^{\theta ,\psi }  = \mathcal{L}_{IB_{0}}^{\theta _{0},\psi _{0} } + \lambda \cdot \mathcal{L}_{IB_{1}}^{\theta _{1},\psi _{1} } $
+   \State $\mathcal{L} _{task-related}  =\frac{2}{\beta + \gamma} \cdot \mathcal{L}_{IB_{overall}}^{\theta ,\psi} + \alpha\cdot\frac{1}{n_{mb} }\sum_{n=1}^{n_{mb}}\left ( z_{1}^{n}-Y^{n}  \right )^{2}  $
+   \State $( \theta _{k} ,\psi _{k} ) \longleftarrow ( \theta _{k} ,\psi _{k} ) -\eta\cdot \bigtriangledown _( \theta _{k} ,\psi _{k} )\mathcal{L} _{task-related}$, $(k = 0,1)$
+   \Until{convergence} 
+    \end{algorithmic}
+\end{algorithm}

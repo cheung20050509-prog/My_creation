@@ -1,0 +1,37 @@
+\begin{align}
+\begin{aligned}
+p\left ( X_{1}, B_{0} \right ) = \int dX_{0} p\left ( X_{0}, X_{ 1}, B_{0} \right ) = \int dX_0 p\left ( X_0 \right ) \cdot p\left ( X_{ 1}| X_{0}\right ) \cdot p\left ( B_{0}| X_{0} \right ).
+\end{aligned}
+\label{introduceX0}
+\end{align}
+Therefore, $I\left ( B_{0}; X_{ 1} \right ) $ can be given by 
+\begin{align}
+\begin{aligned}
+I\left ( B_{0}; X_{ 1} \right ) =& \int dX_{0}dB_{0}dX_{ 1} p\left ( X_0 \right ) \cdot p\left ( X_{ 1}| X_{0}\right ) \cdot p\left ( B_{0}| X_{0} \right )\cdot \log_{}{q_{\psi _{0} }\left (X_{ 1}|B_{0} \right ) } \\=& 
+ \mathbb{E} _{B_{0}\sim p(B_{0}|X_{0})}\mathbb{E} _{X_{0}\sim p(X_{0}) }\left [ \log_{}{q_{\psi _{0} } \left ( X_{ 1}|B_{0}  \right )  }   \right ],
+\end{aligned}
+% \label{introduceX0}
+\end{align}
+where $q_{\psi _{0} } \left ( B_{0}|X_{0}\right )$ are used as the variational approximation for $p\left ( B_{0}|X_{0}\right )$. Then we have the derivation of the Eqn. (\ref{Tlossfunc1}) as
+\begin{align}
+\begin{aligned}
+\mathcal{L}_{IB_{0}}^{\theta _{0},\psi _{0} } \left ( X_{0}; X_{ 1} \right ) &= I\left ( X_{0}; B_{0} \right )-\beta I\left ( B_{0}; X_{ 1} \right ) \\
+&\approx \mathbb{E} _{X_{0}\sim p(X_{0}) }  KL\left ( q_{\theta _{0}}\left ( B_{0}|X_{0} \right ) ||q\left ( B_{0} \right ) \right )  \\& -\beta\cdot \mathbb{E} _{B_{0}\sim p(B_{0}|X_{0})}\mathbb{E} _{X_{0}\sim p(X_{0}) }\left [ \log_{}{q_{\psi _{0} } \left ( X_{ 1}|B_{0}  \right )  }   \right ].
+\end{aligned}
+\label{AAlossfunc1}
+\end{align}
+And we can easily get the derivation of the Eqn. (\ref{Tlossfunc2}) in similar steps as above. The loss function of the subsequent-level Information Bottleneck is shown as: 
+\begin{align}
+\begin{aligned}
+\mathcal{L}_{IB_{ 1}}^{\theta _{ 1},\psi _{ 1} } \left ( B_{0}; X_{ 2} \right ) = I\left ( B_{0}; B_{ 1} \right )-\gamma I\left ( B_{ 1}; X_{ 2} \right ).
+\end{aligned}
+\label{appeq2_IB}
+\end{align}
+%Here, some derivations using the variational approximations have been omitted, and the final results of 
+The results of $I\left ( B_{0}; B_{ 1} \right )$ and $I\left ( B_{ 1}; X_{ 2} \right )$ are shown as:
+\begin{align}
+\begin{aligned}
+I\left ( B_{0}; B_{ 1} \right ) =& \int dB_{0}dB_{ 1} p\left (B_{0},B_{ 1} \right )\cdot \log_{}{\frac{p\left (B_{0},B_{ 1} \right )}{p\left (B_{0}\right )\cdot p\left (B_{ 1}\right )} } \\\approx& \int dB_{0}dB_{ 1} p\left ( B_{0}  \right )\cdot q_{\theta _{ 1} } \left ( B_{ 1}|B_{0} \right )\cdot \log_{}{\frac{q_{\theta _{ 1} } \left (B_{ 1}|B{0} \right )}{ q\left (B_{ 1}\right )} }\\=& \mathbb{E} _{B_0\sim p\left ( B_0 \right ) } \left [  KL\left ( q_{\theta _{ 1} } \left ( B_{ 1}|B_0 \right )||q\left ( B_{ 1} \right )   \right )  \right ], 
+\end{aligned}
+% \label{I_B0_ 1}
+\end{align}

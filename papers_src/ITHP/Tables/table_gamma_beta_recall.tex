@@ -1,0 +1,25 @@
+\begin{table}[ht]
+\vspace{-0.2 cm}
+\setlength{\abovecaptionskip}{0.2 cm}
+\setlength{\belowcaptionskip}{-0.3 cm} 
+\setlength\tabcolsep{9 pt}
+\renewcommand{\arraystretch}{1.26}
+\centering
+\begin{tabular}{c|cccccc}
+\multicolumn{7}{c}{\textbf{Recall}} \\
+\hline\hline
+% \diagbox{$\boldsymbol{\gamma}$}{$\boldsymbol{\beta}$} & \textbf{2} & \textbf{4} & \textbf{8} & \textbf{16} & \textbf{32} & \textbf{64} \\
+\diagbox{\raisebox{0.2ex}{$\boldsymbol{\gamma}$}}{\lower0.2ex\hbox{$\boldsymbol{\beta}$}} & \textbf{2} & \textbf{4} & \textbf{8} & \textbf{16} & \textbf{32} & \textbf{64} \\
+
+\hline
+\textbf{2} & 0.607 & 0.627 & 0.696 & 0.737 & 0.742 & 0.736 \\
+\textbf{4} & 0.619 & 0.650 & 0.706 & 0.740 & 0.747 & 0.742 \\
+\textbf{8} & 0.622 & 0.649 & 0.736 & 0.742 & \uline{0.752} & 0.742 \\
+\textbf{16} & 0.681 & 0.672 & 0.726 & 0.745 & 0.747 & 0.735 \\
+\textbf{32} & 0.692 & 0.698 & 0.722 & 0.745 & 0.741 & 0.748 \\
+\textbf{64} & 0.703 & 0.721 & 0.723 & 0.740 & 0.745 & 0.738 \\
+\hline\hline
+\end{tabular}
+\caption{\textbf{Weighted recall for the binary classification task under varying Lagrange multipliers.} The table shows the corresponding values of weighted recall for different combinations of Lagrange multipliers ($\beta$ and $\gamma$). The optimal result is underlined.}
+\label{table:gamma_beta_recall}
+\end{table}

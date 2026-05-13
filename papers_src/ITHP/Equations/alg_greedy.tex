@@ -1,0 +1,30 @@
+\begin{algorithm}[H]
+
+\caption{Greedy Algorithm for Ranking Modalities}
+\begin{algorithmic}
+
+\Function{GreedySubmodularSort}{$modalities, evaluatePerformance$}
+    \State $S \gets \text{empty set}$
+    \State $ModalityList \gets \text{empty list}$
+    \While{$|S| < | modalities |$}
+        \State $bestImprovement \gets -\infty$
+        \State $bestModality \gets \text{null}$
+        \For{\textbf{each} $modality \text{ in modalities} - S$}
+            \State $newPerformance \gets evaluatePerformance(S \cup \{modality\})$
+            \State $improvement \gets newPerformance - evaluatePerformance(S)$
+            \If{$improvement > bestImprovement$}
+                \State $bestImprovement \gets improvement$
+                \State $bestModality \gets modality$
+            \EndIf
+        \EndFor
+        \If{$bestModality \text{ is null}$}
+            \State \textbf{break}
+        \EndIf
+        \State $S \gets S \cup \{bestModality\}$
+        \State $ModalityList.\text{append}(bestModality)$
+    \EndWhile
+    \State \Return $ModalityList$
+\EndFunction
+
+\end{algorithmic}
+\end{algorithm}

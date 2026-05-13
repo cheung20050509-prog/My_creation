@@ -1,0 +1,15 @@
+\begin{align}
+\begin{aligned}
+\mathcal{L}_{IB_{0}}^{\theta _{0},\psi _{0} } \left ( X_{0}; X_{1} \right ) &= I\left ( X_{0}; B_{0} \right )-\beta I\left ( B_{0}; X_{1} \right )\\
+&\approx \mathbb{E} _{X_{0}\sim p(X_{0}) } KL\left ( q_{\theta _{0}}\left ( B_{0}|X_{0} \right ) ||q\left ( B_{0} \right ) \right )  \\& -\beta\cdot \mathbb{E} _{B_{0}\sim p(B_{0}|X_{0})}\mathbb{E} _{X_{0}\sim p(X_{0}) }\left [ \log_{}{q_{\psi _{0} } \left ( X_{1}|B_{0}  \right )  }  \right ].
+\end{aligned}
+\label{C1_firstlevel}
+\end{align}
+Then, the subsequent level IB loss can be given as:
+\begin{align}
+\begin{aligned}
+\mathcal{L}_{IB_{k+1}}^{\theta _{k+1},\psi _{k+1} } \left ( B_{k}; X_{k+2} \right ) &= I\left ( B_{k}; B_{k+1} \right )-\gamma_{k} I\left ( B_{k+1}; X_{k+2} \right ) \\
+&\approx \mathbb{E} _{B_{k}\sim p(B_{k}) } KL\left ( q_{\theta _{k+1}}\left ( B_{k+1}|B_{k} \right ) ||q\left ( B_{k+1} \right ) \right )  \\& -\gamma_{k}\cdot \mathbb{E} _{B_{k+1}\sim p(B_{k+1}|B_{k})}\mathbb{E} _{B_{k}\sim p(B_{k}) }\left [ \log_{}{q_{\psi _{k+1} } \left ( X_{k+2}|B_{k+1}  \right )  }   \right ], \\& (k = 0,1,\cdots\cdots,N-2).
+\end{aligned}
+\label{C1_subseqlevel}
+\end{align}

@@ -1,0 +1,69 @@
+% \begin{wraptable}{l}{0.506\textwidth}
+% \vspace{-0.36 cm}
+% \setlength{\abovecaptionskip}{0.2 cm}
+% \setlength{\belowcaptionskip}{-0.506 cm} 
+% \centering
+% \setlength\tabcolsep{5.06 pt}
+% \begin{tabular}{lcccc}
+% \multicolumn{5}{c}{\textbf{CMU-MOSI}} \\
+% \hline\hline
+% \textbf{Task Metric} & $\textbf{BA}{\uparrow}$ & $\textbf{F1}{\uparrow}$ & $\textbf{MAE}{\downarrow}$ & $\textbf{Corr}{\uparrow}$ \\
+% \hline
+% \multicolumn{5}{c}{\textbf{BERT}} \\
+% \hline
+% BERT             & 83.5 & 83.4 & 0.739 & 0.782 \\
+% Self-MM           & 84.0 & 84.4 & 0.713 & 0.798 \\
+% MMIM            & 84.1 & 84.0 & 0.700 & 0.800 \\
+% MAG   & 84.2 & 84.1 & 0.712 & 0.796 \\
+% \textbf{ITHP}                      & \textbf{85.3} & \textbf{85.3} & \textbf{0.708} & \textbf{0.801} \\
+% \hline
+% \multicolumn{5}{c}{\textbf{DeBERTa}} \\
+% \hline
+% DeBERTa     & 84.7 & 84.8 & 0.709 & 0.817 \\
+% Self-MM    & 55.1 & 53.5 & 1.44 & 0.158 \\
+% MMIM        & 85.8 & 85.9 & 0.649 & 0.829 \\
+% MAG    & 86.1 & 86.0 & 0.690 & 0.831 \\
+% \textbf{ITHP} & \textbf{\uline{88.7}} & \textbf{\uline{88.6}} & \textbf{\uline{0.643}} & \textbf{\uline{0.852}} \\
+% \midrule 
+% Human       & 85.7 & 87.5 & 0.710 & 0.820 \\
+% \hline\hline
+% \end{tabular}
+% \caption{\textbf{Model Performance for BERT and DeBERTa-Based Models on CMU-MOSI dataset.} The table presents the performance of other BERT-based pre-trained models. Models developed by us are highlighted in bold, and optimal results are underlined. ITHP consistently outperforms other models.} %The metrics used include Binary Accuracy (BA), F1 Score (F1), Mean Absolute Error (MAE), and Pearson Correlation (Corr).}
+% \label{tab:ModelsPerformance_MOSI}
+% \end{wraptable}
+
+\begin{wraptable}{r}{0.506\textwidth}
+\vspace{-0.46 cm}
+\setlength{\abovecaptionskip}{0.2 cm}
+\setlength{\belowcaptionskip}{-0.506 cm} 
+\centering
+\setlength\tabcolsep{5.06 pt}
+\begin{tabular}{lcccc}
+\multicolumn{5}{c}{\textbf{CMU-MOSI}} \\
+\hline\hline
+\textbf{Task Metric} & $\textbf{BA}{\uparrow}$ & $\textbf{F1}{\uparrow}$ & $\textbf{MAE}{\downarrow}$ & $\textbf{Corr}{\uparrow}$ \\
+\hline
+\multicolumn{5}{c}{\textbf{BERT}} \\
+\hline
+% BERT            & 83.5 & 83.4 & 0.739 & 0.782 \\
+Self-MM$_b$           & 84.0 & 84.4 & 0.713 & 0.798 \\
+MMIM$_b$            & 84.1 & 84.0 & 0.700 & 0.800 \\
+MAG$_b$   & 84.2 & 84.1 & 0.712 & 0.796 \\
+% \textbf{ITHP$_b$}                      & \textbf{85.3} & \textbf{85.3} & \textbf{0.708} & \textbf{0.801} \\
+
+% DeBERTa     & 84.7 & 84.8 & 0.709 & 0.817 \\
+Self-MM$_d$    & 55.1 & 53.5 & 1.44 & 0.158 \\
+MMIM$_d$        & 85.8 & 85.9 & 0.649 & 0.829 \\
+MAG$_d$    & 86.1 & 86.0 & 0.690 & 0.831 \\
+UniMSE & 85.9 & 85.8 & 0.691 & 0.809 \\
+MIB & 85.3 & 85.3 & 0.711 & 0.798 \\
+BBFN & 84.3 & 84.3 & 0.776 & 0.755 \\
+\textbf{ITHP} & \textbf{\uline{88.7}} & \textbf{\uline{88.6}} & \textbf{\uline{0.643}} & \textbf{\uline{0.852}} \\
+\midrule 
+Human       & 85.7 & 87.5 & 0.710 & 0.820 \\
+\hline\hline
+\end{tabular}
+% \caption{\textbf{Model Performance for BERT and DeBERTa-Based Models on CMU-MOSI dataset.} The table presents the performance of other BERT-based pre-trained models. Models developed by us are highlighted in bold, and optimal results are underlined.} %The metrics used include Binary Accuracy (BA), F1 Score (F1), Mean Absolute Error (MAE), and Pearson Correlation (Corr).}
+\caption{\textbf{Model performance on CMU-MOSI dataset.} The table presents the performance of other BERT-based (indicated with subscript ``$b$'') and DeBERTa-based (indicated with subscript ``$d$'') pre-trained models. Models developed by us are highlighted in bold, and optimal results are underlined.}% The metrics used include Binary Accuracy (BA), F1 Score (F1), Mean Absolute Error (MAE), and Pearson Correlation (Corr).}
+\label{tab:ModelsPerformance_MOSI}
+\end{wraptable}

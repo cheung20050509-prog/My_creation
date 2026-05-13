@@ -1,0 +1,9 @@
+\begin{align}
+\mathcal{L} _{overall}^{\theta ,\psi } \left ( X_{0}, X_{N}  \right )  = \mathcal{L}_{IB_{0}}^{\theta _{0},\psi _{0} } \left ( X_{0}; X_{1} \right ) + \sum_{k=0}^{N-2} \lambda_{k} \cdot \mathcal{L}_{IB_{k+1}}^{\theta _{k+1},\psi _{k+1} } \left ( B_{k}; X_{k+2} \right ).
+\label{C1_totalloss}
+\end{align}
+With the overall loss derived here, we can further get the expression of the loss function considering the downstream task, so the Eqn. (\ref{taskloss}) can be generalized to the form with $N$ modal states as:
+\begin{align}
+\mathcal{L} _{task-related} = \frac{N-1}{\beta +\sum_{k=0}^{N-2} \gamma_{k}  } \cdot \mathcal{L} _{overall}^{\theta ,\psi } \left ( X_{0}, X_{N}  \right ) + \alpha \cdot \mathcal{L} _{task-related}\left ( B_{N-1}, Y  \right ).
+\label{C1_taskloss}
+\end{align}
