@@ -123,7 +123,7 @@ PARALLEL=${#SLOT_GPUS[@]}
 echo "======== $(date -Is) MOSEI trial70 PRISM ablation batch: GPUs=[${GPU_IDS[*]}] JOBS_PER_GPU=[${JOBS_ARR[*]}] PARALLEL=${PARALLEL} (EXCLUDE_GPUS auto-only: ${EXCLUDE_GPUS:-∅}) ========"
 echo "NOTE: Baseline none vs frozen — run none as the sole CUDA job on that GPU (no second training on the same card)."
 
-MODES=(none no_infogate no_mselector no_ib no_conf_gating no_adaptive_gate)
+MODES=(none no_infogate no_mselector no_ib no_ib_no_mselector_no_infogate no_conf_gating no_adaptive_gate)
 n_modes=${#MODES[@]}
 
 for ((start = 0; start < n_modes; start += PARALLEL)); do

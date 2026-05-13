@@ -3,7 +3,7 @@
 
 Loads frozen phase1 trial~70 checkpoints under ``ablation_study/runs/`` (same layout
 as ``train_fixed_mosei_phase1_trial70.py``), extracts pooled primary embeddings
-before the regression head, fits t-SNE **per variant** (independent 2D spaces).
+before the regression head, fits t-SNE **per variant** (independent 2D or 3D spaces).
 
 **Default coloring:** discrete **7 bins** aligned with ``train.py`` Acc-7:
 ``clip(round(y), -3, 3)`` → ordinal 0..6. Uses a **high-contrast solid palette**
@@ -12,10 +12,10 @@ before the regression head, fits t-SNE **per variant** (independent 2D spaces).
 color + shape; optional per-panel bin counts in subtitles.
 
 **Optional ``--color-mode ternary``:** collapse Acc-7 to **negative / neutral /
-positive** (bins −3..−1 / 0 / +1..+3) with a **paper-style** look inspired by
-ordinal-learning t-SNE figures: teal ``+`` / dark blue ``o`` / magenta ``x``,
-**per-panel** legend (lower right), and **min–max normalized** axes to ``[0,1]``
-with 0.2 ticks (each panel scaled independently).
+positive** (bins −3..−1 / 0 / +1..+3) with a **paper-style** look: teal ``×``
+(``x`` marker) / solid vivid blue filled ``o`` (no contrasting rim) / magenta ``+``,
+**per-panel** legend (lower right), and **min–max normalized** axes to ``[0,1]^2`` or ``[0,1]^3``
+when ``--n-components 3``, with 0.2 ticks (each panel scaled independently).
 
 Usage (from ``My_creation/``)::
 
@@ -23,6 +23,19 @@ Usage (from ``My_creation/``)::
 
     python ablation_study/tsne_mosei_prism_ablation.py --verbose \\
       --dump-label-stats ablation_study/runs/mosei_phase1_trial70_tsne/label_stats.csv
+
+    # Sharper PNG (default ``--dpi 480``, ``--fig-scale 1.35``); e.g. poster:
+    python ablation_study/tsne_mosei_prism_ablation.py --dpi 600 --fig-scale 1.6 \\
+      --output ablation_study/runs/mosei_phase1_trial70_tsne/ablation_tsne_prism_mosei.png
+
+    # Reproduce tuned 2D ternary figure (perplexity 20, early exaggeration 24):
+    python ablation_study/tsne_mosei_prism_ablation.py --n-components 2 --color-mode ternary \\
+      --perplexity 20 --early-exaggeration 24 --init pca --learning-rate auto \\
+      --output ablation_study/runs/mosei_phase1_trial70_tsne/ablation_tsne_prism_mosei_fig3style.png
+
+    # 3D t-SNE (static matplotlib view); use ``--n-components 2`` for classic 2D:
+    python ablation_study/tsne_mosei_prism_ablation.py --n-components 3 --color-mode ternary \\
+      --output ablation_study/runs/mosei_phase1_trial70_tsne/ablation_tsne_prism_mosei_fig3style_3d.png
 
 Requires trained ``infogate_mosei_best.pt`` in each run directory.
 """
@@ -45,6 +58,7 @@ import numpy as np
 import torch
 from matplotlib.lines import Line2D
 from sklearn.manifold import TSNE
+from sklearn.model_selection import train_test_split
 
 _HERE = Path(__file__).resolve().parent
 _MY = _HERE.parent
@@ -62,12 +76,13 @@ DISCRETE7_COLORS = [
 ACC7_LABELS = [r"$-3$", r"$-2$", r"$-1$", r"$0$", r"$+1$", r"$+2$", r"$+3$"]
 # One marker per Acc-7 bin: negative / neutral / positive (still seven colors).
 ACC7_MARKERS = ("v", "v", "v", "o", "^", "^", "^")
-
-# Ternary sentiment (paper-style): marker + face/edge colors (Acc-7 collapsed).
+# Ternary sentiment (paper-style): marker + colors (Acc-7 collapsed).
+# Neutral uses one solid vivid blue (no separate dark rim on ``o`` markers).
+TERNARY_NEUTRAL_BLUE = "#0066CC"
 TERNARY_CLASSES: tuple[tuple[str, str, str, str], ...] = (
-    ("negative", "negative", "+", "#20B2AA"),  # teal / cyan +
-    ("neutral", "neutral", "o", "#08306b"),  # dark blue circle
-    ("positive", "positive", "x", "#ae017e"),  # magenta x
+    ("negative", "negative", "x", "#20B2AA"),  # teal ×
+    ("neutral", "neutral", "o", TERNARY_NEUTRAL_BLUE),
+    ("positive", "positive", "+", "#ae017e"),  # magenta +
 )
 
 
@@ -123,7 +138,7 @@ def _panel_overlap_note(n: int, counts: np.ndarray, st: dict[str, float | int]) 
         f"n={n}\n"
         f"P(y<0)={100 * float(st['frac_lt0']):.1f}%  "
         f"bins −3..−1: {neg123} ({neg123_pct:.1f}%)\n"
-        "2D projection stacks many points"
+        "Low-D projection stacks many points"
     )
 
 
@@ -186,6 +201,7 @@ DEFAULT_VARIANTS: tuple[tuple[str, str], ...] = (
     ("no_ib", "w/o VTB"),
     ("no_mselector", "w/o DPR"),
     ("no_infogate", "w/o InfoGate"),
+    ("no_ib_no_mselector_no_infogate", "w/o VTB+DPR+InfoGate"),
 )
 
 
@@ -261,13 +277,13 @@ def _stratified_acc7_indices(idx: np.ndarray, cap: int, seed: int) -> np.ndarray
         return np.sort(rng.choice(n, size=cap, replace=False))
 
 
-def _unit_square_normalize(xy: np.ndarray) -> np.ndarray:
-    """Min–max each axis to [0, 1] (per panel, like normalized t-SNE axes in papers)."""
-    xy = np.asarray(xy, dtype=np.float64)
-    lo = xy.min(axis=0)
-    hi = xy.max(axis=0)
+def _unit_box_normalize(x: np.ndarray) -> np.ndarray:
+    """Min–max each coordinate axis to [0, 1] (per panel; 2D or 3D)."""
+    x = np.asarray(x, dtype=np.float64)
+    lo = x.min(axis=0)
+    hi = x.max(axis=0)
     span = np.maximum(hi - lo, 1e-9)
-    return (xy - lo) / span
+    return (x - lo) / span
 
 
 def _ternary_masks(idx: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -281,38 +297,67 @@ def _ternary_masks(idx: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]
 def _ternary_legend_handles() -> list[Line2D]:
     handles: list[Line2D] = []
     for _key, label, marker, color in TERNARY_CLASSES:
-        handles.append(
-            Line2D(
-                [0],
-                [0],
-                linestyle="None",
-                marker=marker,
-                color="none",
-                markerfacecolor=color if marker == "o" else "none",
-                markeredgecolor=color,
-                markeredgewidth=1.15 if marker != "o" else 0.5,
-                markersize=7.0 if marker == "o" else 8.0,
-                label=label,
+        if marker == "o":
+            handles.append(
+                Line2D(
+                    [0],
+                    [0],
+                    linestyle="None",
+                    marker=marker,
+                    color="none",
+                    markerfacecolor=color,
+                    markeredgecolor=color,
+                    markeredgewidth=0.0,
+                    markersize=7.0,
+                    label=label,
+                )
             )
-        )
+        else:
+            handles.append(
+                Line2D(
+                    [0],
+                    [0],
+                    linestyle="None",
+                    marker=marker,
+                    color="none",
+                    markerfacecolor="none",
+                    markeredgecolor=color,
+                    markeredgewidth=1.15,
+                    markersize=8.0,
+                    label=label,
+                )
+            )
     return handles
 
 
-def _run_tsne(H: np.ndarray, perplexity: float, seed: int) -> np.ndarray:
+def _run_tsne(
+    H: np.ndarray,
+    perplexity: float,
+    seed: int,
+    n_components: int,
+    *,
+    early_exaggeration: float,
+    learning_rate: str | float,
+    init: str,
+) -> np.ndarray:
     n = H.shape[0]
     if n < 4:
         raise ValueError(f"Need at least 4 samples for t-SNE, got {n}")
+    if n_components not in (2, 3):
+        raise ValueError(f"n_components must be 2 or 3, got {n_components}")
     perp = min(perplexity, float(n - 1))
     perp = max(perp, 2.0)
-    tsne = TSNE(
-        n_components=2,
+    if early_exaggeration <= 0:
+        raise ValueError(f"early_exaggeration must be positive, got {early_exaggeration}")
+    # sklearn defaults: max_iter=1000; Barnes–Hut allows dim 2–3.
+    return TSNE(
+        n_components=n_components,
         perplexity=perp,
         random_state=seed,
-        max_iter=1500,
-        init="pca",
-        learning_rate="auto",
-    )
-    return tsne.fit_transform(H.astype(np.float64))
+        early_exaggeration=early_exaggeration,
+        learning_rate=learning_rate,
+        init=init,
+    ).fit_transform(H.astype(np.float64))
 
 
 def main() -> int:
@@ -330,7 +375,33 @@ def main() -> int:
         help="Output figure stem; writes both .png and .pdf",
     )
     ap.add_argument("--perplexity", type=float, default=30.0)
-    ap.add_argument("--seed", type=int, default=128)
+    ap.add_argument(
+        "--early-exaggeration",
+        type=float,
+        default=24.0,
+        help="t-SNE early exaggeration; larger often spreads clusters more (sklearn default is 12).",
+    )
+    ap.add_argument(
+        "--learning-rate",
+        type=str,
+        default="auto",
+        help='t-SNE learning rate: ``auto`` (sklearn default) or a positive float, e.g. ``200``.',
+    )
+    ap.add_argument(
+        "--init",
+        type=str,
+        default="pca",
+        choices=("pca", "random"),
+        help="t-SNE embedding initialization.",
+    )
+    ap.add_argument(
+        "--n-components",
+        type=int,
+        choices=(2, 3),
+        default=2,
+        help="t-SNE output dimension: 2 (flat scatter) or 3 (matplotlib 3D; fixed view angle).",
+    )
+    ap.add_argument("--seed", type=int, default=42, help="t-SNE ``random_state``")
     ap.add_argument("--stage", type=int, default=2, choices=(1, 2), help="PRISM forward stage for eval")
     ap.add_argument(
         "--max-samples",
@@ -350,14 +421,15 @@ def main() -> int:
         default="discrete7",
         help=(
             "discrete7: Acc-7 colors + ▼/●/▲ (default). "
-            "ternary: neg/neu/pos collapsed + paper-style +/o/x, [0,1] axes, per-panel legend. "
+            "ternary: neg/neu/pos collapsed + paper-style ×/o/+; with ``--n-components 3``, "
+            "axes are min–max scaled to [0,1]³. "
             "continuous: RdBu_r + colorbar (debug)."
         ),
     )
     ap.add_argument(
         "--marker-size",
         type=float,
-        default=4.0,
+        default=1.35,
         help="Scatter marker area scale (matplotlib ``s``); larger = bigger points.",
     )
     ap.add_argument(
@@ -371,7 +443,32 @@ def main() -> int:
         default=None,
         help="Append one CSV row per variant with label stats and bin counts",
     )
+    ap.add_argument(
+        "--dpi",
+        type=int,
+        default=480,
+        help="PNG export resolution (dots per inch). PDF stays vector.",
+    )
+    ap.add_argument(
+        "--fig-scale",
+        type=float,
+        default=1.35,
+        help="Scale default figure width/height; scatter ``s`` scales ~fig_scale² so marks stay visible.",
+    )
     args = ap.parse_args()
+
+    lr_raw = str(args.learning_rate).strip().lower()
+    if lr_raw == "auto":
+        learning_rate: str | float = "auto"
+    else:
+        try:
+            learning_rate = float(lr_raw)
+        except ValueError:
+            print("error: --learning-rate must be ``auto`` or a float", file=sys.stderr)
+            return 2
+        if learning_rate <= 0:
+            print("error: --learning-rate float must be positive", file=sys.stderr)
+            return 2
 
     runs_root = args.runs_root.expanduser().resolve()
     pairs: list[tuple[str, str]] = []
@@ -387,15 +484,33 @@ def main() -> int:
         sys.path.insert(0, str(_HERE))
 
     n_panels = len(pairs)
-    ncols = min(3, n_panels)
+    # Two columns → 2×2 for the default four PRISM variants; ⌈n/2⌉ rows in general.
+    ncols = 2 if n_panels > 1 else 1
     nrows = int(math.ceil(n_panels / ncols))
-    fig_w = 3.4 * ncols + 0.8
-    fig_h = 3.2 * nrows + 1.4
-    fig, axes = plt.subplots(nrows, ncols, figsize=(fig_w, fig_h), constrained_layout=False)
-    if n_panels == 1:
-        axes_flat = [axes]
+    fs = float(args.fig_scale)
+    if not (fs > 0.0):
+        print("error: --fig-scale must be positive", file=sys.stderr)
+        return 2
+    if not (72 <= int(args.dpi) <= 1200):
+        print("error: --dpi should be between 72 and 1200", file=sys.stderr)
+        return 2
+    # Area-based scatter ``s`` scales ~fs² so point size matches larger axes.
+    s_area_scale = fs * fs
+    n_comp = int(args.n_components)
+    fig_w = (3.4 * ncols + 0.8) * fs
+    fig_h = (3.2 * nrows + 1.4) * fs
+    if n_comp == 3:
+        fig_h *= 1.12
+    slots = nrows * ncols
+    if n_comp == 3:
+        fig = plt.figure(figsize=(fig_w, fig_h))
+        axes_flat = [fig.add_subplot(nrows, ncols, k + 1, projection="3d") for k in range(slots)]
     else:
-        axes_flat = np.atleast_1d(axes).ravel()
+        fig, axes = plt.subplots(nrows, ncols, figsize=(fig_w, fig_h), constrained_layout=False)
+        if n_panels == 1:
+            axes_flat = [axes]
+        else:
+            axes_flat = np.atleast_1d(axes).ravel()
 
     train_mod = None
     legend_handles: list[Line2D] | None = None
@@ -423,54 +538,102 @@ def main() -> int:
         if common_n is None:
             common_n = int(st.get("n", 0))
 
-        xy = _run_tsne(H, args.perplexity, args.seed)
+        emb = _run_tsne(
+            H,
+            args.perplexity,
+            args.seed,
+            n_comp,
+            early_exaggeration=float(args.early_exaggeration),
+            learning_rate=learning_rate,
+            init=str(args.init),
+        )
 
         sc = None
         if args.color_mode == "ternary":
-            xy_plot = _unit_square_normalize(xy)
+            pos_plot = _unit_box_normalize(emb)
             neg_m, neu_m, pos_m = _ternary_masks(idx)
             n_neg, n_neu, n_pos = int(neg_m.sum()), int(neu_m.sum()), int(pos_m.sum())
-            # Slightly larger ``s`` so + / x read like small paper figures when default is tiny.
-            ternary_s = max(14.0, float(args.marker_size) * 3.0)
+            # Dense test sets: keep ``s`` small to limit ink / overplotting; ×/+ stay legible via lw.
+            ms = float(args.marker_size) * s_area_scale
+            # Keep ternary marks small for ~4k points; avoid a large ``max(..., s_area_scale)`` floor.
+            ternary_s = max(0.35 * s_area_scale, min(7.5, ms * 0.52))
             for _key, _label, marker, color in TERNARY_CLASSES:
-                if marker == "+":
-                    sel, lw = neg_m, 0.65
-                elif marker == "o":
-                    sel, lw = neu_m, 0.35
+                if _key == "negative":
+                    sel, lw = neg_m, 0.55
+                elif _key == "neutral":
+                    sel = neu_m
                 else:
-                    sel, lw = pos_m, 0.75
+                    sel, lw = pos_m, 0.5
                 if not np.any(sel):
                     continue
-                if marker == "o":
+                if n_comp == 3:
+                    if marker == "o":
+                        sc = ax.scatter(
+                            pos_plot[sel, 0],
+                            pos_plot[sel, 1],
+                            pos_plot[sel, 2],
+                            c=[color],
+                            marker=marker,
+                            s=ternary_s,
+                            alpha=0.52,
+                            linewidths=0,
+                            edgecolors="none",
+                        )
+                    else:
+                        sc = ax.scatter(
+                            pos_plot[sel, 0],
+                            pos_plot[sel, 1],
+                            pos_plot[sel, 2],
+                            c=[color],
+                            marker=marker,
+                            s=ternary_s,
+                            alpha=0.52,
+                            linewidths=lw,
+                        )
+                elif marker == "o":
                     sc = ax.scatter(
-                        xy_plot[sel, 0],
-                        xy_plot[sel, 1],
+                        pos_plot[sel, 0],
+                        pos_plot[sel, 1],
                         c=[color],
                         marker=marker,
                         s=ternary_s,
-                        alpha=0.88,
-                        linewidths=lw,
-                        edgecolors="#0d1f33",
+                        alpha=0.52,
+                        linewidths=0,
+                        edgecolors="none",
                     )
                 else:
                     sc = ax.scatter(
-                        xy_plot[sel, 0],
-                        xy_plot[sel, 1],
+                        pos_plot[sel, 0],
+                        pos_plot[sel, 1],
                         c=[color],
                         marker=marker,
                         s=ternary_s,
-                        alpha=0.88,
+                        alpha=0.52,
                         linewidths=lw,
                     )
             panel_tag = f"({chr(ord('a') + panel_i)}) "
             count_line = f"neg {n_neg} | neu {n_neu} | pos {n_pos}"
             ax.set_title(f"{panel_tag}{title}\n{count_line}", fontsize=10, ma="left")
-            ax.set_xlim(0.0, 1.0)
-            ax.set_ylim(0.0, 1.0)
             ticks = np.arange(0.0, 1.01, 0.2)
-            ax.set_xticks(ticks)
-            ax.set_yticks(ticks)
-            ax.tick_params(axis="both", labelsize=8)
+            if n_comp == 3:
+                ax.set_xlim(0.0, 1.0)
+                ax.set_ylim(0.0, 1.0)
+                ax.set_zlim(0.0, 1.0)
+                ax.set_xticks(ticks)
+                ax.set_yticks(ticks)
+                ax.set_zticks(ticks)
+                ax.tick_params(axis="both", labelsize=7)
+                try:
+                    ax.set_box_aspect((1, 1, 1))
+                except AttributeError:
+                    pass
+                ax.view_init(elev=22, azim=-58)
+            else:
+                ax.set_xlim(0.0, 1.0)
+                ax.set_ylim(0.0, 1.0)
+                ax.set_xticks(ticks)
+                ax.set_yticks(ticks)
+                ax.tick_params(axis="both", labelsize=8)
             if ternary_legend_handles is not None:
                 leg = ax.legend(
                     handles=ternary_legend_handles,
@@ -487,16 +650,35 @@ def main() -> int:
                 sel = idx == i
                 if not np.any(sel):
                     continue
-                sc = ax.scatter(
-                    xy[sel, 0],
-                    xy[sel, 1],
-                    c=[DISCRETE7_COLORS[i]],
-                    marker=ACC7_MARKERS[i],
-                    s=args.marker_size,
-                    alpha=0.72,
-                    linewidths=0.12,
-                    edgecolors="#2a2a2a",
-                )
+                if n_comp == 3:
+                    sc = ax.scatter(
+                        emb[sel, 0],
+                        emb[sel, 1],
+                        emb[sel, 2],
+                        c=[DISCRETE7_COLORS[i]],
+                        marker=ACC7_MARKERS[i],
+                        s=args.marker_size * s_area_scale,
+                        alpha=0.52,
+                        linewidths=0.1,
+                        edgecolors="#2a2a2a",
+                    )
+                else:
+                    sc = ax.scatter(
+                        emb[sel, 0],
+                        emb[sel, 1],
+                        c=[DISCRETE7_COLORS[i]],
+                        marker=ACC7_MARKERS[i],
+                        s=args.marker_size * s_area_scale,
+                        alpha=0.52,
+                        linewidths=0.1,
+                        edgecolors="#2a2a2a",
+                    )
+            if n_comp == 3:
+                try:
+                    ax.set_box_aspect((1, 1, 1))
+                except AttributeError:
+                    pass
+                ax.view_init(elev=22, azim=-58)
             if legend_handles is None:
                 legend_handles = [
                     Line2D(
@@ -508,7 +690,7 @@ def main() -> int:
                         markerfacecolor=DISCRETE7_COLORS[i],
                         markeredgecolor="#333333",
                         markeredgewidth=0.35,
-                        markersize=5.0,
+                        markersize=5.0 * fs,
                         label=ACC7_LABELS[i],
                     )
                     for i in range(7)
@@ -517,68 +699,132 @@ def main() -> int:
             ax.set_title(f"{title}\n{bin_line}", fontsize=10, ma="left")
             note = _panel_overlap_note(int(st.get("n", 0)), counts, st)
             if note:
-                ax.text(
-                    0.02,
-                    0.98,
-                    note,
-                    transform=ax.transAxes,
-                    fontsize=6.5,
-                    va="top",
-                    ha="left",
-                    linespacing=1.15,
-                    bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#bbbbbb", alpha=0.88),
-                )
+                if n_comp == 3:
+                    ax.text2D(
+                        0.02,
+                        0.98,
+                        note,
+                        transform=ax.transAxes,
+                        fontsize=6.5,
+                        va="top",
+                        ha="left",
+                        linespacing=1.15,
+                        bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#bbbbbb", alpha=0.88),
+                    )
+                else:
+                    ax.text(
+                        0.02,
+                        0.98,
+                        note,
+                        transform=ax.transAxes,
+                        fontsize=6.5,
+                        va="top",
+                        ha="left",
+                        linespacing=1.15,
+                        bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#bbbbbb", alpha=0.88),
+                    )
             ax.set_xticks([])
             ax.set_yticks([])
+            if n_comp == 3:
+                ax.set_zticks([])
         else:
             for i in range(7):
                 sel = idx == i
                 if not np.any(sel):
                     continue
-                sc = ax.scatter(
-                    xy[sel, 0],
-                    xy[sel, 1],
-                    c=y[sel],
-                    cmap="RdBu_r",
-                    marker=ACC7_MARKERS[i],
-                    s=args.marker_size,
-                    alpha=0.72,
-                    linewidths=0.12,
-                    edgecolors="#2a2a2a",
-                    vmin=-3,
-                    vmax=3,
-                )
+                if n_comp == 3:
+                    sc = ax.scatter(
+                        emb[sel, 0],
+                        emb[sel, 1],
+                        emb[sel, 2],
+                        c=y[sel],
+                        cmap="RdBu_r",
+                        marker=ACC7_MARKERS[i],
+                        s=args.marker_size * s_area_scale,
+                        alpha=0.52,
+                        linewidths=0.1,
+                        edgecolors="#2a2a2a",
+                        vmin=-3,
+                        vmax=3,
+                    )
+                else:
+                    sc = ax.scatter(
+                        emb[sel, 0],
+                        emb[sel, 1],
+                        c=y[sel],
+                        cmap="RdBu_r",
+                        marker=ACC7_MARKERS[i],
+                        s=args.marker_size * s_area_scale,
+                        alpha=0.52,
+                        linewidths=0.1,
+                        edgecolors="#2a2a2a",
+                        vmin=-3,
+                        vmax=3,
+                    )
+            if n_comp == 3:
+                try:
+                    ax.set_box_aspect((1, 1, 1))
+                except AttributeError:
+                    pass
+                ax.view_init(elev=22, azim=-58)
             ax.set_title(f"{title}\n(continuous debug)", fontsize=10)
             note = _panel_overlap_note(int(st.get("n", 0)), counts, st)
             if note:
-                ax.text(
-                    0.02,
-                    0.98,
-                    note,
-                    transform=ax.transAxes,
-                    fontsize=6.5,
-                    va="top",
-                    ha="left",
-                    linespacing=1.15,
-                    bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#bbbbbb", alpha=0.88),
-                )
+                if n_comp == 3:
+                    ax.text2D(
+                        0.02,
+                        0.98,
+                        note,
+                        transform=ax.transAxes,
+                        fontsize=6.5,
+                        va="top",
+                        ha="left",
+                        linespacing=1.15,
+                        bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#bbbbbb", alpha=0.88),
+                    )
+                else:
+                    ax.text(
+                        0.02,
+                        0.98,
+                        note,
+                        transform=ax.transAxes,
+                        fontsize=6.5,
+                        va="top",
+                        ha="left",
+                        linespacing=1.15,
+                        bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#bbbbbb", alpha=0.88),
+                    )
             ax.set_xticks([])
             ax.set_yticks([])
+            if n_comp == 3:
+                ax.set_zticks([])
 
     for j in range(len(pairs), len(axes_flat)):
         axes_flat[j].set_visible(False)
 
     n_note = f"Same test split per panel (n={common_n}). " if common_n else ""
+    dim_box = r"$[0,1]^3$" if n_comp == 3 else r"$[0,1]^2$"
     if args.color_mode == "ternary":
+        view_3d = (
+            "Static 3D view (elevation 22°, azimuth −58°); for exploration use an interactive viewer. "
+            if n_comp == 3
+            else ""
+        )
         fig.suptitle(
             "MOSEI test-set $h_p$ t-SNE — PRISM macro ablations (trial 70)\n"
             + n_note
             + "Ternary style: Acc-7 collapsed to negative / neutral / positive; "
-            "each panel axes are min–max scaled to $[0,1]^2$; t-SNE fit per variant.",
+            + f"each panel axes are min–max scaled to {dim_box}; t-SNE fit per variant. "
+            + view_3d,
             fontsize=11,
             y=1.02,
         )
     else:
+        overlap_note = (
+            "t-SNE is fit independently per variant; dense 3D overlap in one view is normal."
+            if n_comp == 3
+            else "t-SNE is fit independently per variant; dense 2D overlap is normal and does not show per-bin mass."
+        )
         fig.suptitle(
             "MOSEI test-set $h_p$ t-SNE — PRISM macro ablations (trial 70)\n"
             + (
@@ -587,7 +833,7 @@ def main() -> int:
                 else "Colors: continuous (debug); same ▼/●/▲ markers by Acc-7 bin. "
             )
             + n_note
-            + "t-SNE is fit independently per variant; dense 2D overlap is normal and does not show per-bin mass.",
+            + overlap_note,
             fontsize=11,
             y=1.02,
         )
@@ -620,7 +866,7 @@ def main() -> int:
     stem = args.output.with_suffix("")
     png_path = stem.with_suffix(".png")
     pdf_path = stem.with_suffix(".pdf")
-    fig.savefig(png_path, dpi=200, bbox_inches="tight")
+    fig.savefig(png_path, dpi=int(args.dpi), bbox_inches="tight")
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)
     print(f"Wrote {png_path} and {pdf_path}")

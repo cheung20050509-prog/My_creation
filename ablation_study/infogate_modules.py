@@ -5,8 +5,10 @@ for Robust Multimodal Fusion
 Paper terminology (PRISM): **VTB** — variational token bottleneck per modality
 (implemented by ``IBEncoder`` / ``ib_enc_*``). **DPR** — differentiable primary router
 (Gumbel routing on bottleneck sequences; implemented as class ``MSelector`` and attribute
-``mselector`` for checkpoint compatibility). Ablation flags ``no_ib`` / ``no_mselector``
-match ``w/o VTB`` and ``w/o DPR`` in the manuscript.
+``mselector`` for checkpoint compatibility). Ablation flags ``no_ib`` / ``no_mselector`` / ``no_infogate`` match ``w/o VTB``,
+``w/o DPR``, and ``w/o InfoGate`` in the manuscript. The combined flag
+``no_ib_no_mselector_no_infogate`` applies all three (strong text-primary baseline:
+linear bottleneck, fixed language primary, no auxiliary fusion).
 
 Addresses four limitations of PCCA (MODS, AAAI 2026):
 L1. Unfiltered cross-attention         -> IB bottleneck filtering
@@ -19,6 +21,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+
+
+def _parse_ablation_flags(raw: str) -> frozenset[str]:
+    """Expand CLI ablation strings into atomic flags (single or combined)."""
+    if raw == "none":
+        return frozenset()
+    if raw == "no_ib_no_mselector_no_infogate":
+        return frozenset({"no_ib", "no_mselector", "no_infogate"})
+    return frozenset({raw})
 
 
 def masked_sequence_mean(tensor, mask=None):
@@ -499,13 +510,19 @@ class InfoGate(nn.Module):
         self.bottleneck_dim = bn_dim
         self.ablation = args.get('ablation', 'none')
         _allowed_ablation = frozenset({
-            'none', 'no_infogate', 'no_mselector', 'no_ib',
-            'no_conf_gating', 'no_adaptive_gate',
+            'none',
+            'no_infogate',
+            'no_mselector',
+            'no_ib',
+            'no_conf_gating',
+            'no_adaptive_gate',
+            'no_ib_no_mselector_no_infogate',
         })
         if self.ablation not in _allowed_ablation:
             raise ValueError(
                 f"Unknown ablation={self.ablation!r}; expected one of {sorted(_allowed_ablation)}"
             )
+        self._abl_flags = _parse_ablation_flags(self.ablation)
         # ``no_ib`` / ``no_mselector`` == paper ``w/o VTB`` / ``w/o DPR``; strings are CLI-stable.
         # 'regression' (default) or 'binary'. Switches per-modality L_lib / L_rib losses.
         self.task_type = args.get('task_type', 'regression')
@@ -541,7 +558,7 @@ class InfoGate(nn.Module):
         if self.use_hcf:
             self.ib_enc_h = IBEncoder(unified_dim, ib_hidden, bn_dim, dropout)
 
-        if self.ablation == 'no_ib':
+        if 'no_ib' in self._abl_flags:
             self.ib_bypass = nn.ModuleDict({
                 m: nn.Linear(unified_dim, bn_dim) for m in self.modalities
             })
@@ -560,7 +577,7 @@ class InfoGate(nn.Module):
                                     gumbel_tau=self.gumbel_tau)
 
         # --- 6. InfoGate cross-attention ---
-        if self.ablation == 'no_infogate':
+        if 'no_infogate' in self._abl_flags:
             self.infogate = None
         else:
             self.infogate = InfoGateModule(
@@ -807,7 +824,7 @@ class InfoGate(nn.Module):
             F_dict['h'] = F_h
 
         # 2. VTB encode (``no_ib`` bypasses VTB: linear bottleneck, no IB losses) ---
-        if self.ablation == 'no_ib':
+        if 'no_ib' in self._abl_flags:
             B, mu, lv, conf = self._ib_bypass_forward(F_dict)
             L_tib = zero
         else:
@@ -835,14 +852,14 @@ class InfoGate(nn.Module):
         lv_pooled = {m: self._masked_mean(lv[m], tok_mask) for m in self.modalities}
 
         # 5. Label-level IB loss (task-aware bottleneck supervision) ----
-        if self.use_l_lib and labels is not None and self.ablation != 'no_ib':
+        if self.use_l_lib and labels is not None and 'no_ib' not in self._abl_flags:
             L_lib = self._label_ib(B_pooled, mu_pooled, lv_pooled, labels)
         else:
             L_lib = zero
 
         # 7. DPR routing (``self.mselector`` unless ``no_mselector`` / fixed text-primary) ---
         num_modalities = len(self.modality_order)
-        if self.ablation == 'no_mselector':
+        if 'no_mselector' in self._abl_flags:
             weights, primary_onehot, primary_idx = self._fixed_language_primary(
                 Bs, device, num_modalities)
         elif self.use_hcf:
@@ -860,8 +877,10 @@ class InfoGate(nn.Module):
 
         # Delay routing supervision to stage 2; disabled for ``no_ib`` / ``no_mselector``.
         _rib_on = (
-            self.use_l_rib and labels is not None and stage == 2
-            and self.ablation not in ('no_ib', 'no_mselector')
+            self.use_l_rib
+            and labels is not None
+            and stage == 2
+            and not (self._abl_flags & {'no_ib', 'no_mselector'})
         )
         if _rib_on:
             L_rib_kl, L_rib_balance, routing_target, routing_errors, routing_entropy = \
@@ -876,7 +895,7 @@ class InfoGate(nn.Module):
             routing_entropy = zero
 
         # 9. InfoGate cross-attention ---------------------------------
-        if self.ablation == 'no_infogate':
+        if 'no_infogate' in self._abl_flags:
             B_p_enhanced = B_p
         else:
             B_p_enhanced = self.infogate(B_p, conf_p, B_aux_list, conf_aux_list, tok_mask)
@@ -888,11 +907,15 @@ class InfoGate(nn.Module):
         logits = self.primary_classifier(self.primary_dropout(self.primary_ln(h_p)))
 
         # 12. Combine IB losses ----------------------------------------
-        if self.ablation == 'no_ib':
+        if 'no_ib' in self._abl_flags:
             ib_loss = zero
         else:
             ib_loss = self.alpha_ib * (L_tib + L_lib)
-            if self.use_l_rib and labels is not None and self.ablation not in ('no_ib', 'no_mselector'):
+            if (
+                self.use_l_rib
+                and labels is not None
+                and not (self._abl_flags & {'no_ib', 'no_mselector'})
+            ):
                 ib_loss = ib_loss + self.selector_rib_weight * L_rib
 
         # Slot-name maps:
