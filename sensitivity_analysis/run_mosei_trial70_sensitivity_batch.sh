@@ -3,10 +3,11 @@
 #
 # Usage:
 #   bash sensitivity_analysis/run_mosei_trial70_sensitivity_batch.sh beta_ib
+#   bash sensitivity_analysis/run_mosei_trial70_sensitivity_batch.sh selector_rib_weight
 #   RUNS_ROOT=/path/to/runs AXIS=mse_weight bash sensitivity_analysis/run_mosei_trial70_sensitivity_batch.sh
 #
 # Env:
-#   PYTHON       default: python3 (override to ITHP5090 conda python if needed)
+#   PYTHON       default: ITHP5090 conda python (same as fixed_experiment/*.sh); override if needed
 #   GPU_LIST     e.g. "0,1" — unset on 2-GPU machine defaults to 0,1
 #   EXCLUDE_GPUS default 1 on multi-GPU; to use only GPU 1 set GPU_LIST=1 and EXCLUDE_GPUS= (empty)
 #   JOBS_PER_GPU unset → 1 job per listed GPU (same semantics as PRISM batch scripts)
@@ -16,7 +17,13 @@ set -euo pipefail
 MY_CREATION="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$MY_CREATION"
 
-PYTHON="${PYTHON:-python3}"
+_DEFAULT_PY="/root/autodl-tmp/anaconda3/envs/ITHP5090/bin/python"
+if [[ -x "${_DEFAULT_PY}" ]]; then
+  PYTHON="${PYTHON:-${_DEFAULT_PY}}"
+else
+  PYTHON="${PYTHON:-python3}"
+fi
+unset _DEFAULT_PY
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
 AXIS="${AXIS:-${1:-beta_ib}}"
@@ -141,4 +148,5 @@ for ((start = 0; start < n_vals; start += PARALLEL)); do
 done
 
 echo "======== $(date -Is) axis=${AXIS} finished. Aggregate with: ========"
-echo "$PYTHON sensitivity_analysis/run_mosei_trial70_sensitivity.py aggregate --runs-root \"$RUNS_ROOT\""
+echo "$PYTHON sensitivity_analysis/run_mosei_trial70_sensitivity.py aggregate --runs-root \"$RUNS_ROOT\" \\"
+echo "  --summary-out \"${MY_CREATION}/sensitivity_analysis/results/mosei_trial70/summary.csv\""

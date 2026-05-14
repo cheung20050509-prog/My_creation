@@ -6,6 +6,10 @@ checkpoints/
 logs/
 *.log
 
+# Local training / Optuna outputs (large; keep scripts only)
+runs/
+Testing_Stability_Analysis/runs/
+
 # Frozen repro local outputs (checkpoints live under runs/*/checkpoints/)
 fixed_experiment/runs/
 ablation_study/runs/

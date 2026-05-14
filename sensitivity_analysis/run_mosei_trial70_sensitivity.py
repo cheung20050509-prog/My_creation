@@ -2,12 +2,17 @@
 """MOSEI phase1 trial 70 hyper-parameter sensitivity: one knob at a time, rest frozen.
 
 Reads frozen defaults from ``fixed_experiment/mosei_phase1_trial70_hparams.py`` (same
-float formatting as Optuna / verify script). Writes under ``runs/sensitivity_mosei/`` by default.
+float formatting as Optuna / verify script). Writes under ``runs/sensitivity_mosei/`` by default (training checkpoints/logs).
+Use ``aggregate --summary-out sensitivity_analysis/results/mosei_trial70/summary.csv``
+to place the summary table next to figures under this package.
 
 Commands:
   list-values --axis NAME          Print default grid (one value per line, stdout).
   train --axis NAME --value FLOAT  Run fixed_experiment/train.py once.
   aggregate --runs-root DIR        Scan **/train.log, write summary.csv next to runs-root.
+
+Supported axes include ``selector_rib_weight`` (routing supervision scale; default grid
+includes 0 for no ``L_rib`` term).
 """
 
 from __future__ import annotations
@@ -40,7 +45,13 @@ RESULT_LINE_RE = re.compile(
     r"\s+(Selection score|Acc-2|Acc-7|Acc-5|Acc-3|MAE|Corr|F1):\s+([\d.]+)%?"
 )
 
-SUPPORTED_AXES = ("beta_ib", "mse_weight", "alpha_ib", "selector_target_temp")
+SUPPORTED_AXES = (
+    "beta_ib",
+    "mse_weight",
+    "alpha_ib",
+    "selector_target_temp",
+    "selector_rib_weight",
+)
 
 
 def default_grid(axis: str) -> list[float]:
@@ -49,6 +60,7 @@ def default_grid(axis: str) -> list[float]:
     m0 = float(p["mse_weight"])
     a0 = float(p["alpha_ib"])
     t0 = float(p["selector_target_temp"])
+    w0 = float(p["selector_rib_weight"])
     if axis == "beta_ib":
         return sorted({b0 * f for f in (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0)})
     if axis == "mse_weight":
@@ -58,6 +70,14 @@ def default_grid(axis: str) -> list[float]:
     if axis == "selector_target_temp":
         # Skip extremely small t (EMOE-style router collapse); still include 0.1.
         return [0.1, 0.2, t0, 0.5, 0.7, 1.0]
+    if axis == "selector_rib_weight":
+        # 0 = no L_rib term; then band around trial70 default (typ. 0.05), up to ~Optuna max.
+        return sorted(
+            {
+                round(x, 6)
+                for x in (0.0, 0.01, w0 * 0.5, w0, w0 * 1.5, w0 * 2.0, 0.15)
+            }
+        )
     raise ValueError(f"unsupported axis: {axis}")
 
 
@@ -188,7 +208,7 @@ def cmd_train(axis: str, value: float, runs_root: Path, dry_run: bool) -> int:
     return 0
 
 
-def cmd_aggregate(runs_root: Path) -> int:
+def cmd_aggregate(runs_root: Path, summary_out: Path | None) -> int:
     rows: list[dict[str, object]] = []
     for log_path in sorted(runs_root.glob("*/*/train.log")):
         rel = log_path.relative_to(runs_root)
@@ -220,7 +240,8 @@ def cmd_aggregate(runs_root: Path) -> int:
         row.update({k: metrics.get(k, "") for k in ("MAE", "Corr", "F1", "Acc-2", "Acc-7", "SelectionScore")})
         rows.append(row)
 
-    summary = runs_root / "summary.csv"
+    summary = summary_out.expanduser().resolve() if summary_out else (runs_root / "summary.csv")
+    summary.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
         "axis",
         "value",
@@ -269,6 +290,16 @@ def main() -> int:
         required=True,
         help="Directory containing AXIS/TAG/train.log",
     )
+    p_agg.add_argument(
+        "--summary-out",
+        type=Path,
+        default=None,
+        help=(
+            "Write summary.csv here (default: <runs-root>/summary.csv). "
+            "Use e.g. sensitivity_analysis/results/mosei_trial70/summary.csv to keep "
+            "tables under this package."
+        ),
+    )
 
     args = ap.parse_args()
     if args.command == "list-values":
@@ -276,7 +307,8 @@ def main() -> int:
     if args.command == "train":
         return cmd_train(args.axis, args.value, args.runs_root.expanduser().resolve(), args.dry_run)
     if args.command == "aggregate":
-        return cmd_aggregate(args.runs_root.expanduser().resolve())
+        so = args.summary_out.expanduser().resolve() if args.summary_out else None
+        return cmd_aggregate(args.runs_root.expanduser().resolve(), so)
     return 1
 
 

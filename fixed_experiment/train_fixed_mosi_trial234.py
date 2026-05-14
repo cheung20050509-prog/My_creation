@@ -11,6 +11,16 @@ from pathlib import Path
 from mosi_trial234_hparams import build_train_argv
 
 
+def _override_seed_in_argv(argv: list[str], seed: int) -> list[str]:
+    out = list(argv)
+    try:
+        i = out.index("--seed")
+        out[i + 1] = str(int(seed))
+    except (ValueError, IndexError) as exc:
+        raise RuntimeError("build_train_argv did not emit --seed / --seed value") from exc
+    return out
+
+
 def main() -> int:
     here = Path(__file__).resolve().parent
     my_creation = here.parent
@@ -27,9 +37,17 @@ def main() -> int:
         action="store_true",
         help="Print train.py invocation and exit",
     )
+    ap.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Override train.py --seed (default: frozen hparams TRIAL_234_PARAMS['seed'])",
+    )
     args = ap.parse_args()
 
     argv = build_train_argv(checkpoint_dir=args.checkpoint_dir)
+    if args.seed is not None:
+        argv = _override_seed_in_argv(argv, args.seed)
     cmd = [sys.executable, "-u", str(train_py), *argv]
     if args.dry_run:
         print("cwd:", my_creation)
