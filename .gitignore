@@ -16,6 +16,10 @@ ablation_study/runs/
 deberta-v3-base/
 albert-base-v2/
 bert-base-chinese/
+bert-base-uncase/
+
+# Large local archives (do not track)
+*.tar.gz
 _arxiv_MODS/
 _arxiv_CyIN/
 _arxiv_MODS

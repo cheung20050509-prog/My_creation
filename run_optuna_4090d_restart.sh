@@ -28,6 +28,7 @@
 #   ./run_optuna_4090d_restart.sh phase3     # only after phase2 has converged
 #   ./run_optuna_4090d_restart.sh phase4     # SIMSv2: local search around phase3 trial 148 (no tight hull)
 #   ./run_optuna_4090d_restart.sh phase4_mosi  # MOSI micro-local: phase4_mosi trial 8 + phase3 s2 {89,43,75}
+#   ./run_optuna_4090d_restart.sh phase4_mosi_space3  # MOSI space3 study (same DB dir as phase4_mosi); anchors space2 {121,266,234,239,220}
 #   ./run_optuna_4090d_restart.sh phase5_mosi  # Clean MOSI micro-local DB (same anchors as phase4_mosi)
 #   ./run_optuna_4090d_restart.sh phase5_simsv2  # SIMS: merge anchors phase3 #148 + phase4 #0 (needs phase4 db)
 #
@@ -35,8 +36,10 @@
 #   ONLY=simsv2 ./run_optuna_4090d_restart.sh phase4
 #   ONLY=simsv2 ./run_optuna_4090d_restart.sh phase5_simsv2  # after phase4 SIMS db exists
 #   ONLY=mosi ./run_optuna_4090d_restart.sh phase4_mosi  # or phase5_mosi (clean db)
+#   ONLY=mosi MOSI_GPU=1 MOSI_MICRO_N_TRIALS=500 ./run_optuna_4090d_restart.sh phase4_mosi_space3  # e.g. +300 trials after 200
 #
 # Optional env (defaults in-script): MOSI_N_EPOCHS_CAP, MOSI_EARLY_STOP_PATIENCE;
+# MOSI_SPACE3_LOG (phase4_mosi_space3 driver log basename under run/, default mosi_space3_gpu1.log);
 # SIMSV2_N_EPOCHS_CAP, SIMSV2_EARLY_STOP_PATIENCE (phase4 / phase5_simsv2 only).
 # Resume trial budget: MOSI_MICRO_N_TRIALS (phase4_mosi|phase5_mosi) and SIMSV2_N_TRIALS
 # are **target totals** (COMPLETE+PRUNED+FAIL+RUNNING in the study); set to (existing+N) to add N trials.
@@ -48,7 +51,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-PHASE="${1:?Usage: $0 <phase1|phase2|phase3|phase4|phase4_mosi|phase5_mosi|phase5_simsv2|phase6_simsv2>}"
+PHASE="${1:?Usage: $0 <phase1|phase2|phase3|phase4|phase4_mosi|phase4_mosi_space3|phase5_mosi|phase5_simsv2|phase6_simsv2>}"
 ONLY="${ONLY:-all}"   # all | mosi | mosei | simsv2
 
 case "$PHASE" in
@@ -57,10 +60,11 @@ case "$PHASE" in
   phase3) TIER=3 ;;
   phase4) TIER=3 ;;
   phase4_mosi) TIER=3 ;;
+  phase4_mosi_space3) TIER=3 ;;
   phase5_mosi) TIER=3 ;;
   phase5_simsv2) TIER=3 ;;
   phase6_simsv2) TIER=3 ;;
-  *) echo "ERROR: unknown phase '$PHASE'; expected phase1|phase2|phase3|phase4|phase4_mosi|phase5_mosi|phase5_simsv2|phase6_simsv2" >&2; exit 1 ;;
+  *) echo "ERROR: unknown phase '$PHASE'; expected phase1|phase2|phase3|phase4|phase4_mosi|phase4_mosi_space3|phase5_mosi|phase5_simsv2|phase6_simsv2" >&2; exit 1 ;;
 esac
 
 # MOSI micro-local (phase4_mosi / phase5_mosi): Optuna n_epochs cap + train dev early stop
@@ -105,6 +109,13 @@ case "$PHASE" in
     MOSEI_TRIALS=150
     MOSEI_NSTART=55
     ;;
+  phase4_mosi_space3)  # tier 3; study infogate_mosi_phase4_mosi_4090d_space3 (see launch_mosi_space3)
+    # Default target total 500 (= +300 after a 200-trial space3 run); override with MOSI_MICRO_N_TRIALS.
+    MOSI_MICRO_TRIALS=500
+    MOSI_MICRO_NSTART=15
+    MOSEI_TRIALS=150
+    MOSEI_NSTART=55
+    ;;
   phase5_mosi)  # tier 3; fresh MOSI micro-local dir (same anchor policy as phase4_mosi)
     MOSI_MICRO_TRIALS=60
     MOSI_MICRO_NSTART=22
@@ -130,7 +141,7 @@ case "$PHASE" in
   phase4)
     SIMSV2_TRIALS="${SIMSV2_N_TRIALS:-$SIMSV2_TRIALS}"
     ;;
-  phase4_mosi|phase5_mosi)
+  phase4_mosi|phase4_mosi_space3|phase5_mosi)
     MOSI_MICRO_TRIALS="${MOSI_MICRO_N_TRIALS:-$MOSI_MICRO_TRIALS}"
     ;;
   phase5_simsv2|phase6_simsv2)
@@ -146,6 +157,10 @@ fi
 ROOT="$(pwd)"
 # phase4_mosi / phase5_mosi / phase5_simsv2 use their own directories (no collision with phase4 SIMS).
 PHASE_ROOT="$ROOT/logs/optuna/4090D_restart/$PHASE"
+# space3 driver shares phase4_mosi artefacts (one sqlite file, multiple studies).
+if [[ "$PHASE" == "phase4_mosi_space3" ]]; then
+  PHASE_ROOT="$ROOT/logs/optuna/4090D_restart/phase4_mosi"
+fi
 mkdir -p "$PHASE_ROOT/db" "$PHASE_ROOT/run" "$PHASE_ROOT/train_logs" "$PHASE_ROOT/checkpoints"
 
 echo "[$(date -Iseconds)] launching $PHASE (tier=$TIER, ONLY=$ONLY)"
@@ -261,6 +276,46 @@ launch_mosi_micro_local () {
     --enqueue_trials_storage "${p4_mosi_db}" \
     --enqueue_trials_study "${p4_mosi_study}" \
     --enqueue_trials_numbers "8" \
+    >> "${logfile}" 2>&1 &
+  echo "    PID=$!"
+}
+
+# MOSI study ``infogate_mosi_phase4_mosi_4090d_space3`` (local hull from space2 trials
+# 121,266,234,239,220). Reuses ``phase4_mosi`` DB + train_logs + checkpoints.
+launch_mosi_space3 () {
+  local gpu="$1"
+  local logfile="$PHASE_ROOT/run/${MOSI_SPACE3_LOG:-mosi_space3_gpu1.log}"
+  local study="infogate_mosi_phase4_mosi_4090d_space3"
+  local db; db="$(db_uri mosi)"
+  local p4_mosi_db="sqlite:///${ROOT}/logs/optuna/4090D_restart/phase4_mosi/db/mosi.db"
+  local space2_study="infogate_mosi_phase4_mosi_4090d_space2"
+  local anchor_nums="121,266,234,239,220"
+
+  echo "  [$(date -Iseconds)] mosi (phase4_mosi space3) -> GPU${gpu}  ${logfile}"
+  {
+    echo ""
+    echo "######## [$(date -Iseconds)] driver restart (mosi phase4_mosi space3) ########"
+  } >> "${logfile}"
+  nohup env CUDA_VISIBLE_DEVICES="${gpu}" "${PYTHON}" -u optuna_search_v2.py \
+    --dataset mosi \
+    --gpu 0 \
+    --disable_two_stage_mosi \
+    --search_tier "${TIER}" \
+    --n_trials "${MOSI_MICRO_TRIALS}" \
+    --n_startup_trials "${MOSI_MICRO_NSTART}" \
+    --n_epochs "${MOSI_N_EPOCHS_CAP}" \
+    --early_stop_patience "${MOSI_EARLY_STOP_PATIENCE}" \
+    --selection_metric mae \
+    --study_name "${study}" \
+    --db "${db}" \
+    --artefact_root "${PHASE_ROOT}" \
+    --stage_label "phase4_mosi_space3" \
+    --local_space_anchor_storage "${p4_mosi_db}" \
+    --local_space_anchor_study "${space2_study}" \
+    --local_space_anchor_trials "${anchor_nums}" \
+    --enqueue_trials_storage "${p4_mosi_db}" \
+    --enqueue_trials_study "${space2_study}" \
+    --enqueue_trials_numbers "${anchor_nums}" \
     >> "${logfile}" 2>&1 &
   echo "    PID=$!"
 }
@@ -405,7 +460,7 @@ launch_simsv2 () {
 }
 
 # GPU layout: MOSI GPU0; MOSEI GPU1; SIMSv2 GPU0 (use ONLY= to avoid MOSI+SIMSv2 on same card).
-# phase4_mosi: physical GPU via MOSI_GPU (default 0).
+# phase4_mosi / phase4_mosi_space3 / phase5_mosi: physical GPU via MOSI_GPU (default 0).
 # MOSEI: MOSEI_GPU (default 1). Set MOSEI_GPU=0 on single-GPU machines.
 # SIMSv2: SIMS_GPU (default 0). Set SIMS_GPU=1 when a second GPU is available for true parallelism.
 MOSI_GPU="${MOSI_GPU:-0}"
@@ -417,6 +472,12 @@ if [[ "$PHASE" == "phase4_mosi" || "$PHASE" == "phase5_mosi" ]]; then
     exit 1
   fi
   launch_mosi_micro_local "${MOSI_GPU}"
+elif [[ "$PHASE" == "phase4_mosi_space3" ]]; then
+  if [[ "$ONLY" != "mosi" && "$ONLY" != "all" ]]; then
+    echo "ERROR: ${PHASE} only launches MOSI space3; use ONLY=mosi or ONLY=all." >&2
+    exit 1
+  fi
+  launch_mosi_space3 "${MOSI_GPU}"
 elif [[ "$PHASE" == "phase6_simsv2" ]]; then
   if [[ "$ONLY" != "simsv2" && "$ONLY" != "all" ]]; then
     echo "ERROR: phase6_simsv2 only launches SIMSv2 expanded search; use ONLY=simsv2 or ONLY=all." >&2

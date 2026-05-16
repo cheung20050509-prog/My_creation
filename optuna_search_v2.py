@@ -248,6 +248,29 @@ def parse_best_results(log_path):
                 if key == "Selection score":
                     key = "SelectionScore"
                 results[key] = val
+    # When training ends before any epoch satisfies the Best Results gate
+    # (e.g. n_epochs < select_start), the Best Results block is empty — use
+    # the trailing "Last Epoch (...) Results:" metrics instead.
+    if "MAE" not in results:
+        in_last = False
+        with open(log_path, "r") as f:
+            for line in f:
+                if line.startswith("Last Epoch"):
+                    in_last = True
+                    continue
+                if in_last and line.startswith("Best Test"):
+                    break
+                if in_last:
+                    m = RESULT_LINE_RE.match(line)
+                    if not m:
+                        continue
+                    key, raw = m.groups()
+                    val = float(raw)
+                    if key in ("Acc-2", "Acc-7", "Acc-5", "Acc-3"):
+                        val /= 100.0
+                    if key == "Selection score":
+                        key = "SelectionScore"
+                    results[key] = val
     return results
 
 
@@ -1285,6 +1308,10 @@ def objective(trial, cli):
         "--ema_start_epoch", str(params["ema_start_epoch"]),
     ]
 
+    pm = getattr(cli, "pretrained_model", None)
+    if pm:
+        cmd.extend(["--model", pm, "--text_backbone", "bert"])
+
     for attr, flag in (
         ("disable_l_lib", "--disable_l_lib"),
         ("disable_l_rib", "--disable_l_rib"),
@@ -1527,7 +1554,24 @@ def main():
                     help="Skip apply_dataset_bounds_overrides(); use the FULL global "
                          "search space. Use for cold restarts that should NOT inherit "
                          "narrowing derived from prior-GPU runs.")
+    pa.add_argument(
+        "--pretrained_model",
+        type=str,
+        default=None,
+        help="If set, each train subprocess gets --model <abs> and --text_backbone bert "
+             "(BERT-base-uncased local dir or HF id).",
+    )
     cli = pa.parse_args()
+    if cli.pretrained_model:
+        raw = cli.pretrained_model.strip()
+        exp = os.path.expanduser(raw)
+        if os.path.isdir(exp) or os.path.isfile(exp):
+            cli.pretrained_model = os.path.abspath(exp)
+        elif os.path.isabs(exp) and (os.path.isdir(exp) or os.path.isfile(exp)):
+            cli.pretrained_model = exp
+        else:
+            # HuggingFace hub id (e.g. google-bert/bert-base-uncased) — not a local path.
+            cli.pretrained_model = raw
 
     ds = cli.dataset
     if not cli.no_dataset_overrides:

@@ -22,7 +22,8 @@ Example::
         --runs-root runs/sensitivity_mosei/trial70 \\
         --summary-out sensitivity_analysis/results/mosei_trial70/summary.csv
     python3 sensitivity_analysis/plot_mosei_sensitivity_emoe_style.py \\
-        --output sensitivity_analysis/results/mosei_trial70/mosei_sensitivity_emoe_style.png
+        --output sensitivity_analysis/results/mosei_trial70/mosei_sensitivity_emoe_style.pdf \\
+        --xlog-axes beta_ib,alpha_ib
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ DEFAULT_ACC7_YLIM: tuple[float, float] = (35.0, 75.0)
 DEFAULT_MAE_YLIM: tuple[float, float] = (0.4, 0.6)
 _DEFAULT_RESULTS = _SENS / "results" / "mosei_trial70"
 _DEFAULT_SUMMARY = _DEFAULT_RESULTS / "summary.csv"
-_DEFAULT_OUTPUT = _DEFAULT_RESULTS / "mosei_trial70_sensitivity_emoe_style.png"
+_DEFAULT_OUTPUT = _DEFAULT_RESULTS / "mosei_trial70_sensitivity_emoe_style.pdf"
 
 DEFAULT_AXES_ORDER = (
     "beta_ib",
@@ -53,12 +54,13 @@ DEFAULT_AXES_ORDER = (
     "selector_rib_weight",
 )
 
-AXIS_TITLE = {
+# X-axis labels (below each panel): prefer Greek letters for hyper-parameters.
+AXIS_XLABEL = {
     "beta_ib": r"$\beta_{\mathrm{IB}}$",
-    "mse_weight": r"$\mathrm{mse\_weight}$",
+    "mse_weight": r"$\rho_{\mathrm{mse}}$",
     "alpha_ib": r"$\alpha_{\mathrm{IB}}$",
-    "selector_target_temp": r"$t_{\mathrm{sel}}$",
-    "selector_rib_weight": r"$w_{\mathrm{RIB}}$",
+    "selector_target_temp": r"$\tau_{\mathrm{sel}}$",
+    "selector_rib_weight": r"$\gamma_{\mathrm{RIB}}$",
 }
 
 
@@ -125,7 +127,7 @@ def _mae_ylim(
 def plot(
     *,
     summary_csv: Path,
-    output_png: Path,
+    output_path: Path,
     axes_order: tuple[str, ...],
     xlog_axes: set[str],
     acc7_ylim: tuple[float, float] | None,
@@ -134,7 +136,7 @@ def plot(
 ) -> None:
     rows = load_rows(summary_csv)
     plt.rcParams.update({"font.size": 11})
-    fig, axs = plt.subplots(1, len(axes_order), figsize=(4.6 * len(axes_order), 4.65), constrained_layout=True)
+    fig, axs = plt.subplots(1, len(axes_order), figsize=(4.6 * len(axes_order), 4.35), constrained_layout=True)
 
     if len(axes_order) == 1:
         axs = [axs]
@@ -148,7 +150,7 @@ def plot(
                 print(f"ERROR: {msg}", file=sys.stderr)
                 sys.exit(1)
             ax.text(0.5, 0.5, "no data", ha="center", va="center", transform=ax.transAxes)
-            ax.set_title(AXIS_TITLE.get(axis, axis))
+            ax.set_xlabel(AXIS_XLABEL.get(axis, axis), fontsize=13)
             continue
 
         any_data = True
@@ -206,27 +208,28 @@ def plot(
         mae_step = 0.05 if span_m >= 0.15 else (0.02 if span_m >= 0.06 else 0.01)
         ax2.yaxis.set_major_locator(MultipleLocator(mae_step))
 
-        ax.set_title(AXIS_TITLE.get(axis, axis), fontsize=13)
         ax.grid(True, axis="y", alpha=0.35)
-        ax.set_xlabel(axis.replace("_", " "), fontsize=11)
+        ax.set_xlabel(AXIS_XLABEL.get(axis, axis), fontsize=13)
 
         h1, l1 = ax.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
         ax.legend(h1 + h2, l1 + l2, loc="upper right", fontsize=10, framealpha=0.9)
 
-    fig.suptitle(
-        "Sensitivity analysis on CMU-MOSEI (trial 70): vary one hyper-parameter, others fixed.",
-        fontsize=12,
-    )
-
     if not any_data:
         print("ERROR: no plottable data in any panel", file=sys.stderr)
         sys.exit(1)
 
-    output_png.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_png, dpi=200)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    out = output_path.expanduser().resolve()
+    suffix = out.suffix.lower()
+    if suffix == ".pdf":
+        fig.savefig(out, format="pdf", bbox_inches="tight")
+    elif suffix in (".png", ".jpg", ".jpeg", ".tif", ".tiff", ".svg"):
+        fig.savefig(out, dpi=200, bbox_inches="tight")
+    else:
+        fig.savefig(out, bbox_inches="tight")
     plt.close(fig)
-    print(f"Wrote {output_png}")
+    print(f"Wrote {out}")
 
 
 def main() -> int:
@@ -241,7 +244,7 @@ def main() -> int:
         "--output",
         type=Path,
         default=_DEFAULT_OUTPUT,
-        help=f"Output PNG path (default: {_DEFAULT_OUTPUT})",
+        help=f"Output figure path (.pdf / .png / …; default: {_DEFAULT_OUTPUT})",
     )
     ap.add_argument(
         "--axes",
@@ -306,7 +309,7 @@ def main() -> int:
 
     plot(
         summary_csv=args.summary_csv.expanduser().resolve(),
-        output_png=args.output.expanduser().resolve(),
+        output_path=args.output.expanduser().resolve(),
         axes_order=axes_order,
         xlog_axes=xlog,
         acc7_ylim=acc7_ylim,

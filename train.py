@@ -90,8 +90,32 @@ parser.add_argument("--early_stop_patience", type=int, default=0,
 parser.add_argument("--early_stop_min_delta", type=float, default=0.0,
                     help="When >0, a dev improvement must exceed this margin on the "
                          "selection score (tiebreak-only wins still count).")
+parser.add_argument(
+    "--text_backbone",
+    type=str,
+    default="auto",
+    choices=["auto", "deberta", "bert"],
+    help="Text encoder for mosi/mosei: bert uses BertTokenizer + InfoGate_BERT; "
+         "deberta uses DeBERTa; auto infers from --model path (default mosi/mosei: DeBERTa).",
+)
 
 args = parser.parse_args()
+
+
+def effective_text_backbone():
+    """Resolve text backbone for mosi/mosei (simsv2 is always BERT in this codebase)."""
+    if args.dataset == "simsv2":
+        return "bert"
+    if args.text_backbone == "bert":
+        return "bert"
+    if args.text_backbone == "deberta":
+        return "deberta"
+    m = os.path.normpath(str(args.model)).lower()
+    if "deberta" in m:
+        return "deberta"
+    if "bert" in m and "deberta" not in m:
+        return "bert"
+    return "deberta"
 
 if args.dataset == "simsv2":
     if "deberta-v3-base" in args.model:
@@ -211,6 +235,8 @@ def convert_to_features(examples, max_seq_length, tokenizer):
 def get_tokenizer(model):
     if args.dataset == "simsv2":
         return BertTokenizer.from_pretrained(model)
+    if effective_text_backbone() == "bert":
+        return BertTokenizer.from_pretrained(model)
     return DebertaV2Tokenizer.from_pretrained(model)
 
 
@@ -264,6 +290,10 @@ def set_seed(seed):
 
 def build_model(n_opt):
     if args.dataset == "simsv2":
+        model = InfoGate_BertForSequenceClassification.from_pretrained(
+            args.model, multimodal_config=args, num_labels=1)
+        backbone_prefix = "bert.model."
+    elif effective_text_backbone() == "bert":
         model = InfoGate_BertForSequenceClassification.from_pretrained(
             args.model, multimodal_config=args, num_labels=1)
         backbone_prefix = "bert.model."
