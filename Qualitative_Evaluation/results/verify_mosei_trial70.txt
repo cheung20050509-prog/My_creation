@@ -1,0 +1,11 @@
+=== checkpoint test_results (dev-selected epoch) ===
+  acc2: 0.874033
+  acc7: 0.559767
+  corr: 0.799450
+  f1: 0.872635
+  mae: 0.499361
+
+=== log Best Results MAE ===
+  0.499400
+
+OK: log Best Results MAE matches checkpoint test_results['mae'] within tolerance.

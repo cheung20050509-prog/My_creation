@@ -1,19 +1,40 @@
 #!/usr/bin/env python3
-"""Export per-sample DPR primary modality indices (eval, deterministic routing).
+"""Export per-sample DPR primary modality + soft routing weights (eval, deterministic).
 
 ``logs/optuna/4090D_restart/*.log`` only contain epoch-level ``Diag`` batch means;
 they cannot identify which sample is A/V primary.  This script loads a checkpoint,
-runs ``model.eval()`` on dev or test, and writes a CSV:
-``global_index, split_index, primary_idx, primary_name``.
+runs ``model.eval()`` on dev or test, and writes a CSV with:
 
-Slot order matches ``MSelector`` / ``train.py`` diagnostics: 0=acoustic, 1=language,
-2=visual.
+  ``global_index``, ``split_index``, ``label``, ``logit``, ``abs_err``,
+  ``route_entropy``, ``h_p_l2norm``,
+  ``primary_idx``, ``primary_name``,
+  ``w_a``, ``w_l``, ``w_v``, ``w_max``,
+  ``ib_conf_t``, ``ib_conf_a``, ``ib_conf_v``, ``ib_conf_fused``
 
-Usage (from ``My_creation/``)::
+where ``w_*`` are the DPR ``softmax(logits)`` weights (see ``MSelector._route`` in
+``infogate_modules.py``) and ``w_max = max(w_a,w_l,w_v)`` (routing confidence for
+the chosen primary).  **Non-language-dominated** samples are those with
+``primary_idx != 1`` (0=acoustic, 1=language, 2=visual).
+
+``route_entropy`` is ``-sum_k w_k log w_k`` (nats).  ``h_p_l2norm`` is the L2 norm of
+the primary pooled vector ``h_p`` (``InfoGate`` forward's fourth return) before the head.
+
+``ib_conf_*`` are **VTB / IBEncoder** confidences ``sigmoid(-logvar)``, aggregated
+per sample: mask-mean over valid tokens, then mean over bottleneck dimensions
+(see ``ib_conf_utils.per_sample_ib_conf_mean``).  ``ib_conf_t`` aligns with
+training logs ``conf_t`` (text slot); ``ib_conf_fused`` matches the spirit of
+``fusion_conf`` on the **primary mixed** ``conf_p`` after DPR routing (per-sample
+masked mean, not an identical scalar to the epoch log batch mean).
+
+Canonical checkpoint path hints (relative to ``My_creation/``) live in
+``Qualitative_Evaluation/GOLD_CHECKPOINT_PATHS.txt``.
+
+Usage (from ``My_creation/``); CSV 建议写到 ``Qualitative_Evaluation/results/``::
 
     python Qualitative_Evaluation/dump_dpr_primary_on_split.py \\
-      --checkpoint ablation_study/runs/mosei_phase1_trial70_no_ib/checkpoints/infogate_mosei_best.pt \\
-      --dataset mosei --split test --output /tmp/mosei70_noib_dpr_test.csv
+      --checkpoint logs/optuna/4090D_restart/phase1/checkpoints/optuna_mosei_phase1/trial_70/infogate_mosei_best.pt \\
+      --dataset mosei --split test \\
+      --output Qualitative_Evaluation/results/mosei_trial70_dpr_test.csv
 """
 
 from __future__ import annotations
@@ -40,6 +61,12 @@ if _MY not in sys.path:
 import global_configs  # noqa: E402
 from deberta_infogate import InfoGate_DeBertaForSequenceClassification  # noqa: E402
 from global_configs import DEVICE  # noqa: E402
+
+from ib_conf_utils import (  # noqa: E402
+    install_infogate_ib_trace,
+    per_sample_dpr_entropy,
+    per_sample_ib_conf_mean,
+)
 
 
 def _apply_ckpt_arch(cli: SimpleNamespace, ckpt_path: str) -> None:
@@ -152,6 +179,17 @@ def build_tensor_dataset(feats):
     )
 
 
+def _weights_and_primary_from_mselector_output(out) -> tuple[torch.Tensor | None, torch.Tensor]:
+    """Parse ``MSelector`` forward return: 3-way (6-tuple) or 4-way (7-tuple)."""
+    if not isinstance(out, tuple):
+        return None, out if torch.is_tensor(out) else out[-1]
+    if len(out) >= 6 and torch.is_tensor(out[3]) and out[3].dim() == 2:
+        return out[3], out[5]
+    if len(out) >= 7 and torch.is_tensor(out[4]) and out[4].dim() == 2:
+        return out[4], out[6]
+    return None, out[-1]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--checkpoint", type=str, required=True)
@@ -206,12 +244,17 @@ def main() -> int:
     model.to(DEVICE)
     model.eval()
 
-    captured: list[torch.Tensor] = []
+    captured: list[tuple[torch.Tensor | None, torch.Tensor]] = []
 
     def _hook(_mod, _inp, out):
-        captured.append(out[-1].detach().cpu())
+        w, p = _weights_and_primary_from_mselector_output(out)
+        captured.append(
+            (w.detach().cpu() if w is not None else None, p.detach().cpu())
+        )
 
-    h = model.dberta.infogate.mselector.register_forward_hook(_hook)
+    ig = model.dberta.infogate
+    h = ig.mselector.register_forward_hook(_hook)
+    cleanup_ib, ib_store = install_infogate_ib_trace(ig)
 
     ds_path = os.path.join(_MY, "datasets", f"{cli.dataset}.pkl")
     with open(ds_path, "rb") as fh:
@@ -235,35 +278,91 @@ def main() -> int:
     names = {0: "acoustic", 1: "language", 2: "visual"}
     rows = []
     offset = 0
-    with torch.no_grad():
-        for batch in tqdm(dl, desc=f"DPR {args.split}"):
-            batch = tuple(t.to(DEVICE) for t in batch)
-            input_ids, visual, acoustic, _labels = batch
-            visual = visual.squeeze(1)
-            acoustic = acoustic.squeeze(1)
-            captured.clear()
-            _ = model(input_ids, visual, acoustic, labels=None, stage=2)
-            if not captured:
-                print("ERROR: mselector hook did not fire", file=sys.stderr)
-                h.remove()
-                return 1
-            pidx = captured[-1]
-            for j in range(pidx.size(0)):
-                pi = int(pidx[j].item())
-                rows.append(
-                    {
-                        "global_index": offset + j,
-                        "split_index": offset + j,
-                        "primary_idx": pi,
-                        "primary_name": names.get(pi, str(pi)),
-                    }
-                )
-            offset += pidx.size(0)
-    h.remove()
+    pad_id = model.config.pad_token_id if model.config.pad_token_id is not None else 0
+    try:
+        with torch.no_grad():
+            for batch in tqdm(dl, desc=f"DPR {args.split}"):
+                batch = tuple(t.to(DEVICE) for t in batch)
+                input_ids, visual, acoustic, labels = batch
+                visual = visual.squeeze(1)
+                acoustic = acoustic.squeeze(1)
+                attn = input_ids.ne(pad_id).float()
+                ib_store.clear()
+                captured.clear()
+                logits, _, _, h_p = model(input_ids, visual, acoustic, labels=None, stage=2)
+                if not captured:
+                    print("ERROR: mselector hook did not fire", file=sys.stderr)
+                    return 1
+                wcpu, pidx = captured[-1]
+                if wcpu is None:
+                    print("ERROR: could not parse DPR weights from mselector output", file=sys.stderr)
+                    return 1
+                if wcpu.size(-1) != 3:
+                    print(
+                        f"ERROR: expected 3 DPR modalities for mosi/mosei, got {wcpu.size(-1)}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                if not {"t", "a", "v", "conf_p"}.issubset(ib_store.keys()):
+                    print(
+                        "ERROR: IB conf hooks missing keys "
+                        f"(have {sorted(ib_store.keys())})",
+                        file=sys.stderr,
+                    )
+                    return 1
+                ib_t = per_sample_ib_conf_mean(ib_store["t"], attn).cpu()
+                ib_a = per_sample_ib_conf_mean(ib_store["a"], attn).cpu()
+                ib_v = per_sample_ib_conf_mean(ib_store["v"], attn).cpu()
+                ib_f = per_sample_ib_conf_mean(ib_store["conf_p"], attn).cpu()
+                logit_b = logits.squeeze(-1).detach().cpu()
+                y_b = labels.squeeze(-1).detach().cpu()
+                hp_norm = h_p.squeeze(-1).norm(dim=-1).detach().cpu()
+                ent_b = per_sample_dpr_entropy(wcpu).cpu()
+                for j in range(pidx.size(0)):
+                    pi = int(pidx[j].item())
+                    wa = float(wcpu[j, 0].item())
+                    wl = float(wcpu[j, 1].item())
+                    wv = float(wcpu[j, 2].item())
+                    wmax = max(wa, wl, wv)
+                    yj = float(y_b[j].item())
+                    lj = float(logit_b[j].item())
+                    rows.append(
+                        {
+                            "global_index": offset + j,
+                            "split_index": offset + j,
+                            "label": yj,
+                            "logit": lj,
+                            "abs_err": abs(lj - yj),
+                            "route_entropy": float(ent_b[j].item()),
+                            "h_p_l2norm": float(hp_norm[j].item()),
+                            "primary_idx": pi,
+                            "primary_name": names.get(pi, str(pi)),
+                            "w_a": wa,
+                            "w_l": wl,
+                            "w_v": wv,
+                            "w_max": wmax,
+                            "ib_conf_t": float(ib_t[j].item()),
+                            "ib_conf_a": float(ib_a[j].item()),
+                            "ib_conf_v": float(ib_v[j].item()),
+                            "ib_conf_fused": float(ib_f[j].item()),
+                        }
+                    )
+                offset += pidx.size(0)
+    finally:
+        h.remove()
+        cleanup_ib()
 
-    os.makedirs(os.path.dirname(os.path.abspath(args.output)) or ".", exist_ok=True)
+    out_dir = os.path.dirname(os.path.abspath(args.output)) or "."
+    os.makedirs(out_dir, exist_ok=True)
+    fieldnames = [
+        "global_index", "split_index", "label", "logit", "abs_err",
+        "route_entropy", "h_p_l2norm",
+        "primary_idx", "primary_name",
+        "w_a", "w_l", "w_v", "w_max",
+        "ib_conf_t", "ib_conf_a", "ib_conf_v", "ib_conf_fused",
+    ]
     with open(args.output, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["global_index", "split_index", "primary_idx", "primary_name"])
+        w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()
         w.writerows(rows)
 
@@ -272,8 +371,16 @@ def main() -> int:
     nl = sum(1 for r in rows if r["primary_idx"] == 1)
     nv = sum(1 for r in rows if r["primary_idx"] == 2)
     nnl = na + nv
+    non_l = [r for r in rows if r["primary_idx"] != 1]
+    wmax_non_l = [float(r["w_max"]) for r in non_l]
+    mean_wmax_nl = sum(wmax_non_l) / len(wmax_non_l) if wmax_non_l else 0.0
+
+    mean_abs = sum(float(r["abs_err"]) for r in rows) / max(n, 1)
+
     print(f"Wrote {n} rows to {args.output}")
     print(f"Counts: acoustic={na}  language={nl}  visual={nv}  non_language={nnl} ({100.0 * nnl / max(n,1):.2f}%)")
+    print(f"Non-L DPR w_max mean: {mean_wmax_nl:.6f}  (n={len(non_l)})")
+    print(f"Mean |logit-label| (subset MAE proxy): {mean_abs:.6f}")
     return 0
 
 

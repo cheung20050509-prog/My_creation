@@ -1,0 +1,26 @@
+MOSEI test sample (dump: mosei_trial70_dpr_test.csv), Optuna trial 70, global_index = 750
+========================================================================================
+
+Regression targets (same row as qualitative CSV):
+  label y              +0.3333333432674408  (~ +1/3)
+  prediction logit     +0.3062061071395874
+  absolute error       0.027127236127853394   (strong agreement)
+
+Differentiable Primary Router (softmax weights on this sample):
+  primary_name         acoustic
+  primary_idx          0
+  w_a (acoustic)       0.47064208984375   (argmax / w_max)
+  w_l (language)       0.45210549235343933
+  w_v (visual)         0.07725243270397186
+  route_entropy        0.9114207029342651
+  ||h_p||_2            9.626276969909668
+
+VTB / IB confidence (sample-level means in CSV; token-level in TSV dump):
+  ib_conf_t            0.6404987573623657
+  ib_conf_a            0.5053001642227173
+  ib_conf_v            0.48877039551734924
+  ib_conf_fused        0.5053001642227173
+
+Artifacts (generated under Qualitative_Evaluation/results/):
+  mosei_trial70_idx750_ib_conf_tokens.tsv
+  mosei_trial70_idx750_ib_conf_tokens_heatmap.png

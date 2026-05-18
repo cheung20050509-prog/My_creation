@@ -1,0 +1,15 @@
+# Canonical Optuna checkpoints (4090D_restart) for qualitative / DPR dumps.
+# Paths are relative to My_creation/. Adjust trial numbers if your DB differs.
+# DPR CSV / verify 文本输出目录: Qualitative_Evaluation/results/
+#
+# MOSI — study infogate_mosi_phase4_mosi_4090d_space3, trial 301 (common paper row)
+logs/optuna/4090D_restart/phase4_mosi/checkpoints/optuna_mosi_phase4_mosi_space3/trial_301/infogate_mosi_best.pt
+#
+# MOSEI — study infogate_mosei_phase1_4090d, trial 70 (gold repro)
+logs/optuna/4090D_restart/phase1/checkpoints/optuna_mosei_phase1/trial_70/infogate_mosei_best.pt
+#
+# MUStARD (ALBERT+HCF classify) — example trial 113 (b3 study)
+logs/optuna/4090D_restart/classification/optuna_classify_mustard_albert_hcf_b3_20260427_235533/checkpoints/optuna_mustard/trial_113/infogate_mustard_best.pt
+#
+# UR-FUNNY (ALBERT+HCF classify) — example trial 98 (20260426 study; see optuna_search_classify notes)
+logs/optuna/4090D_restart/classification/optuna_classify_albert_hcf_20260426_192758/checkpoints/optuna_ur_funny/trial_98/infogate_ur_funny_best.pt

@@ -1,0 +1,8 @@
+VsXGwSZazwA_10,"Witnesses quite commonly will forget certain pieces of information, not be able to remember details and will change their mind about what happened and when, but that should be expected.",0.6666666865348816,test
+VsXGwSZazwA_1,Forensic psychology is concerned with all aspects of crime in a criminal investigative procedure.,0.0,test
+VsXGwSZazwA_0,I'm Dr Graham Pike from the Department of Psychology at the OU and I'm a forensic psychologist.,1.3333333730697632,test
+VsXGwSZazwA_2,"One thing forensic psychologists have done is look at witness memory, particularly how we can help the police to get the most out of what a witness has seen of a crime.",1.0,test
+VsXGwSZazwA_4,One thing that might happen is that we allow a witness simply to recall everything they can without interrupting them.,0.0,test
+VsXGwSZazwA_7,One of the reasons it's so important to look at witness memory is there's an expectation that our brains act a bit like a computer.,0.0,test
+VsXGwSZazwA_6,By doing that the witness can remember more accurate information.,1.6666666269302368,test
+VsXGwSZazwA_8,"So the information goes in, is stored perfectly and can just be retrieved perfectly.",1.6666666269302368,test

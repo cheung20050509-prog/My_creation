@@ -1,0 +1,111 @@
+# Qualitative evaluation: fixed case IDs (paper / appendix)
+
+Regenerate full per-sample tables with:
+
+  python Qualitative_Evaluation/dump_dpr_primary_on_split.py ...
+  python Qualitative_Evaluation/dump_dpr_primary_classify.py ...
+
+(see script docstrings for columns: label, logit, DPR w_*, route_entropy, ib_conf_*, h_p_l2norm, …)
+
+**Latest regenerated CSVs (relative to `My_creation/`)**  
+- MOSEI trial 70 / test: `Qualitative_Evaluation/results/mosei_trial70_dpr_test.csv` (4643 rows)  
+- MUStARD trial 113 / test: `Qualitative_Evaluation/results/mustard_trial113_dpr_test.csv` (68 rows)  
+
+Run with `conda run -n ITHP5090 python …` from `My_creation/` if system Python has no torch.
+
+--------------------------------------------------------------------------------
+## Case A — MOSEI (regression, DeBERTa)
+
+- **Study / ckpt (relative to My_creation/)**  
+  `logs/optuna/4090D_restart/phase1/checkpoints/optuna_mosei_phase1/trial_70/infogate_mosei_best.pt`
+- **Split**: `test`
+- **Row**: **`global_index = 2856`** (`split_index = 2856`)
+
+**Why this row**  
+Rare **acoustic-primary** DPR (`primary_idx=0`) on MOSEI trial-70 test (only a handful of such rows).  
+DPR weights are **A/L near-tie** (`w_a≈0.443`, `w_l≈0.438`, `w_v≈0.119`) with moderate **`route_entropy≈0.975`** (not collapsed to one-hot).  
+VTB: **`ib_conf_t` highest** among `ib_conf_{t,a,v}` (~0.63 vs ~0.50), while **`abs_err≈0.257`** is well below the split-wide mean |logit−label| — a clean “router says A, IB still trusts text more” contrast for discussion.
+
+--------------------------------------------------------------------------------
+## Case B — MUStARD (binary, ALBERT + HCF)
+
+- **Study / ckpt (relative to My_creation/)**  
+  `logs/optuna/4090D_restart/classification/optuna_classify_mustard_albert_hcf_b3_20260427_235533/checkpoints/optuna_mustard/trial_113/infogate_mustard_best.pt`
+- **Split**: `test`
+- **Row**: **`global_index = 7`** (`split_index = 7`) · **`hid = '1_11699'`** (BBT)
+
+**Why this row (replaces old `global_index=1` / `1_2842`)**  
+Official JSON is **`"sarcasm": true`** for this utterance (task **`label=1`**). Punchline is **ironic** (“No, Stuart picked out those throw pillows all on his own” — implies the opposite).  
+At threshold 0.5 the checkpoint gives **`pred_bin=0`**, **`prob≈0.069`** → **false negative** on a **true sarcasm** case: better for a paper qualitative than a **non-sarcastic** clip misclassified as sarcastic.  
+**Acoustic DPR primary** (`primary_idx=0`) with **near-uniform 4-way weights** (`route_entropy≈1.386`) — pairs cleanly with Case A’s MOSEI acoustic-primary story while the **task error** is “missed sarcasm” rather than “false alarm on non-sarcasm”.
+
+**Optional alternate (sarcasm + correct + A-primary)**  
+`global_index=0`, `hid='1_2614'`, **`label=1`**, **`pred_correct=1`**, also **acoustic-primary** — use if you want a **positive** detection example without FN.
+
+--------------------------------------------------------------------------------
+## 任意 MOSEI / MUStARD sample：索引怎么对齐 raw？
+
+**1. 先定 split 与行号**  
+dump 脚本 **`shuffle=False`**，顺序与 **`convert_to_features` 读 pkl 列表的顺序一致**。因此：
+
+- CSV 里的 **`global_index`** = **`split_index`** = pkl 里该 split 的 **0-based 下标 `i`**。  
+  例：`--split test` → 用 **`data["test"][i]`**，其中 **`i == global_index`**。
+
+**2. MOSEI（`datasets/mosei.pkl`）**  
+每条：`((words, visual, acoustic), label, segment)`。
+
+- **转写（与模型一致）**：`' '.join(words)`。  
+- **对齐 YouTube / CMU-MOSEI raw**：**`segment`** ≈ **`[video_id, start_sec, end_sec]`**（三个字符串；秒可 `float()`）。用 **`video_id` + 时间段** 在 YouTube 或官方 Raw/SDK 里定位片段。
+
+**3. MUStARD（`datasets/mustard.pkl`）**  
+每条：`((p_words, p_vis, p_aco, p_hcf), (c_words, c_vis, c_aco, c_hcf), hid, label)`（见 `data_humor.py`）。
+
+- **转写**：context 为 `c_words`（多为 `list[str]`），punchline 为 `p_words`（多为 `str`）；与 tokenizer 输入同源。  
+- **对齐官方包**：用 **`hid`**（如 `'1_2842'`）在 **`sarcasm_data.json`**（或你造 pkl 时的同一份标注）里 **全文搜索**；再按该条 JSON 的 **视频路径 / clip id** 打开对应 **`.mp4`**。
+
+**4. 和 CSV 对上号**  
+在 `Qualitative_Evaluation/results/*.csv` 里筛 **`global_index == i`**，即与 **`datasets/{mosei,mustard}.pkl`** 中 **`data["test"][i]`** 为同一条样本。
+
+--------------------------------------------------------------------------------
+## 如何在「raw」里定位下面两条固定案例（pkl → 原始音视频 / 官方标注）
+
+下面假设工作目录在 **`My_creation/`**，且已有 **`datasets/mosei.pkl`**、**`datasets/mustard.pkl`**（与训练 / dump 脚本一致）。
+
+### 从 pkl 取出定位键（推荐先跑一遍）
+
+```python
+import pickle
+
+# MOSEI Case A — test 第 2856 条
+with open("datasets/mosei.pkl", "rb") as f:
+    m = pickle.load(f)
+(words, visual, acoustic), label, segment = m["test"][2856]
+# segment: numpy 数组，3 个字符串 ≈ [YouTube video_id, start_sec, end_sec]
+vid, t0, t1 = segment[0], segment[1], segment[2]
+text = " ".join(words)
+
+# MUStARD Case B — test 第 7 条（真讽刺；hid 1_11699）
+with open("datasets/mustard.pkl", "rb") as f:
+    u = pickle.load(f)
+(p_w, p_vis, p_aco, p_hcf), (c_w, c_vis, c_aco, c_hcf), hid, label = u["test"][7]
+# 结构见 data_humor.py：punchline tuple, context tuple, hid, label
+# hid 例：'1_11699'；在 sarcasm_data.json 里搜该 key
+```
+
+### Case A（MOSEI）→ raw
+
+1. **文本**：直接用上面的 **`words`** 拼成句子（与模型输入同源）。
+2. **视频 / 音频时间轴**：**`segment`** 里一般是 **`[YouTube_id, 起始秒, 结束秒]`**（字符串，可 `float(t0)` / `float(t1)`）。
+   - 在浏览器打开对应 **YouTube** 视频，把 URL 里的 `v=` 换成 `vid`，再按起止秒截片段（或下载后本地 `ffmpeg` 裁切）。
+   - 若你本地有 **CMU-MOSEI 官方 Raw/SDK** 解压包：不同发行版目录结构不同，但 **video_id + 时间段** 与语料对齐方式一致；用 **`vid` + `t0`–`t1`** 在官方提供的对齐表 / 视频列表里检索即可（与 pkl 同源对齐）。
+
+### Case B（MUStARD）→ raw
+
+1. **文本**：**`ctx`（context）** 与 **`punch`（punchline）** 里的词段 / 字符串即转写（与 `data_humor.py` 里 tokenizer 输入一致）。
+2. **元数据键**：**`hid`**（Case B 为 **`'1_11699'`**）。HKT 版 pkl 通常表示 **「剧集来源编号」_「utterance 编号」**（`1` / `2` 多对应 MUStARD 里两个 show 来源；**后半段数字**在官方 JSON 里唯一性更好）。
+3. **在官方 raw 里找**：
+   - 下载 **MUStARD** 官方包里的 **`sarcasm_data.json`**（或你当时构建 pkl 所用的同一份标注）。
+   - 全文检索 **`"1_11699"`**（或按你 JSON schema 搜 utterance id **`11699`**）。
+   - **视频**：官方包内常有按 **dialog / utterance id** 命名的 **`.mp4`** 或按 JSON 字段给出的路径；用检索到的那条 meta 里的 **video path / clip id** 打开对应文件即可。
+
+若你本地的 MUStARD 目录结构或 JSON 键名与上述不一致，以 **「能搜到 `hid` 字符串或后半段 utterance id」** 为准；**`hid` 与 `test` 下标在 pkl 里是一一对应的**。
