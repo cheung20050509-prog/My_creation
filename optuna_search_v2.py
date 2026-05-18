@@ -89,15 +89,167 @@ CATEGORICAL_SPACE = {
     "unified_dim": [128, 256, 384],
 }
 
+# ── phase7 micro-refine: narrow hulls + fixed stable categoricals (see run_optuna_4090d_restart.sh) ──
+MICRO_REFINE_MODES = ("none", "mosi", "simsv2")
+
+# Local-space patches merged with anchor hulls (intersected per-key).
+MICRO_REFINE_MOSI_LOCAL_SPACE = {
+    "batch_config": [0],
+    "n_epochs": (90, 102),
+    "learning_rate": (2.05e-5, 2.45e-5),
+    "ig_learning_rate": (1.85e-4, 2.45e-4),
+    "beta_ib": (19.0, 25.5),
+    "mse_weight": (1.12, 1.42),
+    "dropout_prob": (0.22, 0.32),
+    "alpha_ib": (0.0040, 0.0055),
+    "stage1_epochs": (4, 7),
+    "warmup_proportion": (0.085, 0.115),
+    "weight_decay": (5.5e-4, 8.5e-4),
+    "ema_decay": (0.9950, 0.9956),
+    "selector_target_temp": (0.64, 0.82),
+    "selector_rib_weight": (0.055, 0.085),
+    "gumbel_tau_start": (0.95, 1.65),
+    "gumbel_tau_end": (0.10, 0.28),
+    "num_heads": [8],
+    "unified_dim": [128],
+    "bottleneck_dim": [192],
+    "num_infogate_layers": (3, 3),
+    "ema_start_epoch": (3, 8),
+}
+
+
+def _intersect_float_range(lo_a, hi_a, lo_b, hi_b):
+    lo = max(float(lo_a), float(lo_b))
+    hi = min(float(hi_a), float(hi_b))
+    if lo + 1e-12 < hi:
+        return (lo, hi)
+    return (float(lo_b), float(hi_b))
+
+
+def _intersect_int_range(lo_a, hi_a, lo_b, hi_b):
+    lo = max(int(lo_a), int(lo_b))
+    hi = min(int(hi_a), int(hi_b))
+    if lo <= hi:
+        return (lo, hi)
+    return (int(lo_b), int(hi_b))
+
+
+def merge_micro_refine_local_space(local_space, dataset, micro_refine):
+    """Merge micro-refine bounds with anchor ``local_space`` (intersect per key)."""
+    if micro_refine not in MICRO_REFINE_MODES or micro_refine == "none":
+        return local_space
+    if micro_refine == "mosi" and dataset != "mosi":
+        return local_space
+    if micro_refine == "simsv2" and dataset != "simsv2":
+        return local_space
+    patch = (
+        MICRO_REFINE_MOSI_LOCAL_SPACE if micro_refine == "mosi"
+        else MICRO_REFINE_SIMSV2_LOCAL_SPACE
+    )
+    base = dict(local_space or {})
+    for k, v in patch.items():
+        if k not in base:
+            base[k] = v
+            continue
+        old = base[k]
+        if isinstance(v, tuple) and len(v) == 2 and isinstance(v[0], (int, float)):
+            if isinstance(old, tuple) and len(old) == 2:
+                if all(isinstance(x, int) for x in old + v):
+                    base[k] = _intersect_int_range(old[0], old[1], v[0], v[1])
+                else:
+                    base[k] = _intersect_float_range(old[0], old[1], v[0], v[1])
+            else:
+                base[k] = v
+        elif isinstance(v, list):
+            if isinstance(old, list):
+                inter = [x for x in old if x in set(v)]
+                base[k] = inter if inter else list(v)
+            else:
+                base[k] = list(v)
+        else:
+            base[k] = v
+    return base
+
+
+def simsv2_micro_band_extra_bounds(band):
+    """Tight vs escape bands for a subset of SIMSv2 knobs (see phase7 plan)."""
+    if band == "tight":
+        return {
+            "mse_weight": (0.68, 0.92),
+            "beta_ib": (3.8, 9.5),
+            "selector_target_temp": (0.35, 0.52),
+            "selector_rib_weight": (0.018, 0.055),
+            "gumbel_tau_end": (0.42, 0.62),
+        }
+    return {
+        "mse_weight": (0.48, 1.95),
+        "beta_ib": (3.0, 22.0),
+        "selector_target_temp": (0.12, 0.72),
+        "selector_rib_weight": (0.010, 0.095),
+        "gumbel_tau_end": (0.10, 0.72),
+    }
+
+
+MICRO_REFINE_SIMSV2_LOCAL_SPACE = {
+    "batch_config": [0],
+    "n_epochs": (52, 66),
+    "learning_rate": (1.45e-5, 3.25e-5),
+    "ig_learning_rate": (2.7e-4, 4.05e-4),
+    "dropout_prob": (0.048, 0.145),
+    "alpha_ib": (0.0016, 0.0055),
+    "stage1_epochs": (5, 8),
+    "warmup_proportion": (0.072, 0.125),
+    "weight_decay": (4.8e-4, 1.05e-3),
+    "ema_decay": (0.9988, 0.9995),
+    "gumbel_tau_start": (1.55, 2.0),
+    "num_heads": [8],
+    "unified_dim": [384],
+    "bottleneck_dim": [64],
+    "num_infogate_layers": (2, 2),
+    "ema_start_epoch": (3, 3),
+}
+
+
+def apply_micro_refine_fixed_categoricals(params, dataset, micro_refine):
+    """Force stable categorical / structural knobs after sampling (phase7 micro-refine)."""
+    if micro_refine == "none":
+        return
+    if micro_refine == "mosi" and dataset == "mosi":
+        candidates = BATCH_CANDIDATES["mosi"]
+        bc = 0
+        bs, acc = candidates[bc]
+        params["batch_config"] = bc
+        params["train_batch_size"] = bs
+        params["gradient_accumulation_step"] = acc
+        params["num_heads"] = 8
+        params["unified_dim"] = 128
+        params["bottleneck_dim"] = 192
+        params["num_infogate_layers"] = 3
+    elif micro_refine == "simsv2" and dataset == "simsv2":
+        candidates = BATCH_CANDIDATES["simsv2"]
+        bc = 0
+        bs, acc = candidates[bc]
+        params["batch_config"] = bc
+        params["train_batch_size"] = bs
+        params["gradient_accumulation_step"] = acc
+        params["num_heads"] = 8
+        params["unified_dim"] = 384
+        params["bottleneck_dim"] = 64
+        params["num_infogate_layers"] = 2
+        params["ema_start_epoch"] = 3
+
 
 # ══════════════════════════════════════════════════════════════
 # Search space (3 tiers)
 # ══════════════════════════════════════════════════════════════
 
-def suggest_float_param(trial, name, bounds, *, log=False, local_space=None):
+def suggest_float_param(trial, name, bounds, *, log=False, local_space=None,
+                        extra_bounds=None):
     low, high = bounds
     if local_space and name in local_space:
         low, high = local_space[name]
+    if extra_bounds and name in extra_bounds:
+        low, high = extra_bounds[name]
     return trial.suggest_float(name, low, high, log=log)
 
 
@@ -115,7 +267,12 @@ def suggest_categorical_param(trial, name, choices, local_space=None):
 
 
 def suggest_tier1(trial, dataset="mosi", n_epochs_max=None, n_epochs_min=None,
-                  local_space=None, search_tier=1):
+                  local_space=None, search_tier=1, micro_refine="none"):
+    micro_refine = micro_refine or "none"
+    band_extra = None
+    if dataset == "simsv2" and micro_refine == "simsv2":
+        band = trial.suggest_categorical("micro_refine_band", ["tight", "escape"])
+        band_extra = simsv2_micro_band_extra_bounds(band)
     candidates = BATCH_CANDIDATES[dataset]
     batch_idx = suggest_categorical_param(
         trial, "batch_config", list(range(len(candidates))), local_space)
@@ -141,13 +298,13 @@ def suggest_tier1(trial, dataset="mosi", n_epochs_max=None, n_epochs_min=None,
         "seed": 128,  # Fixed seed
         "learning_rate": suggest_float_param(
             trial, "learning_rate", LOG_FLOAT_BOUNDS["learning_rate"], log=True,
-            local_space=local_space),
+            local_space=local_space, extra_bounds=band_extra),
         "ig_learning_rate": suggest_float_param(
             trial, "ig_learning_rate", LOG_FLOAT_BOUNDS["ig_learning_rate"], log=True,
-            local_space=local_space),
+            local_space=local_space, extra_bounds=band_extra),
         "beta_ib": suggest_float_param(
             trial, "beta_ib", LOG_FLOAT_BOUNDS["beta_ib"], log=True,
-            local_space=local_space),
+            local_space=local_space, extra_bounds=band_extra),
         "num_infogate_layers": suggest_int_param(
             trial, "num_infogate_layers", INT_BOUNDS["num_infogate_layers"],
             local_space),
@@ -156,10 +313,10 @@ def suggest_tier1(trial, dataset="mosi", n_epochs_max=None, n_epochs_min=None,
             local_space),
         "mse_weight": suggest_float_param(
             trial, "mse_weight", LINEAR_FLOAT_BOUNDS["mse_weight"],
-            local_space=local_space),
+            local_space=local_space, extra_bounds=band_extra),
         "dropout_prob": suggest_float_param(
             trial, "dropout_prob", LINEAR_FLOAT_BOUNDS["dropout_prob"],
-            local_space=local_space),
+            local_space=local_space, extra_bounds=band_extra),
     }
 
 
@@ -182,20 +339,28 @@ def suggest_tier2(trial, local_space=None):
     }
 
 
-def suggest_tier3(trial, local_space=None):
+def suggest_tier3(trial, local_space=None, micro_refine="none", dataset="mosi"):
+    micro_refine = micro_refine or "none"
+    band_extra = None
+    if micro_refine == "simsv2" and dataset == "simsv2":
+        band = trial.params.get("micro_refine_band")
+        if band in ("tight", "escape"):
+            band_extra = simsv2_micro_band_extra_bounds(band)
     return {
         "selector_target_temp": suggest_float_param(
             trial, "selector_target_temp",
-            LINEAR_FLOAT_BOUNDS["selector_target_temp"], local_space=local_space),
+            LINEAR_FLOAT_BOUNDS["selector_target_temp"], local_space=local_space,
+            extra_bounds=band_extra),
         "selector_rib_weight": suggest_float_param(
             trial, "selector_rib_weight",
-            LINEAR_FLOAT_BOUNDS["selector_rib_weight"], local_space=local_space),
+            LINEAR_FLOAT_BOUNDS["selector_rib_weight"], local_space=local_space,
+            extra_bounds=band_extra),
         "gumbel_tau_start": suggest_float_param(
             trial, "gumbel_tau_start", LINEAR_FLOAT_BOUNDS["gumbel_tau_start"],
             local_space=local_space),
         "gumbel_tau_end": suggest_float_param(
             trial, "gumbel_tau_end", LINEAR_FLOAT_BOUNDS["gumbel_tau_end"],
-            local_space=local_space),
+            local_space=local_space, extra_bounds=band_extra),
         "num_heads": suggest_categorical_param(
             trial, "num_heads", CATEGORICAL_SPACE["num_heads"], local_space),
         "unified_dim": suggest_categorical_param(
@@ -206,18 +371,23 @@ def suggest_tier3(trial, local_space=None):
 
 
 def build_search_params(trial, tier, dataset="mosi", n_epochs_max=None, n_epochs_min=None,
-                        local_space=None):
+                        local_space=None, micro_refine="none"):
+    micro_refine = (micro_refine or "none").lower()
+    if micro_refine not in MICRO_REFINE_MODES:
+        micro_refine = "none"
     params = dict(DEFAULTS)
     params.update(suggest_tier1(
         trial, dataset, n_epochs_max, n_epochs_min,
-        local_space=local_space, search_tier=tier))
+        local_space=local_space, search_tier=tier, micro_refine=micro_refine))
     if tier >= 2:
         params.update(suggest_tier2(trial, local_space=local_space))
     if tier >= 3:
-        params.update(suggest_tier3(trial, local_space=local_space))
+        params.update(suggest_tier3(
+            trial, local_space=local_space, micro_refine=micro_refine, dataset=dataset))
     ne = int(params["n_epochs"])
     params["ema_start_epoch"] = min(
         int(params["ema_start_epoch"]), max(0, ne - 1))
+    apply_micro_refine_fixed_categoricals(params, dataset, micro_refine)
     return params
 
 
@@ -330,6 +500,38 @@ def parse_best_dev_metrics(log_path, dataset="mosi",
                     best = {"Acc2": acc2, "Acc7": acc7, "MAE": mae,
                             "Corr": corr, "F1": f1}
     return current_epoch, best
+
+
+def parse_min_dev_mae_stage2(log_path, dataset="mosi", stage1_epochs=0):
+    """Minimum dev-set MAE over stage-2 epochs (epoch > stage1_epochs).
+
+    Aligns with ``train.py`` checkpoint selection when ``--selection_metric mae``:
+    the best checkpoint minimizes dev MAE among epochs with ``epoch >= stage1_epochs``.
+    Optuna must optimize this dev MAE, not the test MAE printed under ``Best Results``.
+    """
+    if not os.path.exists(log_path):
+        return None
+    current_epoch = 0
+    best_mae = None
+    with open(log_path, "r") as f:
+        for line in f:
+            em = EPOCH_LINE_RE.match(line)
+            if em:
+                current_epoch = int(em.group(1))
+                continue
+            dm_s = DEV_LINE_SIMSV2_RE.match(line)
+            dm = DEV_LINE_RE.match(line) if dm_s is None else None
+            if (dm_s or dm) and current_epoch <= int(stage1_epochs):
+                continue
+            if dm_s:
+                mae = float(dm_s.group(4))
+            elif dm:
+                mae = float(dm.group(3))
+            else:
+                continue
+            if best_mae is None or mae < best_mae:
+                best_mae = mae
+    return best_mae
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1191,7 +1393,19 @@ def print_study_summary(study, cli):
             return
         bt = study.best_trial
         print(f"  Best trial: #{bt.number}")
-        print(f"  Best {cli.selection_metric}: {bt.value:.6f}")
+        print(f"  Best {cli.selection_metric} (Optuna objective): {bt.value:.6f}")
+        if cli.selection_metric == "mae" and bt.user_attrs.get("test_mae") is not None:
+            print(
+                "  Best-trial Best Results (test) MAE (diagnostic; not the objective): "
+                f"{float(bt.user_attrs['test_mae']):.6f}"
+            )
+            if bt.user_attrs.get("dev_mae") is not None:
+                print(
+                    "  Same trial min dev MAE (stage-2, matches objective): "
+                    f"{float(bt.user_attrs['dev_mae']):.6f}"
+                )
+        if bt.user_attrs.get("train_log_path"):
+            print(f"  Train log: {bt.user_attrs['train_log_path']}")
         print("  Params:")
         for k, v in bt.params.items():
             print(f"    {k}: {v}")
@@ -1257,10 +1471,13 @@ def cleanup_checkpoints_single(study, ckpt_base, higher_is_better):
 # ══════════════════════════════════════════════════════════════
 
 def objective(trial, cli):
-    params = build_search_params(trial, cli.search_tier, cli.dataset,
-                                  getattr(cli, 'n_epochs', None),
-                                  getattr(cli, 'n_epochs_min', None),
-                                  local_space=getattr(cli, 'local_space', None))
+    params = build_search_params(
+        trial, cli.search_tier, cli.dataset,
+        getattr(cli, 'n_epochs', None),
+        getattr(cli, 'n_epochs_min', None),
+        local_space=getattr(cli, 'local_space', None),
+        micro_refine=getattr(cli, "micro_refine", "none"),
+    )
     ds = cli.dataset
 
     stage_label = getattr(cli, "stage_label", None)
@@ -1400,16 +1617,19 @@ def objective(trial, cli):
         raise optuna.TrialPruned()
 
     # ── parse final results ──
+    # ``Best Results`` / ``Last Epoch`` blocks report *test* metrics at the
+    # dev-selected checkpoint. For ``--selection_metric mae``, Optuna must
+    # minimize *dev* MAE (same criterion as ``train.py``), not test MAE.
     results = parse_best_results(log_path)
     if "MAE" not in results:
         print(f"  Trial {trial.number}: no MAE in log")
         raise optuna.TrialPruned()
 
-    mae = results["MAE"]
+    test_mae = results["MAE"]
     acc2 = results.get("Acc-2", 0)
     corr = results.get("Corr", 0)
     f1 = results.get("F1", 0)
-    sel_kw = dict(acc2=acc2, mae=mae, corr=corr, f1=f1)
+    sel_kw = dict(acc2=acc2, mae=test_mae, corr=corr, f1=f1)
     if ds == "simsv2":
         sel_kw["acc5"] = results.get("Acc-5", 0)
         sel_kw["acc3"] = results.get("Acc-3", 0)
@@ -1417,12 +1637,28 @@ def objective(trial, cli):
         sel_kw["acc7"] = results.get("Acc-7", 0)
     composite = compute_selection_score("acc2_composite", **sel_kw)
 
+    if not cli.multi_objective and cli.selection_metric == "mae":
+        dev_mae = parse_min_dev_mae_stage2(log_path, ds, s1_ep)
+        if dev_mae is None:
+            print(f"  Trial {trial.number}: no dev MAE parsed for objective")
+            raise optuna.TrialPruned()
+        trial.set_user_attr("dev_mae", float(dev_mae))
+        trial.set_user_attr("test_mae", float(test_mae))
+        trial.set_user_attr("train_log_path", os.path.abspath(log_path))
+        print(
+            f"  Trial {trial.number} DONE: dev_MAE={dev_mae:.4f} "
+            f"test_MAE={test_mae:.4f} composite={composite:.4f} "
+            f"Acc2={acc2*100:.2f}% Corr={corr:.4f}"
+        )
+        return float(dev_mae)
+
     print(f"  Trial {trial.number} DONE: composite={composite:.4f} "
-          f"Acc2={acc2*100:.2f}% MAE={mae:.4f} Corr={corr:.4f}")
+          f"Acc2={acc2*100:.2f}% MAE={test_mae:.4f} Corr={corr:.4f}")
+    trial.set_user_attr("train_log_path", os.path.abspath(log_path))
 
     if not cli.multi_objective:
         return compute_selection_score(cli.selection_metric, **sel_kw)
-    return composite, mae
+    return composite, test_mae
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1533,6 +1769,14 @@ def main():
         help="Never prune training subprocesses based on mid-run dev metrics.",
     )
     pa.add_argument(
+        "--micro_refine",
+        type=str,
+        default="none",
+        choices=list(MICRO_REFINE_MODES),
+        help="phase7-style narrow refinement: merge MICRO_REFINE_* local bounds, "
+             "fix stable categoricals (MOSI or SIMSv2), SIMSv2 adds tight/escape bands.",
+    )
+    pa.add_argument(
         "--enqueue_trials_storage",
         type=str,
         default=None,
@@ -1562,6 +1806,10 @@ def main():
              "(BERT-base-uncased local dir or HF id).",
     )
     cli = pa.parse_args()
+    mr = (getattr(cli, "micro_refine", "none") or "none").lower()
+    if mr not in MICRO_REFINE_MODES:
+        mr = "none"
+    cli.micro_refine = mr
     if cli.pretrained_model:
         raw = cli.pretrained_model.strip()
         exp = os.path.expanduser(raw)
@@ -1574,6 +1822,18 @@ def main():
             cli.pretrained_model = raw
 
     ds = cli.dataset
+    if cli.micro_refine == "mosi" and ds != "mosi":
+        print(
+            "ERROR: --micro_refine mosi requires --dataset mosi.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if cli.micro_refine == "simsv2" and ds != "simsv2":
+        print(
+            "ERROR: --micro_refine simsv2 requires --dataset simsv2.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     if not cli.no_dataset_overrides:
         apply_dataset_bounds_overrides(ds)
     else:
@@ -1606,6 +1866,13 @@ def main():
         and not cli.multi_objective
         and not cli.disable_two_stage_mosi
     )
+    if cli.micro_refine == "mosi" and ds == "mosi" and use_two_stage_mosi:
+        print(
+            "ERROR: --micro_refine mosi requires --disable_two_stage_mosi "
+            "(single-study Optuna driver).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     anchor_parts = (
         cli.local_space_anchor_storage,
@@ -1736,6 +2003,12 @@ def main():
         if anchor_extras:
             print(f"  Extra anchor group(s): {anchor_extras}")
         print(f"  Trial # (best-first, merged): {[t.number for t in anchor_ranked]}")
+        print(summarize_local_space(local_space), end="")
+
+    local_space = merge_micro_refine_local_space(local_space, ds, cli.micro_refine)
+    if cli.micro_refine != "none":
+        print("\n" + "=" * 60)
+        print(f"Micro-refine patch merged (mode={cli.micro_refine})")
         print(summarize_local_space(local_space), end="")
 
     enqueue_trials_resolved = (

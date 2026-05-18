@@ -12,11 +12,11 @@
 #   * MOSI two-stage enabled (random anchors -> TPE-local at the SAME tier)
 #   * n_startup tuned per phase (random warmup before TPE kicks in)
 #
-# Outputs (per phase):
-#   logs/optuna/4090D_restart/<phase>/db/{mosi,mosei,simsv2}.db
-#   logs/optuna/4090D_restart/<phase>/run/{mosi,mosei,simsv2}.log    # driver stdout
-#   logs/optuna/4090D_restart/<phase>/train_logs/                    # train.py per trial
-#   logs/optuna/4090D_restart/<phase>/checkpoints/                   # train.py per trial
+# Outputs (per phase) — always under this script's directory (My_creation/):
+#   My_creation/logs/optuna/4090D_restart/<phase>/db/{mosi,mosei,simsv2}.db
+#   My_creation/logs/optuna/4090D_restart/<phase>/run/{mosi,mosei,simsv2}.log
+#   My_creation/logs/optuna/4090D_restart/<phase>/train_logs/
+#   My_creation/logs/optuna/4090D_restart/<phase>/checkpoints/
 #
 # Classification (UR-FUNNY / MUStARD) uses the same top-level folder::
 #   logs/optuna/4090D_restart/classification/<RUN_TAG>/...
@@ -31,6 +31,14 @@
 #   ./run_optuna_4090d_restart.sh phase4_mosi_space3  # MOSI space3 study (same DB dir as phase4_mosi); anchors space2 {121,266,234,239,220}
 #   ./run_optuna_4090d_restart.sh phase5_mosi  # Clean MOSI micro-local DB (same anchors as phase4_mosi)
 #   ./run_optuna_4090d_restart.sh phase5_simsv2  # SIMS: merge anchors phase3 #148 + phase4 #0 (needs phase4 db)
+#   ./run_optuna_4090d_restart.sh phase6_simsv2  # SIMS expanded full-space; warm-start enqueue from phase4 space2
+#   ./run_optuna_4090d_restart.sh phase7_mosi    # MOSI dev-MAE micro-refine (clean DB; anchors space3 trials 301,179,247)
+#   ./run_optuna_4090d_restart.sh phase7_simsv2 # SIMSv2 dev-MAE micro-refine; --disable_pruning; anchors space2 {52,81,0}
+#
+#   Summarize best dev-MAE trial + Best Results test MAE (after phase7)::
+#     cd My_creation && python scripts/optuna_summarize_best_devmae.py \\
+#       --storage sqlite:///$PWD/logs/optuna/4090D_restart/phase7_mosi/db/mosi.db \\
+#       --study-name infogate_mosi_phase7_mosi_4090d_devmae
 #
 #   ONLY=mosi  ./run_optuna_4090d_restart.sh phase1   # launch one dataset only
 #   ONLY=simsv2 ./run_optuna_4090d_restart.sh phase4
@@ -40,8 +48,8 @@
 #
 # Optional env (defaults in-script): MOSI_N_EPOCHS_CAP, MOSI_EARLY_STOP_PATIENCE;
 # MOSI_SPACE3_LOG (phase4_mosi_space3 driver log basename under run/, default mosi_space3_gpu1.log);
-# SIMSV2_N_EPOCHS_CAP, SIMSV2_EARLY_STOP_PATIENCE (phase4 / phase5_simsv2 only).
-# Resume trial budget: MOSI_MICRO_N_TRIALS (phase4_mosi|phase5_mosi) and SIMSV2_N_TRIALS
+# SIMSV2_N_EPOCHS_CAP, SIMSV2_EARLY_STOP_PATIENCE (phase4 / phase5_simsv2 / phase7_simsv2).
+# Resume trial budget: MOSI_MICRO_N_TRIALS (phase4_mosi|phase5_mosi|phase7_mosi) and SIMSV2_N_TRIALS
 # are **target totals** (COMPLETE+PRUNED+FAIL+RUNNING in the study); set to (existing+N) to add N trials.
 # New Optuna study name (same DB file allows multiple studies): set MOSI_STUDY_NAME / SIMSV2_STUDY_NAME,
 # or MOSI_STUDY_SUFFIX / SIMSV2_STUDY_SUFFIX (appended to default name) when parameter distributions changed.
@@ -49,9 +57,11 @@
 # so both see the script directory (plain `cd && A & B &` only applies `cd` to the first background job).
 #
 set -euo pipefail
-cd "$(dirname "$0")"
+# All DBs / train_logs / checkpoints live under My_creation/logs/optuna/4090D_restart/
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
 
-PHASE="${1:?Usage: $0 <phase1|phase2|phase3|phase4|phase4_mosi|phase4_mosi_space3|phase5_mosi|phase5_simsv2|phase6_simsv2>}"
+PHASE="${1:?Usage: $0 <phase1|phase2|phase3|phase4|phase4_mosi|phase4_mosi_space3|phase5_mosi|phase5_simsv2|phase6_simsv2|phase7_mosi|phase7_simsv2>}"
 ONLY="${ONLY:-all}"   # all | mosi | mosei | simsv2
 
 case "$PHASE" in
@@ -64,7 +74,9 @@ case "$PHASE" in
   phase5_mosi) TIER=3 ;;
   phase5_simsv2) TIER=3 ;;
   phase6_simsv2) TIER=3 ;;
-  *) echo "ERROR: unknown phase '$PHASE'; expected phase1|phase2|phase3|phase4|phase4_mosi|phase4_mosi_space3|phase5_mosi|phase5_simsv2|phase6_simsv2" >&2; exit 1 ;;
+  phase7_mosi) TIER=3 ;;
+  phase7_simsv2) TIER=3 ;;
+  *) echo "ERROR: unknown phase '$PHASE'; expected phase1|phase2|phase3|phase4|phase4_mosi|phase4_mosi_space3|phase5_mosi|phase5_simsv2|phase6_simsv2|phase7_mosi|phase7_simsv2" >&2; exit 1 ;;
 esac
 
 # MOSI micro-local (phase4_mosi / phase5_mosi): Optuna n_epochs cap + train dev early stop
@@ -132,6 +144,17 @@ case "$PHASE" in
     MOSEI_TRIALS=150;   MOSEI_NSTART=55
     SIMSV2_TRIALS=120;  SIMSV2_NSTART=55
     ;;
+  phase7_mosi)  # tier 3; clean dev-MAE micro-refine (see launch_mosi_phase7_devmae)
+    MOSI_MICRO_TRIALS=100
+    MOSI_MICRO_NSTART=20
+    MOSEI_TRIALS=150
+    MOSEI_NSTART=55
+    ;;
+  phase7_simsv2)  # tier 3; SIMS dev-MAE micro-refine (see launch_simsv2)
+    MOSI_S1_TRIALS=60;  MOSI_S2_TRIALS=140; MOSI_S2_TOP_K=8;  MOSI_S2_NSTART=25
+    MOSEI_TRIALS=150;   MOSEI_NSTART=55
+    SIMSV2_TRIALS=150;  SIMSV2_NSTART=30
+    ;;
 esac
 
 # Resume / add budget on same DB without editing case values:
@@ -141,10 +164,10 @@ case "$PHASE" in
   phase4)
     SIMSV2_TRIALS="${SIMSV2_N_TRIALS:-$SIMSV2_TRIALS}"
     ;;
-  phase4_mosi|phase4_mosi_space3|phase5_mosi)
+  phase4_mosi|phase4_mosi_space3|phase5_mosi|phase7_mosi)
     MOSI_MICRO_TRIALS="${MOSI_MICRO_N_TRIALS:-$MOSI_MICRO_TRIALS}"
     ;;
-  phase5_simsv2|phase6_simsv2)
+  phase5_simsv2|phase6_simsv2|phase7_simsv2)
     SIMSV2_TRIALS="${SIMSV2_N_TRIALS:-$SIMSV2_TRIALS}"
     ;;
 esac
@@ -154,7 +177,6 @@ if [[ ! -x "$PYTHON" ]]; then
   echo "ERROR: PYTHON='$PYTHON' is not executable." >&2; exit 1
 fi
 
-ROOT="$(pwd)"
 # phase4_mosi / phase5_mosi / phase5_simsv2 use their own directories (no collision with phase4 SIMS).
 PHASE_ROOT="$ROOT/logs/optuna/4090D_restart/$PHASE"
 # space3 driver shares phase4_mosi artefacts (one sqlite file, multiple studies).
@@ -320,6 +342,47 @@ launch_mosi_space3 () {
   echo "    PID=$!"
 }
 
+# MOSI phase7: clean study optimizing min **dev** MAE; fixed categorical basin + narrow hull
+# (anchors: phase4_mosi DB, space3 study trials 301,179,247).
+launch_mosi_phase7_devmae () {
+  local gpu="$1"
+  local logfile="$PHASE_ROOT/run/mosi_phase7_devmae.log"
+  local study="infogate_mosi_phase7_mosi_4090d_devmae"
+  local db; db="$(db_uri mosi)"
+  local p4_mosi_db="sqlite:///${ROOT}/logs/optuna/4090D_restart/phase4_mosi/db/mosi.db"
+  local space3_study="infogate_mosi_phase4_mosi_4090d_space3"
+  local anchor_nums="301,179,247"
+
+  echo "  [$(date -Iseconds)] mosi (phase7 dev-MAE micro-refine) -> GPU${gpu}  ${logfile}"
+  {
+    echo ""
+    echo "######## [$(date -Iseconds)] driver restart (mosi phase7 devmae) ########"
+  } >> "${logfile}"
+  nohup env CUDA_VISIBLE_DEVICES="${gpu}" "${PYTHON}" -u optuna_search_v2.py \
+    --dataset mosi \
+    --gpu 0 \
+    --disable_two_stage_mosi \
+    --search_tier "${TIER}" \
+    --n_trials "${MOSI_MICRO_TRIALS}" \
+    --n_startup_trials "${MOSI_MICRO_NSTART}" \
+    --n_epochs "${MOSI_N_EPOCHS_CAP}" \
+    --early_stop_patience "${MOSI_EARLY_STOP_PATIENCE}" \
+    --selection_metric mae \
+    --micro_refine mosi \
+    --study_name "${study}" \
+    --db "${db}" \
+    --artefact_root "${PHASE_ROOT}" \
+    --stage_label "phase7_mosi_devmae" \
+    --local_space_anchor_storage "${p4_mosi_db}" \
+    --local_space_anchor_study "${space3_study}" \
+    --local_space_anchor_trials "${anchor_nums}" \
+    --enqueue_trials_storage "${p4_mosi_db}" \
+    --enqueue_trials_study "${space3_study}" \
+    --enqueue_trials_numbers "${anchor_nums}" \
+    >> "${logfile}" 2>&1 &
+  echo "    PID=$!"
+}
+
 launch_mosei () {
   local gpu="$1"
   local logfile="$PHASE_ROOT/run/mosei.log"
@@ -360,6 +423,9 @@ launch_simsv2 () {
   local local_space_args=()
   local artefact_args=()
   local simsv2_train_caps=()
+  local micro_refine_args=()
+  local prune_flags=()
+  local simsv2_stage_sl="${PHASE}"
   if [[ "$PHASE" == "phase3" ]]; then
     override_args=()
     # SQLite absolute URI: 3 slashes + absolute path = 4 slashes total.
@@ -433,6 +499,34 @@ launch_simsv2 () {
       --enqueue_trials_study "${p4_study}"
       --enqueue_trials_numbers "52,81,0"
     )
+  elif [[ "$PHASE" == "phase7_simsv2" ]]; then
+    study="infogate_simsv2_phase7_simsv2_4090d_devmae"
+    simsv2_stage_sl="phase7_simsv2_devmae"
+    simsv2_train_caps=(
+      --n_epochs "${SIMSV2_N_EPOCHS_CAP:-88}"
+      --early_stop_patience "${SIMSV2_EARLY_STOP_PATIENCE:-18}"
+    )
+    override_args=()
+    artefact_args=(--artefact_root "${PHASE_ROOT}")
+    micro_refine_args=(--micro_refine simsv2)
+    prune_flags=(--disable_pruning)
+    local p4_db="sqlite:///${ROOT}/logs/optuna/4090D_restart/phase4/db/simsv2.db"
+    local p4_study="infogate_simsv2_phase4_4090d_space2"
+    local p4_path="${ROOT}/logs/optuna/4090D_restart/phase4/db/simsv2.db"
+    if [[ ! -f "${p4_path}" ]]; then
+      echo "ERROR: phase7_simsv2 requires existing ${p4_path} (run phase4 SIMSv2 space2 first)." >&2
+      exit 1
+    fi
+    local_space_args=(
+      --local_space_anchor_storage "${p4_db}"
+      --local_space_anchor_study "${p4_study}"
+      --local_space_anchor_trials "52,81,0"
+    )
+    enqueue_args=(
+      --enqueue_trials_storage "${p4_db}"
+      --enqueue_trials_study "${p4_study}"
+      --enqueue_trials_numbers "52,81,0"
+    )
   fi
 
   echo "  [$(date -Iseconds)] simsv2 -> GPU${gpu}  ${logfile}"
@@ -450,11 +544,13 @@ launch_simsv2 () {
     "${override_args[@]}" \
     --study_name "${study}" \
     --db "${db}" \
-    --stage_label "${PHASE}" \
+    --stage_label "${simsv2_stage_sl}" \
     "${artefact_args[@]}" \
     "${enqueue_args[@]}" \
     "${local_space_args[@]}" \
     "${simsv2_train_caps[@]}" \
+    "${micro_refine_args[@]}" \
+    "${prune_flags[@]}" \
     >> "${logfile}" 2>&1 &
   echo "    PID=$!"
 }
@@ -478,9 +574,21 @@ elif [[ "$PHASE" == "phase4_mosi_space3" ]]; then
     exit 1
   fi
   launch_mosi_space3 "${MOSI_GPU}"
+elif [[ "$PHASE" == "phase7_mosi" ]]; then
+  if [[ "$ONLY" != "mosi" && "$ONLY" != "all" ]]; then
+    echo "ERROR: phase7_mosi only launches MOSI dev-MAE micro-refine; use ONLY=mosi or ONLY=all." >&2
+    exit 1
+  fi
+  launch_mosi_phase7_devmae "${MOSI_GPU}"
 elif [[ "$PHASE" == "phase6_simsv2" ]]; then
   if [[ "$ONLY" != "simsv2" && "$ONLY" != "all" ]]; then
     echo "ERROR: phase6_simsv2 only launches SIMSv2 expanded search; use ONLY=simsv2 or ONLY=all." >&2
+    exit 1
+  fi
+  launch_simsv2 "${SIMS_GPU}"
+elif [[ "$PHASE" == "phase7_simsv2" ]]; then
+  if [[ "$ONLY" != "simsv2" && "$ONLY" != "all" ]]; then
+    echo "ERROR: phase7_simsv2 only launches SIMSv2 dev-MAE micro-refine; use ONLY=simsv2 or ONLY=all." >&2
     exit 1
   fi
   launch_simsv2 "${SIMS_GPU}"

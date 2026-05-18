@@ -22,8 +22,11 @@ Example::
         --runs-root runs/sensitivity_mosei/trial70 \\
         --summary-out sensitivity_analysis/results/mosei_trial70/summary.csv
     python3 sensitivity_analysis/plot_mosei_sensitivity_emoe_style.py \\
-        --output sensitivity_analysis/results/mosei_trial70/mosei_sensitivity_emoe_style.pdf \\
-        --xlog-axes beta_ib,alpha_ib
+        --output sensitivity_analysis/results/mosei_trial70/mosei_sensitivity_emoe_style.pdf
+
+By default **``α_IB``** uses a **log x-axis** with ``$10^{-3}$`` … ``$10^{-1}$``-style
+tick labels (matches CMU-MOSEI trial-70 reference). Other panels are **linear** unless
+you pass ``--xlog-axes`` (comma-separated names, e.g. ``beta_ib``).
 """
 
 from __future__ import annotations
@@ -35,7 +38,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import LogFormatterMathtext, LogLocator, MultipleLocator, NullFormatter
 
 _SENS = Path(__file__).resolve().parent
 
@@ -136,7 +139,13 @@ def plot(
 ) -> None:
     rows = load_rows(summary_csv)
     plt.rcParams.update({"font.size": 11})
-    fig, axs = plt.subplots(1, len(axes_order), figsize=(4.6 * len(axes_order), 4.35), constrained_layout=True)
+    fig, axs = plt.subplots(
+        1,
+        len(axes_order),
+        figsize=(4.65 * len(axes_order), 4.95),
+        constrained_layout=True,
+    )
+    fig.set_constrained_layout_pads(w_pad=0.06, h_pad=0.55, wspace=0.22, hspace=0.0)
 
     if len(axes_order) == 1:
         axs = [axs]
@@ -150,7 +159,9 @@ def plot(
                 print(f"ERROR: {msg}", file=sys.stderr)
                 sys.exit(1)
             ax.text(0.5, 0.5, "no data", ha="center", va="center", transform=ax.transAxes)
-            ax.set_xlabel(AXIS_XLABEL.get(axis, axis), fontsize=13)
+            ax.set_xlabel(
+                AXIS_XLABEL.get(axis, axis), fontsize=13, labelpad=10,
+            )
             continue
 
         any_data = True
@@ -182,9 +193,14 @@ def plot(
             span_a = y_hi - y_lo
         acc_step = 5 if span_a <= 45 else 10
         ax.yaxis.set_major_locator(MultipleLocator(acc_step))
-        if axis in xlog_axes:
+        # α_IB: fixed log x (reference figure); other axes: log only if listed in xlog_axes.
+        use_log_x = axis == "alpha_ib" or axis in xlog_axes
+        if use_log_x:
             ax.set_xscale("log")
-        ax.tick_params(axis="x", labelsize=11)
+            ax.xaxis.set_major_locator(LogLocator(base=10))
+            ax.xaxis.set_major_formatter(LogFormatterMathtext())
+            ax.xaxis.set_minor_formatter(NullFormatter())
+        ax.tick_params(axis="x", labelsize=11, pad=2)
 
         ax2 = ax.twinx()
         (line_mae,) = ax2.plot(
@@ -209,25 +225,40 @@ def plot(
         ax2.yaxis.set_major_locator(MultipleLocator(mae_step))
 
         ax.grid(True, axis="y", alpha=0.35)
-        ax.set_xlabel(AXIS_XLABEL.get(axis, axis), fontsize=13)
+        ax.set_xlabel(
+            AXIS_XLABEL.get(axis, axis), fontsize=13, labelpad=11,
+        )
 
         h1, l1 = ax.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
-        ax.legend(h1 + h2, l1 + l2, loc="upper right", fontsize=10, framealpha=0.9)
+        ax.legend(
+            h1 + h2, l1 + l2, loc="upper right", fontsize=10, framealpha=0.9,
+        )
 
     if not any_data:
         print("ERROR: no plottable data in any panel", file=sys.stderr)
         sys.exit(1)
 
+    for ax, axis in zip(axs, axes_order):
+        use_log_x = axis == "alpha_ib" or axis in xlog_axes
+        if not use_log_x:
+            for lbl in ax.get_xticklabels():
+                lbl.set_rotation(16)
+                lbl.set_ha("right")
+            continue
+        for lbl in ax.get_xticklabels():
+            lbl.set_rotation(18)
+            lbl.set_ha("right")
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     out = output_path.expanduser().resolve()
     suffix = out.suffix.lower()
     if suffix == ".pdf":
-        fig.savefig(out, format="pdf", bbox_inches="tight")
+        fig.savefig(out, format="pdf", bbox_inches="tight", pad_inches=0.28)
     elif suffix in (".png", ".jpg", ".jpeg", ".tif", ".tiff", ".svg"):
-        fig.savefig(out, dpi=200, bbox_inches="tight")
+        fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.28)
     else:
-        fig.savefig(out, bbox_inches="tight")
+        fig.savefig(out, bbox_inches="tight", pad_inches=0.28)
     plt.close(fig)
     print(f"Wrote {out}")
 
@@ -256,7 +287,11 @@ def main() -> int:
         "--xlog-axes",
         type=str,
         default="",
-        help="Comma-separated axes to use log-scale x (e.g. beta_ib)",
+        help=(
+            "Comma-separated axes for optional log-scale x (default: none). "
+            "The α_IB panel is always log-x; this flag only affects other names "
+            "(e.g. beta_ib). Log axes use $10^{k}$-style tick labels."
+        ),
     )
     ap.add_argument(
         "--acc7-ylim",
