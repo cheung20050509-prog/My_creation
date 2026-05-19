@@ -68,6 +68,7 @@ class InfoGate_DebertaModel(DebertaV2PreTrainedModel):
             'selector_target_temp': getattr(multimodal_config, 'selector_target_temp', 0.35),
             'selector_balance_weight': getattr(multimodal_config, 'selector_balance_weight', 0.0),
             'selector_rib_weight': getattr(multimodal_config, 'selector_rib_weight', 0.05),
+            'align_mix_floor': getattr(multimodal_config, 'align_mix_floor', 0.3),
             'gumbel_tau': getattr(multimodal_config, 'gumbel_tau_start', 1.0),
             'task_type': getattr(multimodal_config, 'task_type', 'regression'),
         }

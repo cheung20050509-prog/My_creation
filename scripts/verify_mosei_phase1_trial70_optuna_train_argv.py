@@ -29,6 +29,7 @@ TRIAL_70_PARAMS = {
     "ema_decay": 0.999,
     "selector_target_temp": 0.35,
     "selector_rib_weight": 0.05,
+    "align_mix_floor": 0.3,
     "gumbel_tau_start": 1.0,
     "gumbel_tau_end": 0.5,
     "num_heads": 4,
@@ -56,6 +57,7 @@ def format_train_float_argv(p: dict) -> dict[str, str]:
         "ema_decay": str(p["ema_decay"]),
         "selector_target_temp": f"{p['selector_target_temp']:.4f}",
         "selector_rib_weight": f"{p['selector_rib_weight']:.4f}",
+        "align_mix_floor": f"{p['align_mix_floor']:.4f}",
         "gumbel_tau_start": f"{p['gumbel_tau_start']:.4f}",
         "gumbel_tau_end": f"{p['gumbel_tau_end']:.4f}",
     }
@@ -155,6 +157,7 @@ def main() -> int:
             "ema_decay",
             "selector_target_temp",
             "selector_rib_weight",
+            "align_mix_floor",
             "gumbel_tau_start",
             "gumbel_tau_end",
         ):

@@ -9,7 +9,13 @@ import math
 import os
 import random
 import pickle
+import sys
 import numpy as np
+
+_FIXED_EXP_DIR = os.path.dirname(os.path.abspath(__file__))
+_MY_CREATION_DIR = os.path.dirname(_FIXED_EXP_DIR)
+if _MY_CREATION_DIR not in sys.path:
+    sys.path.insert(0, _MY_CREATION_DIR)
 
 from sklearn.metrics import accuracy_score, f1_score
 
@@ -27,6 +33,11 @@ from bert_infogate import InfoGate_BertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
 from simsv2_metrics import compute_simsv2_kuda_metrics
+from simsv2_mmsa_data import (
+    build_simsv2_mmsa_feature_vectors,
+    resolve_seq_lens,
+    simsv2_mmsa_loader_banner,
+)
 from selection_utils import (
     DEFAULT_SELECTION_METRIC,
     SELECTION_METRIC_CHOICES,
@@ -36,8 +47,6 @@ from selection_utils import (
 )
 
 # Snapshot under ablation_study/: tokenizer weights + pickles live in My_creation/.
-_FIXED_EXP_DIR = os.path.dirname(os.path.abspath(__file__))
-_MY_CREATION_DIR = os.path.dirname(_FIXED_EXP_DIR)
 
 # ============================================================
 # CLI
@@ -74,6 +83,12 @@ parser.add_argument("--selector_balance_weight", type=float, default=0.0,
                     help="Batch-level routing entropy regularization weight.")
 parser.add_argument("--selector_rib_weight", type=float, default=0.05,
                     help="Overall weight of the routing supervision loss.")
+parser.add_argument(
+    "--align_mix_floor",
+    type=float,
+    default=0.3,
+    help="Minimum alignment mix weight in InfoGate adaptive gating (0 disables floor).",
+)
 parser.add_argument("--disable_l_lib", action="store_true",
                     help="Ablate the label-level IB loss.")
 parser.add_argument("--disable_l_rib", action="store_true",
@@ -118,6 +133,26 @@ parser.add_argument("--early_stop_patience", type=int, default=0,
 parser.add_argument("--early_stop_min_delta", type=float, default=0.0,
                     help="When >0, a dev improvement must exceed this margin on the "
                          "selection score (tiebreak-only wins still count).")
+parser.add_argument(
+    "--simsv2_feature_mode",
+    type=str,
+    default="mmsa",
+    choices=["mmsa", "legacy"],
+    help="SIMSv2 only: mmsa uses pickle text_bert + lengths + seq_lens.",
+)
+parser.add_argument(
+    "--simsv2_seq_lens_order",
+    type=str,
+    default="mmsa",
+    choices=["mmsa", "kuda"],
+    help="SIMSv2 only: mmsa=T,A,V triple; kuda=T,V,A triple.",
+)
+parser.add_argument(
+    "--simsv2_seq_lens",
+    type=str,
+    default="",
+    help="SIMSv2 only: optional comma-separated caps; empty = preset.",
+)
 
 args = parser.parse_args()
 
@@ -182,35 +217,77 @@ def prepare_deberta_input(tokens, visual, acoustic, tokenizer):
 def convert_to_features(examples, max_seq_length, tokenizer):
     features = []
     if args.dataset == "simsv2":
-        # examples is a dict
         num_samples = len(examples["raw_text"])
-        for i in range(num_samples):
-            words = examples["raw_text"][i]
-            visual = examples["vision"][i]
-            acoustic = examples["audio"][i]
-            label_id = examples["regression_labels"][i]
-            
-            # Ensure it's a scalar value
-            if isinstance(label_id, (list, tuple, np.ndarray)):
-                label_id = label_id[0]
+        if getattr(args, "simsv2_feature_mode", "mmsa") == "mmsa":
+            if "text_bert" not in examples:
+                raise KeyError(
+                    "SIMSv2 mmsa mode requires 'text_bert' in the pickle. "
+                    "Use --simsv2_feature_mode legacy otherwise."
+                )
+            if tokenizer is None:
+                tokenizer = BertTokenizer.from_pretrained(args.model)
+            seq_lens = resolve_seq_lens(
+                getattr(args, "simsv2_seq_lens_order", "mmsa"),
+                (getattr(args, "simsv2_seq_lens", "") or "").strip() or None,
+            )
+            cls_id = tokenizer.cls_token_id
+            sep_id = tokenizer.sep_token_id
+            pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
+            for i in range(num_samples):
+                label_id = examples["regression_labels"][i]
+                if isinstance(label_id, (list, tuple, np.ndarray)):
+                    label_id = label_id[0]
+                al = examples["audio_lengths"][i]
+                vl = examples["vision_lengths"][i]
+                if isinstance(al, (list, tuple, np.ndarray)):
+                    al = int(al[0])
+                else:
+                    al = int(al)
+                if isinstance(vl, (list, tuple, np.ndarray)):
+                    vl = int(vl[0])
+                else:
+                    vl = int(vl)
+                ids, vis, aud, mask, seg, label_id = build_simsv2_mmsa_feature_vectors(
+                    text_bert=examples["text_bert"][i],
+                    vision=examples["vision"][i],
+                    audio=examples["audio"][i],
+                    audio_length=al,
+                    vision_length=vl,
+                    label_id=float(label_id),
+                    seq_lens=seq_lens,
+                    max_seq_length=max_seq_length,
+                    acoustic_dim=ACOUSTIC_DIM,
+                    visual_dim=VISUAL_DIM,
+                    cls_id=int(cls_id),
+                    sep_id=int(sep_id),
+                    pad_id=int(pad_id),
+                )
+                features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+        else:
+            for i in range(num_samples):
+                words = examples["raw_text"][i]
+                visual = examples["vision"][i]
+                acoustic = examples["audio"][i]
+                label_id = examples["regression_labels"][i]
 
-            tokens = tokenizer.tokenize(words)
-            if len(tokens) > max_seq_length - 2:
-                tokens = tokens[:max_seq_length - 2]
-                visual = visual[:max_seq_length - 2]
-                acoustic = acoustic[:max_seq_length - 2]
-            else:
-                # pad or truncate if needed, SIMSv2 pre-extracts features usually matching text tokens
-                # Let's just truncate visual/acoustic to the length of tokens.
-                min_len = min(len(tokens), len(visual), len(acoustic))
-                tokens = tokens[:min_len]
-                visual = visual[:min_len]
-                acoustic = acoustic[:min_len]
+                if isinstance(label_id, (list, tuple, np.ndarray)):
+                    label_id = label_id[0]
 
-            ids, vis, aud, mask, seg = prepare_deberta_input(
-                tokens, visual, acoustic, tokenizer)
+                tokens = tokenizer.tokenize(words)
+                if len(tokens) > max_seq_length - 2:
+                    tokens = tokens[:max_seq_length - 2]
+                    visual = visual[:max_seq_length - 2]
+                    acoustic = acoustic[:max_seq_length - 2]
+                else:
+                    min_len = min(len(tokens), len(visual), len(acoustic))
+                    tokens = tokens[:min_len]
+                    visual = visual[:min_len]
+                    acoustic = acoustic[:min_len]
 
-            features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+                ids, vis, aud, mask, seg = prepare_deberta_input(
+                    tokens, visual, acoustic, tokenizer)
+
+                features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
     else:
         for example in examples:
             (words, visual, acoustic), label_id, segment = example
@@ -510,6 +587,14 @@ def main():
     print("=" * 60)
     print("InfoGate Training")
     print(f"  Dataset        : {args.dataset}")
+    if args.dataset == "simsv2" and getattr(args, "simsv2_feature_mode", "mmsa") == "mmsa":
+        _sl = resolve_seq_lens(
+            getattr(args, "simsv2_seq_lens_order", "mmsa"),
+            (getattr(args, "simsv2_seq_lens", "") or "").strip() or None,
+        )
+        print(f"  {simsv2_mmsa_loader_banner(_sl, args.simsv2_seq_lens_order)}")
+    elif args.dataset == "simsv2":
+        print("  SIMSv2 loader=legacy (raw_text + min_len alignment)")
     print(f"  Epochs         : {args.n_epochs} (stage1: {args.stage1_epochs})")
     print(f"  Batch size     : {args.train_batch_size}")
     print(f"  LR (backbone)  : {args.learning_rate}")
@@ -521,6 +606,7 @@ def main():
     print(f"  selector_temp  : {args.selector_target_temp}")
     print(f"  selector_bal   : {args.selector_balance_weight}")
     print(f"  selector_rib_w : {args.selector_rib_weight}")
+    print(f"  align_mix_floor  : {args.align_mix_floor}")
     print(f"  Select by      : {args.selection_metric}")
     print(f"  Ablation       : {args.ablation}")
     print(f"  Loss terms     : L_lib={toggle_state(args.use_l_lib)} "

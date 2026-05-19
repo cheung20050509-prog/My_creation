@@ -137,6 +137,8 @@ def build_train_argv(*, checkpoint_dir: str, overrides: dict[str, float]) -> lis
         fmt["selector_target_temp"],
         "--selector_rib_weight",
         fmt["selector_rib_weight"],
+        "--align_mix_floor",
+        fmt["align_mix_floor"],
         "--gumbel_tau_start",
         fmt["gumbel_tau_start"],
         "--gumbel_tau_end",

@@ -97,6 +97,7 @@ LINEAR_FLOAT_BOUNDS = {
     "warmup_proportion":    (0.02, 0.25),
     "selector_target_temp": (0.30, 0.90),
     "selector_rib_weight":  (0.01, 0.15),
+    "align_mix_floor":      (0.0, 0.6),
     # Same as optuna_search_v2.py (Tier3 DPR / ``MSelector`` annealing endpoints).
     "gumbel_tau_start":     (0.5, 2.0),
     "gumbel_tau_end":       (0.1, 1.0),
@@ -255,6 +256,7 @@ DEFAULTS = {
     "ema_start_epoch": 5,
     "selector_target_temp": 0.6,
     "selector_rib_weight": 0.05,
+    "align_mix_floor": 0.3,
     "gumbel_tau_start": 1.0,
     "gumbel_tau_end": 0.5,
     "num_heads": 4,
@@ -513,6 +515,10 @@ def suggest_tier3(trial, dataset, local_space=None):
             trial, "gumbel_tau_end",
             get_linear_float_bounds("gumbel_tau_end", dataset),
             local_space=local_space),
+        "align_mix_floor": suggest_float_param(
+            trial, "align_mix_floor",
+            get_linear_float_bounds("align_mix_floor", dataset),
+            local_space=local_space),
     }
 
 
@@ -765,7 +771,7 @@ def build_local_search_space(study, dataset, search_tier, selection_metric, top_
             if vals:
                 local_space[name] = ordered_choice_subset(
                     CATEGORICAL_SPACE[name], vals, best_params.get(name))
-        tier3_linear_names = ("gumbel_tau_start", "gumbel_tau_end")
+        tier3_linear_names = ("gumbel_tau_start", "gumbel_tau_end", "align_mix_floor")
         for name in tier3_linear_names:
             vals = values_for(name)
             if vals:
@@ -1086,6 +1092,7 @@ def objective(trial, cli):
         "--gumbel_tau_end", f"{params['gumbel_tau_end']:.4f}",
         "--selector_target_temp", f"{params['selector_target_temp']:.4f}",
         "--selector_rib_weight", f"{params['selector_rib_weight']:.4f}",
+        "--align_mix_floor", f"{params['align_mix_floor']:.4f}",
         "--selection_metric", cli.selection_metric,
         "--checkpoint_dir", trial_ckpt,
         "--seed", str(params["seed"]),

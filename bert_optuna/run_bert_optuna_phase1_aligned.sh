@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # BERT-base-uncased Optuna on MOSI + MOSEI, budgets aligned with run_optuna_4090d_restart.sh phase1.
+# Tier-1 only (no align_mix_floor in search space). For align_floor Tier-3 use run_bert_new_space_align_floor.sh.
 # Default: MOSI on physical GPU1, MOSEI on physical GPU0 — both start together; launcher waits for both.
 #
 # Usage:

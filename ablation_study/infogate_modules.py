@@ -220,12 +220,14 @@ class InfoGateLayer(nn.Module):
     state-dict keys for the original 3-modality checkpoints keep loading.
     """
     def __init__(self, hidden_dim, num_heads=4, dropout=0.1, num_aux=2,
-                 no_conf_gating=False, no_adaptive_gate=False):
+                 no_conf_gating=False, no_adaptive_gate=False,
+                 align_mix_floor: float = 0.3):
         super().__init__()
         assert num_aux in (2, 3), f"InfoGateLayer: num_aux must be 2 or 3, got {num_aux}"
         self.num_aux = num_aux
         self.no_conf_gating = no_conf_gating
         self.no_adaptive_gate = no_adaptive_gate
+        self.align_mix_floor = float(align_mix_floor)
 
         # aux -> primary cross-attention
         self.ca_a1_to_p = IBGuidedMultiHeadAttention(hidden_dim, num_heads, dropout)
@@ -314,16 +316,17 @@ class InfoGateLayer(nn.Module):
         sa_p = self.sa_p(B_p_n, B_p_n, B_p_n, conf_sa, tok_mask)
         B_p_up = B_p + self.dropout(sa_p)
 
-        # Alignment-modulated adaptive gating (cosine sim with clamp >= 0.3)
+        # Alignment-modulated adaptive gating (cosine sim with optional floor)
         p_pool = masked_sequence_mean(B_p, tok_mask)
         B_p_fused = B_p_up
+        floor = max(0.0, min(1.0, float(self.align_mix_floor)))
         for gate, aux, ca_out in zip(gates, B_aux_list, ca_outs):
             if self.no_adaptive_gate:
                 gated = ca_out
             else:
                 aux_pool = masked_sequence_mean(aux, tok_mask)
                 align = (F.cosine_similarity(p_pool, aux_pool, dim=-1).clamp(min=-1, max=1) + 1) / 2
-                align = align.clamp(min=0.3).view(-1, 1, 1)
+                align = align.clamp(min=floor).view(-1, 1, 1)
                 gated = align * gate(B_p_up, ca_out)
             B_p_fused = B_p_fused + self.dropout(gated)
 
@@ -348,13 +351,15 @@ class InfoGateLayer(nn.Module):
 class InfoGateModule(nn.Module):
     """Multi-layer stacked InfoGate cross-attention."""
     def __init__(self, hidden_dim, num_layers=3, num_heads=4, dropout=0.1, num_aux=2,
-                 no_conf_gating=False, no_adaptive_gate=False):
+                 no_conf_gating=False, no_adaptive_gate=False,
+                 align_mix_floor: float = 0.3):
         super().__init__()
         self.num_aux = num_aux
         self.layers = nn.ModuleList([
             InfoGateLayer(
                 hidden_dim, num_heads, dropout, num_aux=num_aux,
                 no_conf_gating=no_conf_gating, no_adaptive_gate=no_adaptive_gate,
+                align_mix_floor=align_mix_floor,
             )
             for _ in range(num_layers)
         ])
@@ -507,6 +512,7 @@ class InfoGate(nn.Module):
         self.selector_target_temp = args.get('selector_target_temp', 0.35)
         self.selector_balance_weight = args.get('selector_balance_weight', 0.0)
         self.selector_rib_weight = args.get('selector_rib_weight', 0.05)
+        self.align_mix_floor = float(args.get('align_mix_floor', 0.3))
         self.bottleneck_dim = bn_dim
         self.ablation = args.get('ablation', 'none')
         _allowed_ablation = frozenset({
@@ -584,6 +590,7 @@ class InfoGate(nn.Module):
                 bn_dim, num_layers, num_heads, dropout, num_aux=num_aux,
                 no_conf_gating=(self.ablation == 'no_conf_gating'),
                 no_adaptive_gate=(self.ablation == 'no_adaptive_gate'),
+                align_mix_floor=self.align_mix_floor,
             )
 
         # --- 7. Aggregation ---

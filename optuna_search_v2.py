@@ -51,6 +51,7 @@ DEFAULTS = {
     "stage1_epochs": 10, "warmup_proportion": 0.1,
     "weight_decay": 1e-3, "ema_decay": 0.999,
     "selector_target_temp": 0.35, "selector_rib_weight": 0.05,
+    "align_mix_floor": 0.3,
     "gumbel_tau_start": 1.0, "gumbel_tau_end": 0.5,
     "num_heads": 4, "unified_dim": 256,
     "ema_start_epoch": 5,
@@ -73,6 +74,7 @@ LINEAR_FLOAT_BOUNDS = {
     "ema_decay": (0.99, 0.9995),
     "selector_target_temp": (0.1, 1.0),
     "selector_rib_weight": (0.01, 0.2),
+    "align_mix_floor": (0.0, 0.6),
     "gumbel_tau_start": (0.5, 2.0),
     "gumbel_tau_end": (0.1, 1.0),
 }
@@ -354,6 +356,10 @@ def suggest_tier3(trial, local_space=None, micro_refine="none", dataset="mosi"):
         "selector_rib_weight": suggest_float_param(
             trial, "selector_rib_weight",
             LINEAR_FLOAT_BOUNDS["selector_rib_weight"], local_space=local_space,
+            extra_bounds=band_extra),
+        "align_mix_floor": suggest_float_param(
+            trial, "align_mix_floor",
+            LINEAR_FLOAT_BOUNDS["align_mix_floor"], local_space=local_space,
             extra_bounds=band_extra),
         "gumbel_tau_start": suggest_float_param(
             trial, "gumbel_tau_start", LINEAR_FLOAT_BOUNDS["gumbel_tau_start"],
@@ -909,6 +915,7 @@ def build_local_search_space_from_trials(
     if search_tier >= 3:
         tier3_linear_names = (
             "selector_target_temp", "selector_rib_weight",
+            "align_mix_floor",
             "gumbel_tau_start", "gumbel_tau_end",
         )
         tier3_cat_names = ("num_heads", "unified_dim")
@@ -1517,6 +1524,7 @@ def objective(trial, cli):
         "--ema_decay", str(params["ema_decay"]),
         "--selector_target_temp", f"{params['selector_target_temp']:.4f}",
         "--selector_rib_weight", f"{params['selector_rib_weight']:.4f}",
+        "--align_mix_floor", f"{params['align_mix_floor']:.4f}",
         "--gumbel_tau_start", f"{params['gumbel_tau_start']:.4f}",
         "--gumbel_tau_end", f"{params['gumbel_tau_end']:.4f}",
         "--num_heads", str(params["num_heads"]),

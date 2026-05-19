@@ -21,10 +21,13 @@ Full [0,1] scale (default, backward-compatible)::
 
     ... --kind heatmap --vscale full
 
-Tall layout + diverging colormap (purple band near 0.5, not white)::
+Tall + minimal axes only (no title / notes / long colorbar text)::
+
+    ... --kind heatmap --layout tall --heatmap-minimal
+
+Tall + diverging colormap (purple band near 0.5; default ``ib_purple_div`` when ``--norm twoslope``)::
 
     ... --kind heatmap --layout tall --norm twoslope --vscale data
-    # default cmap becomes ``ib_purple_div``; or e.g.\ ``--cmap twilight``
 """
 
 from __future__ import annotations
@@ -184,6 +187,7 @@ def draw_ib_conf_heatmap(
     vmax: float | None = None,
     layout: str = "wide",
     norm_style: str = "linear",
+    heatmap_minimal: bool = False,
 ) -> Any:
     """Draw heatmap on ``ax``; colorbar on ``fig``. ``layout``: ``wide`` (x=tokens) or ``tall`` (y=tokens)."""
     mat = ib_conf_heatmap_matrix(rows, plot_cols)
@@ -200,7 +204,7 @@ def draw_ib_conf_heatmap(
         norm = _twoslope_norm(vmin_v, vmax_v, 0.5)
         cmap_resolved = resolve_heatmap_cmap(cmap)
         im = ax.imshow(arr, aspect="auto", norm=norm, cmap=cmap_resolved, interpolation="nearest")
-        cbar_label = r"VTB conf.\ $\sigma(-\log\sigma^2)$ (mean$_D$); purple$\approx$0.5"
+        cbar_label = "" if heatmap_minimal else r"VTB conf.\ $\sigma(-\log\sigma^2)$ (mean$_D$); purple$\approx$0.5"
     else:
         cmap_resolved = resolve_heatmap_cmap(cmap)
         im = ax.imshow(
@@ -211,16 +215,17 @@ def draw_ib_conf_heatmap(
             cmap=cmap_resolved,
             interpolation="nearest",
         )
-        cbar_label = "sigmoid(-logvar) (mean over D)"
+        cbar_label = "" if heatmap_minimal else "sigmoid(-logvar) (mean over D)"
 
     cbar = fig.colorbar(im, ax=ax, fraction=0.035, pad=0.02)
-    cbar.set_label(cbar_label)
+    if cbar_label:
+        cbar.set_label(cbar_label)
 
     tok_labels = [row.get("token", str(i)).replace("\n", " ")[:28] for i, row in enumerate(rows)]
 
     if layout == "tall":
-        ax.set_xlabel("VTB slot")
-        ax.set_ylabel("Token (English subword; top to bottom = left-to-right sequence)")
+        ax.set_xlabel("Modality" if heatmap_minimal else "VTB slot")
+        ax.set_ylabel("Token" if heatmap_minimal else "Token (English subword; top to bottom = left-to-right sequence)")
         ax.set_xticks(range(n_ch))
         ax.set_xticklabels([IB_CONF_SHORT_LABEL.get(c, c) for c in plot_cols], fontsize=9, rotation=12, ha="right")
         tick_step = max(1, n_tok // 55)
@@ -233,7 +238,9 @@ def draw_ib_conf_heatmap(
     else:
         ax.set_yticks(range(n_ch))
         ax.set_yticklabels([IB_CONF_SHORT_LABEL.get(c, c) for c in plot_cols], fontsize=9)
-        ax.set_xlabel("English subword (tokenizer order; valid positions)")
+        if heatmap_minimal:
+            ax.set_ylabel("Modality")
+        ax.set_xlabel("Token position" if heatmap_minimal else "English subword (tokenizer order; valid positions)")
         tick_step = max(1, n_tok // 25)
         tick_ix = list(range(0, n_tok, tick_step))
         if n_tok > 1 and tick_ix[-1] != n_tok - 1:
@@ -241,18 +248,21 @@ def draw_ib_conf_heatmap(
         ax.set_xticks(tick_ix)
         ax.set_xticklabels([tok_labels[i] for i in tick_ix], rotation=65, ha="right", fontsize=7)
 
-    ax.set_title(title)
-    if notes:
-        uniq = sorted(set(notes))
-        ax.text(
-            0.99,
-            1.02,
-            " · ".join(uniq),
-            transform=ax.transAxes,
-            fontsize=7,
-            ha="right",
-            va="bottom",
-        )
+    if heatmap_minimal:
+        ax.set_title("")
+    else:
+        ax.set_title(title)
+        if notes:
+            uniq = sorted(set(notes))
+            ax.text(
+                0.99,
+                1.02,
+                " · ".join(uniq),
+                transform=ax.transAxes,
+                fontsize=7,
+                ha="right",
+                va="bottom",
+            )
     return im
 
 
@@ -269,6 +279,7 @@ def save_heatmap_figures(
     vmax: float | None,
     layout: str = "wide",
     norm_style: str = "linear",
+    heatmap_minimal: bool = False,
 ) -> None:
     import matplotlib
 
@@ -297,6 +308,7 @@ def save_heatmap_figures(
         vmax=vmax,
         layout=layout,
         norm_style=norm_style,
+        heatmap_minimal=heatmap_minimal,
     )
     fig.tight_layout()
     for out in out_paths:
@@ -320,6 +332,7 @@ def save_heatmap_figure(
     vmax: float | None,
     layout: str = "wide",
     norm_style: str = "linear",
+    heatmap_minimal: bool = False,
 ) -> None:
     save_heatmap_figures(
         [fig_path],
@@ -333,6 +346,7 @@ def save_heatmap_figure(
         vmax=vmax,
         layout=layout,
         norm_style=norm_style,
+        heatmap_minimal=heatmap_minimal,
     )
 
 
@@ -382,6 +396,11 @@ def main() -> int:
         "--include-pad",
         action="store_true",
         help="Also plot padded positions (default: only valid=1 rows)",
+    )
+    ap.add_argument(
+        "--heatmap-minimal",
+        action="store_true",
+        help="Heatmap only: short axis names, tick labels, colorbar ticks; no title/notes/long colorbar text",
     )
     args = ap.parse_args()
 
@@ -482,6 +501,7 @@ def main() -> int:
             vmax=args.vmax,
             layout=args.layout,
             norm_style=args.norm_style,
+            heatmap_minimal=args.heatmap_minimal,
         )
     else:
         _plot_line(f"{base}_line{ext}")
@@ -497,6 +517,7 @@ def main() -> int:
             vmax=args.vmax,
             layout=args.layout,
             norm_style=args.norm_style,
+            heatmap_minimal=args.heatmap_minimal,
         )
     return 0
 

@@ -73,6 +73,12 @@ parser.add_argument("--selector_balance_weight", type=float, default=0.0,
                     help="Batch-level routing entropy regularization weight.")
 parser.add_argument("--selector_rib_weight", type=float, default=0.05,
                     help="Overall weight of the routing supervision loss.")
+parser.add_argument(
+    "--align_mix_floor",
+    type=float,
+    default=0.3,
+    help="Minimum alignment mix weight in InfoGate adaptive gating (0 disables floor).",
+)
 parser.add_argument("--disable_l_lib", action="store_true",
                     help="Ablate the label-level IB loss.")
 parser.add_argument("--disable_l_rib", action="store_true",

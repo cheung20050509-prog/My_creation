@@ -19,6 +19,10 @@ from bert_infogate import InfoGate_BertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
 from simsv2_metrics import clip_simsv2_pairs, compute_simsv2_kuda_metrics
+from simsv2_mmsa_data import (
+    build_simsv2_mmsa_feature_vectors,
+    resolve_seq_lens,
+)
 
 # ============================================================
 # CLI
@@ -50,6 +54,26 @@ parser.add_argument("--save_prediction_csv", action="store_true",
                     help="Save the true/prediction pairs as CSV.")
 parser.add_argument("--csv_output", type=str, default="",
                     help="Optional output path for the CSV. Defaults under prediction_plots/.")
+parser.add_argument(
+    "--simsv2_feature_mode",
+    type=str,
+    default="mmsa",
+    choices=["mmsa", "legacy"],
+    help="SIMSv2 only: must match training (mmsa=text_bert+lengths+seq_lens).",
+)
+parser.add_argument(
+    "--simsv2_seq_lens_order",
+    type=str,
+    default="mmsa",
+    choices=["mmsa", "kuda"],
+    help="SIMSv2 only: interpretation of --simsv2_seq_lens.",
+)
+parser.add_argument(
+    "--simsv2_seq_lens",
+    type=str,
+    default="",
+    help="SIMSv2 only: optional comma-separated caps; empty = preset.",
+)
 
 args = parser.parse_args()
 
@@ -93,11 +117,17 @@ def apply_architecture_from_checkpoint(cli_args, ckpt_path):
         "selector_target_temp",
         "selector_balance_weight",
         "selector_rib_weight",
+        "align_mix_floor",
         "gumbel_tau_start",
         "gumbel_tau_end",
     )
     applied = []
     for k in keys:
+        if hasattr(saved, k):
+            setattr(cli_args, k, getattr(saved, k))
+            applied.append(k)
+
+    for k in ("simsv2_feature_mode", "simsv2_seq_lens_order", "simsv2_seq_lens"):
         if hasattr(saved, k):
             setattr(cli_args, k, getattr(saved, k))
             applied.append(k)
@@ -170,35 +200,77 @@ def prepare_deberta_input(tokens, visual, acoustic, tokenizer):
 def convert_to_features(examples, max_seq_length, tokenizer):
     features = []
     if args.dataset == "simsv2":
-        # examples is a dict
         num_samples = len(examples["raw_text"])
-        for i in range(num_samples):
-            words = examples["raw_text"][i]
-            visual = examples["vision"][i]
-            acoustic = examples["audio"][i]
-            label_id = examples["regression_labels"][i]
-            
-            # Ensure it's a scalar value
-            if isinstance(label_id, (list, tuple, np.ndarray)):
-                label_id = label_id[0]
+        if getattr(args, "simsv2_feature_mode", "mmsa") == "mmsa":
+            if "text_bert" not in examples:
+                raise KeyError(
+                    "SIMSv2 mmsa mode requires 'text_bert' in the pickle. "
+                    "Use --simsv2_feature_mode legacy otherwise."
+                )
+            if tokenizer is None:
+                tokenizer = BertTokenizer.from_pretrained(args.model)
+            seq_lens = resolve_seq_lens(
+                getattr(args, "simsv2_seq_lens_order", "mmsa"),
+                (getattr(args, "simsv2_seq_lens", "") or "").strip() or None,
+            )
+            cls_id = tokenizer.cls_token_id
+            sep_id = tokenizer.sep_token_id
+            pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
+            for i in range(num_samples):
+                label_id = examples["regression_labels"][i]
+                if isinstance(label_id, (list, tuple, np.ndarray)):
+                    label_id = label_id[0]
+                al = examples["audio_lengths"][i]
+                vl = examples["vision_lengths"][i]
+                if isinstance(al, (list, tuple, np.ndarray)):
+                    al = int(al[0])
+                else:
+                    al = int(al)
+                if isinstance(vl, (list, tuple, np.ndarray)):
+                    vl = int(vl[0])
+                else:
+                    vl = int(vl)
+                ids, vis, aud, mask, seg, label_id = build_simsv2_mmsa_feature_vectors(
+                    text_bert=examples["text_bert"][i],
+                    vision=examples["vision"][i],
+                    audio=examples["audio"][i],
+                    audio_length=al,
+                    vision_length=vl,
+                    label_id=float(label_id),
+                    seq_lens=seq_lens,
+                    max_seq_length=max_seq_length,
+                    acoustic_dim=ACOUSTIC_DIM,
+                    visual_dim=VISUAL_DIM,
+                    cls_id=int(cls_id),
+                    sep_id=int(sep_id),
+                    pad_id=int(pad_id),
+                )
+                features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+        else:
+            for i in range(num_samples):
+                words = examples["raw_text"][i]
+                visual = examples["vision"][i]
+                acoustic = examples["audio"][i]
+                label_id = examples["regression_labels"][i]
 
-            tokens = tokenizer.tokenize(words)
-            if len(tokens) > max_seq_length - 2:
-                tokens = tokens[:max_seq_length - 2]
-                visual = visual[:max_seq_length - 2]
-                acoustic = acoustic[:max_seq_length - 2]
-            else:
-                # pad or truncate if needed, SIMSv2 pre-extracts features usually matching text tokens
-                # Let's just truncate visual/acoustic to the length of tokens.
-                min_len = min(len(tokens), len(visual), len(acoustic))
-                tokens = tokens[:min_len]
-                visual = visual[:min_len]
-                acoustic = acoustic[:min_len]
+                if isinstance(label_id, (list, tuple, np.ndarray)):
+                    label_id = label_id[0]
 
-            ids, vis, aud, mask, seg = prepare_deberta_input(
-                tokens, visual, acoustic, tokenizer)
+                tokens = tokenizer.tokenize(words)
+                if len(tokens) > max_seq_length - 2:
+                    tokens = tokens[:max_seq_length - 2]
+                    visual = visual[:max_seq_length - 2]
+                    acoustic = acoustic[:max_seq_length - 2]
+                else:
+                    min_len = min(len(tokens), len(visual), len(acoustic))
+                    tokens = tokens[:min_len]
+                    visual = visual[:min_len]
+                    acoustic = acoustic[:min_len]
 
-            features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
+                ids, vis, aud, mask, seg = prepare_deberta_input(
+                    tokens, visual, acoustic, tokenizer)
+
+                features.append(InputFeatures(ids, vis, aud, mask, seg, label_id))
     else:
         for example in examples:
             (words, visual, acoustic), label_id, segment = example

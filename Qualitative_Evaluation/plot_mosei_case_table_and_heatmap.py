@@ -143,6 +143,11 @@ def main() -> int:
         default=_DEFAULT_OVERLEAF_GRAPH,
         help="Destination for --copy-to-overleaf",
     )
+    ap.add_argument(
+        "--heatmap-minimal",
+        action="store_true",
+        help="Pass-through to plot_ib_conf_token_tsv: minimal heatmap decoration",
+    )
     args = ap.parse_args()
 
     if not os.path.isfile(args.csv):
@@ -177,6 +182,7 @@ def main() -> int:
         vscale="data",
         vmin=None,
         vmax=None,
+        heatmap_minimal=args.heatmap_minimal,
     )
 
     if args.copy_to_overleaf:

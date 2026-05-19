@@ -53,6 +53,7 @@ def apply_architecture_from_checkpoint(cli_args, ckpt_path):
         "selector_target_temp",
         "selector_balance_weight",
         "selector_rib_weight",
+        "align_mix_floor",
         "gumbel_tau_start",
         "gumbel_tau_end",
         "task_type",

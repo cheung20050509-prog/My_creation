@@ -71,6 +71,7 @@ def _apply_ckpt_arch_deberta(cli: SimpleNamespace, ckpt_path: str) -> None:
         "model", "dataset", "max_seq_length", "unified_dim", "ib_hidden_dim", "bottleneck_dim",
         "num_heads", "num_infogate_layers", "dropout_prob", "beta_ib", "alpha_ib", "mse_weight",
         "selector_target_temp", "selector_balance_weight", "selector_rib_weight",
+        "align_mix_floor",
         "gumbel_tau_start", "gumbel_tau_end", "ablation",
     )
     for k in keys:
@@ -90,6 +91,7 @@ def _apply_ckpt_arch_albert(cli: SimpleNamespace, ckpt_path: str) -> None:
         "model", "dataset", "max_seq_length", "unified_dim", "ib_hidden_dim", "bottleneck_dim",
         "num_heads", "num_infogate_layers", "dropout_prob", "beta_ib", "alpha_ib", "mse_weight",
         "selector_target_temp", "selector_balance_weight", "selector_rib_weight",
+        "align_mix_floor",
         "gumbel_tau_start", "gumbel_tau_end", "task_type",
     )
     for k in keys:
@@ -394,6 +396,7 @@ def main() -> int:
             selector_target_temp=0.35,
             selector_balance_weight=0.0,
             selector_rib_weight=0.05,
+            align_mix_floor=0.3,
             gumbel_tau_start=1.0,
             gumbel_tau_end=0.5,
             ablation="none",
@@ -428,6 +431,7 @@ def main() -> int:
         selector_target_temp=0.6,
         selector_balance_weight=0.0,
         selector_rib_weight=0.05,
+        align_mix_floor=0.3,
         gumbel_tau_start=1.0,
         gumbel_tau_end=0.5,
         task_type="binary",
