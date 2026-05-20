@@ -19,6 +19,11 @@ from bert_infogate import InfoGate_BertForSequenceClassification
 import global_configs
 from global_configs import DEVICE
 from simsv2_metrics import clip_simsv2_pairs, compute_simsv2_kuda_metrics
+from simsv2_mmsa_data import (
+    build_tensor_dataset as build_simsv2_mmsa_dataset,
+    unpack_batch as unpack_simsv2_batch,
+    uses_simsv2_mmsa,
+)
 
 # ============================================================
 # CLI
@@ -50,6 +55,13 @@ parser.add_argument("--save_prediction_csv", action="store_true",
                     help="Save the true/prediction pairs as CSV.")
 parser.add_argument("--csv_output", type=str, default="",
                     help="Optional output path for the CSV. Defaults under prediction_plots/.")
+parser.add_argument(
+    "--simsv2_feature_mode",
+    type=str,
+    default="mmsa",
+    choices=["mmsa", "legacy"],
+    help="SIMSv2 only: mmsa uses text_bert + A/V lengths; legacy re-tokenizes raw_text.",
+)
 
 args = parser.parse_args()
 
@@ -167,8 +179,14 @@ def prepare_deberta_input(tokens, visual, acoustic, tokenizer):
     return input_ids, visual, acoustic, input_mask, segment_ids
 
 
+def simsv2_mmsa_enabled():
+    return uses_simsv2_mmsa(args.dataset, args.simsv2_feature_mode)
+
+
 def convert_to_features(examples, max_seq_length, tokenizer):
     features = []
+    if args.dataset == "simsv2" and simsv2_mmsa_enabled():
+        raise RuntimeError("convert_to_features should not be used when simsv2_feature_mode=mmsa")
     if args.dataset == "simsv2":
         # examples is a dict
         num_samples = len(examples["raw_text"])
@@ -229,14 +247,17 @@ def get_tokenizer(model):
 def get_test_dataloader():
     with open(f"datasets/{args.dataset}.pkl", "rb") as fh:
         data = pickle.load(fh)
-    tok = get_tokenizer(args.model)
-    feats = convert_to_features(data["test"], args.max_seq_length, tok)
-    ds = TensorDataset(
-        torch.tensor(np.array([f.input_ids for f in feats]), dtype=torch.long),
-        torch.tensor(np.array([f.visual for f in feats]), dtype=torch.float),
-        torch.tensor(np.array([f.acoustic for f in feats]), dtype=torch.float),
-        torch.tensor(np.array([f.label_id for f in feats]), dtype=torch.float),
-    )
+    if simsv2_mmsa_enabled():
+        ds = build_simsv2_mmsa_dataset(data["test"], args.max_seq_length)
+    else:
+        tok = get_tokenizer(args.model)
+        feats = convert_to_features(data["test"], args.max_seq_length, tok)
+        ds = TensorDataset(
+            torch.tensor(np.array([f.input_ids for f in feats]), dtype=torch.long),
+            torch.tensor(np.array([f.visual for f in feats]), dtype=torch.float),
+            torch.tensor(np.array([f.acoustic for f in feats]), dtype=torch.float),
+            torch.tensor(np.array([f.label_id for f in feats]), dtype=torch.float),
+        )
     return DataLoader(ds, batch_size=args.test_batch_size, shuffle=False)
 
 
@@ -302,14 +323,20 @@ def load_model(ckpt_path):
 
 def test_model(model, loader):
     preds, labels = [], []
+    use_mmsa = simsv2_mmsa_enabled()
     with torch.no_grad():
         for batch in tqdm(loader, desc="Testing"):
             batch = tuple(t.to(DEVICE) for t in batch)
-            input_ids, visual, acoustic, label_ids = batch
+            input_ids, visual, acoustic, label_ids, input_mask, segment_ids = unpack_simsv2_batch(
+                batch, use_mmsa)
             visual = visual.squeeze(1)
             acoustic = acoustic.squeeze(1)
 
-            logits, _, _, _ = model(input_ids, visual, acoustic, stage=2)
+            fwd_kw = dict(stage=2)
+            if use_mmsa:
+                fwd_kw["attention_mask"] = input_mask
+                fwd_kw["token_type_ids"] = segment_ids
+            logits, _, _, _ = model(input_ids, visual, acoustic, **fwd_kw)
 
             logits = logits.squeeze(-1).cpu().numpy()
             label_ids = label_ids.cpu().numpy().flatten()

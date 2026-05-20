@@ -9,6 +9,7 @@ import math
 import os
 import random
 import pickle
+import sys
 import numpy as np
 
 from sklearn.metrics import accuracy_score, f1_score
@@ -38,6 +39,15 @@ from selection_utils import (
 # Snapshot copy under fixed_experiment/: tokenizer weights + pickles live in My_creation/.
 _FIXED_EXP_DIR = os.path.dirname(os.path.abspath(__file__))
 _MY_CREATION_DIR = os.path.dirname(_FIXED_EXP_DIR)
+if _MY_CREATION_DIR not in sys.path:
+    sys.path.insert(0, _MY_CREATION_DIR)
+
+from simsv2_mmsa_data import (
+    build_tensor_dataset as build_simsv2_mmsa_dataset,
+    format_seq_lens_report,
+    unpack_batch as unpack_simsv2_batch,
+    uses_simsv2_mmsa,
+)
 
 # ============================================================
 # CLI
@@ -98,12 +108,19 @@ parser.add_argument("--early_stop_patience", type=int, default=0,
 parser.add_argument("--early_stop_min_delta", type=float, default=0.0,
                     help="When >0, a dev improvement must exceed this margin on the "
                          "selection score (tiebreak-only wins still count).")
+parser.add_argument(
+    "--simsv2_feature_mode",
+    type=str,
+    default="mmsa",
+    choices=["mmsa", "legacy"],
+    help="SIMSv2 only: mmsa uses text_bert + A/V lengths; legacy re-tokenizes raw_text.",
+)
 
 args = parser.parse_args()
 
 if args.dataset == "simsv2":
     if "deberta-v3-base" in args.model:
-        args.model = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bert-base-chinese")
+        args.model = os.path.join(_MY_CREATION_DIR, "bert-base-chinese")
 
 if isinstance(args.model, str):
     pass # Added to ensure valid code block
@@ -159,8 +176,14 @@ def prepare_deberta_input(tokens, visual, acoustic, tokenizer):
     return input_ids, visual, acoustic, input_mask, segment_ids
 
 
+def simsv2_mmsa_enabled():
+    return uses_simsv2_mmsa(args.dataset, args.simsv2_feature_mode)
+
+
 def convert_to_features(examples, max_seq_length, tokenizer):
     features = []
+    if args.dataset == "simsv2" and simsv2_mmsa_enabled():
+        raise RuntimeError("convert_to_features should not be used when simsv2_feature_mode=mmsa")
     if args.dataset == "simsv2":
         # examples is a dict
         num_samples = len(examples["raw_text"])
@@ -223,6 +246,8 @@ def get_tokenizer(model):
 
 
 def get_dataset(data):
+    if simsv2_mmsa_enabled():
+        return build_simsv2_mmsa_dataset(data, args.max_seq_length)
     tok = get_tokenizer(args.model)
     feats = convert_to_features(data, args.max_seq_length, tok)
     return TensorDataset(
@@ -237,6 +262,10 @@ def setup_data():
     ds_path = os.path.join(_MY_CREATION_DIR, "datasets", f"{args.dataset}.pkl")
     with open(ds_path, "rb") as fh:
         data = pickle.load(fh)
+
+    if simsv2_mmsa_enabled():
+        print(f"  SIMSv2 data    : MMSA fields (text_bert + A/V lengths)")
+        print(f"  {format_seq_lens_report(data['train'], args.max_seq_length)}")
 
     train_ds = get_dataset(data["train"])
     if "dev" in data:
@@ -359,6 +388,15 @@ def toggle_state(enabled):
     return "on" if enabled else "off"
 
 
+def _forward_model(model, input_ids, visual, acoustic, label_ids, stage,
+                   input_mask=None, segment_ids=None):
+    fwd_kw = dict(labels=label_ids, stage=stage)
+    if simsv2_mmsa_enabled():
+        fwd_kw["attention_mask"] = input_mask
+        fwd_kw["token_type_ids"] = segment_ids
+    return model(input_ids, visual, acoustic, **fwd_kw)
+
+
 # ============================================================
 # Train / Eval / Test
 # ============================================================
@@ -368,16 +406,19 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
     total_loss, steps = 0.0, 0
     sum_task, sum_ib = 0.0, 0.0
     sum_detail = {}
+    use_mmsa = simsv2_mmsa_enabled()
 
     train_pbar = tqdm(loader, desc=f"Train (stage {stage})")
     for step, batch in enumerate(train_pbar):
         batch = tuple(t.to(DEVICE) for t in batch)
-        input_ids, visual, acoustic, label_ids = batch
+        input_ids, visual, acoustic, label_ids, input_mask, segment_ids = unpack_simsv2_batch(
+            batch, use_mmsa)
         visual = visual.squeeze(1)
         acoustic = acoustic.squeeze(1)
 
-        logits, ib_loss, loss_dict, _ = model(
-            input_ids, visual, acoustic, labels=label_ids, stage=stage)
+        logits, ib_loss, loss_dict, _ = _forward_model(
+            model, input_ids, visual, acoustic, label_ids, stage,
+            input_mask, segment_ids)
 
         pred_flat = logits.view(-1)
         label_flat = label_ids.view(-1)
@@ -419,14 +460,18 @@ def train_epoch(model, loader, optimizer, scheduler, stage, ema=None):
 def test_epoch(model, loader, stage=2, desc="Test"):
     model.eval()
     preds, labels, all_w = [], [], []
+    use_mmsa = simsv2_mmsa_enabled()
     with torch.no_grad():
         for batch in tqdm(loader, desc=desc):
             batch = tuple(t.to(DEVICE) for t in batch)
-            input_ids, visual, acoustic, label_ids = batch
+            input_ids, visual, acoustic, label_ids, input_mask, segment_ids = unpack_simsv2_batch(
+                batch, use_mmsa)
             visual = visual.squeeze(1)
             acoustic = acoustic.squeeze(1)
 
-            logits, _, _, _ = model(input_ids, visual, acoustic, stage=stage)
+            logits, _, _, _ = _forward_model(
+                model, input_ids, visual, acoustic, label_ids, stage,
+                input_mask, segment_ids)
             preds.extend(logits.view(-1).cpu().numpy().tolist())
             labels.extend(label_ids.view(-1).cpu().numpy().tolist())
 
@@ -490,6 +535,8 @@ def main():
     print("=" * 60)
     print("InfoGate Training")
     print(f"  Dataset        : {args.dataset}")
+    if args.dataset == "simsv2":
+        print(f"  SIMSv2 mode    : {args.simsv2_feature_mode}")
     print(f"  Epochs         : {args.n_epochs} (stage1: {args.stage1_epochs})")
     print(f"  Batch size     : {args.train_batch_size}")
     print(f"  LR (backbone)  : {args.learning_rate}")

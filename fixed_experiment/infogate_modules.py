@@ -297,7 +297,8 @@ class InfoGateLayer(nn.Module):
         sa_p = self.sa_p(B_p_n, B_p_n, B_p_n, conf_p, tok_mask)
         B_p_up = B_p + self.dropout(sa_p)
 
-        # Alignment-modulated adaptive gating (cosine sim with clamp >= 0.3)
+        # Alignment-modulated adaptive gating (normalized cosine sim in [0, 1]).
+        # Floor 0.3 is empirically chosen from experiments (not an Optuna hyperparameter).
         p_pool = masked_sequence_mean(B_p, tok_mask)
         B_p_fused = B_p_up
         for gate, aux, ca_out in zip(gates, B_aux_list, ca_outs):

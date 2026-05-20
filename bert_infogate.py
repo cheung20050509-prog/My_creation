@@ -66,13 +66,22 @@ class InfoGate_BertModel(BertPreTrainedModel):
         self.init_weights()
 
     def forward(self, input_ids, visual, acoustic,
-                labels=None, stage=1):
-        pad_id = self.config.pad_token_id if self.config.pad_token_id is not None else 0
-        attention_mask = input_ids.ne(pad_id).long()
+                labels=None, stage=1,
+                attention_mask=None, token_type_ids=None):
+        if attention_mask is None:
+            pad_id = self.config.pad_token_id if self.config.pad_token_id is not None else 0
+            attention_mask = input_ids.ne(pad_id).long()
+        else:
+            attention_mask = attention_mask.long()
 
-        text_features = self.model(
-            input_ids=input_ids, attention_mask=attention_mask
-        )[0]  # [B, T, 768]
+        bert_kwargs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+        }
+        if token_type_ids is not None:
+            bert_kwargs["token_type_ids"] = token_type_ids.long()
+
+        text_features = self.model(**bert_kwargs)[0]  # [B, T, 768]
 
         logits, ib_loss, loss_dict, h_p = self.infogate(
             text_features, acoustic, visual,
@@ -88,8 +97,11 @@ class InfoGate_BertForSequenceClassification(BertPreTrainedModel):
         self.bert = InfoGate_BertModel(config, multimodal_config)
 
     def forward(self, input_ids, visual, acoustic,
-                labels=None, stage=1):
+                labels=None, stage=1,
+                attention_mask=None, token_type_ids=None):
         return self.bert(
             input_ids, visual, acoustic,
             labels=labels, stage=stage,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
         )

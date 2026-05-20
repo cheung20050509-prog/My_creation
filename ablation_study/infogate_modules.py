@@ -322,6 +322,7 @@ class InfoGateLayer(nn.Module):
                 gated = ca_out
             else:
                 aux_pool = masked_sequence_mean(aux, tok_mask)
+                # Floor 0.3: empirically chosen from experiments (not searched in Optuna).
                 align = (F.cosine_similarity(p_pool, aux_pool, dim=-1).clamp(min=-1, max=1) + 1) / 2
                 align = align.clamp(min=0.3).view(-1, 1, 1)
                 gated = align * gate(B_p_up, ca_out)

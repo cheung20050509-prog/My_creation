@@ -136,6 +136,15 @@ row is left as placeholders (`—`) until you paste final PRISM/InfoGate numbers
 
 **Bold** in baseline rows matches the LaTeX table emphasis in `baseline_table.tex` (best-in-column style marks).
 
+**SIMSv2 data (MMSA / KuDA shared fields).** Download MMSA-style `unaligned.pkl` via
+`datasets/download_simsv2_mmsa.sh` → `datasets/simsv2.pkl`. Training uses
+`--dataset simsv2` with default `--simsv2_feature_mode mmsa`: offline `text_bert`,
+`audio_lengths`, and `vision_lengths` from the pickle; `bert-base-chinese` encodes
+text online. Valid A/V frames are resampled onto the text token axis for InfoGate’s
+shared `[B, T, D]` interface. This does **not** import KuDA knowledge-inject
+pretraining or MMSA’s training framework. Use `--simsv2_feature_mode legacy` only to
+reproduce the old raw_text tokenization path.
+
 ## HKT-aligned classification (UR-FUNNY / MUStARD)
 
 The MHD (UR-FUNNY humor) and MSD (MUStARD sarcasm) pipelines now follow the
