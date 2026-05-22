@@ -24,6 +24,9 @@ from selection_utils import (
     selection_higher_is_better,
 )
 
+DEFAULT_OPTUNA_OBJECTIVE = "dev_mae"
+OPTUNA_OBJECTIVE_CHOICES = ("dev_mae", "test_mae")
+
 # ── paths ──
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TRAIN_SCRIPT = os.path.join(SCRIPT_DIR, "train.py")
@@ -90,7 +93,10 @@ CATEGORICAL_SPACE = {
 }
 
 # ── phase7 micro-refine: narrow hulls + fixed stable categoricals (see run_optuna_4090d_restart.sh) ──
-MICRO_REFINE_MODES = ("none", "mosi", "simsv2")
+# simsv2_final is intentionally compatible with an existing SIMSv2 study:
+# it narrows only continuous / integer knobs and leaves categorical choices
+# unchanged, avoiding Optuna's dynamic categorical distribution error.
+MICRO_REFINE_MODES = ("none", "mosi", "simsv2", "simsv2_final")
 
 # Local-space patches merged with anchor hulls (intersected per-key).
 MICRO_REFINE_MOSI_LOCAL_SPACE = {
@@ -140,12 +146,14 @@ def merge_micro_refine_local_space(local_space, dataset, micro_refine):
         return local_space
     if micro_refine == "mosi" and dataset != "mosi":
         return local_space
-    if micro_refine == "simsv2" and dataset != "simsv2":
+    if micro_refine in ("simsv2", "simsv2_final") and dataset != "simsv2":
         return local_space
-    patch = (
-        MICRO_REFINE_MOSI_LOCAL_SPACE if micro_refine == "mosi"
-        else MICRO_REFINE_SIMSV2_LOCAL_SPACE
-    )
+    if micro_refine == "mosi":
+        patch = MICRO_REFINE_MOSI_LOCAL_SPACE
+    elif micro_refine == "simsv2_final":
+        patch = MICRO_REFINE_SIMSV2_FINAL_LOCAL_SPACE
+    else:
+        patch = MICRO_REFINE_SIMSV2_LOCAL_SPACE
     base = dict(local_space or {})
     for k, v in patch.items():
         if k not in base:
@@ -207,6 +215,29 @@ MICRO_REFINE_SIMSV2_LOCAL_SPACE = {
     "bottleneck_dim": [64],
     "num_infogate_layers": (2, 2),
     "ema_start_epoch": (3, 3),
+}
+
+
+MICRO_REFINE_SIMSV2_FINAL_LOCAL_SPACE = {
+    # Re-derived from simsv2_tier3_fresh top trials after 100 attempts.
+    # Do not include categorical knobs here; this mode resumes the same study.
+    "n_epochs": (61, 67),
+    "learning_rate": (1.1e-5, 1.9e-5),
+    "ig_learning_rate": (7.0e-4, 1.05e-3),
+    "beta_ib": (16.0, 24.0),
+    "mse_weight": (1.35, 1.85),
+    "dropout_prob": (0.05, 0.16),
+    "alpha_ib": (5e-4, 1.2e-3),
+    "stage1_epochs": (3, 6),
+    "warmup_proportion": (0.17, 0.22),
+    "weight_decay": (0.004, 0.010),
+    "ema_decay": (0.9962, 0.9982),
+    "selector_target_temp": (0.82, 1.0),
+    "selector_rib_weight": (0.15, 0.20),
+    "gumbel_tau_start": (1.0, 2.0),
+    "gumbel_tau_end": (0.38, 0.65),
+    "num_infogate_layers": (3, 3),
+    "ema_start_epoch": (6, 8),
 }
 
 
@@ -1121,7 +1152,8 @@ def build_two_stage_study_names(cli):
     if cli.study_name is not None:
         base = sanitize_name(cli.study_name)
         return f"{base}_s1_random", f"{base}_s2_local"
-    suffix = sanitize_name(cli.selection_metric)
+    opt_obj = getattr(cli, "optuna_objective", DEFAULT_OPTUNA_OBJECTIVE) or DEFAULT_OPTUNA_OBJECTIVE
+    suffix = sanitize_name(f"{cli.selection_metric}_{opt_obj}")
     return (
         f"infogate_{cli.dataset}_s1_random_{suffix}",
         f"infogate_{cli.dataset}_s2_local_{suffix}",
@@ -1236,6 +1268,9 @@ def print_study_header(cli, mode_label, existing_trials):
     print(f"  GPU:     {cli.gpu}")
     print(f"  Mode:    {mode_label}")
     print(f"  Metric:  {cli.selection_metric}")
+    opt_obj = getattr(cli, "optuna_objective", DEFAULT_OPTUNA_OBJECTIVE) or DEFAULT_OPTUNA_OBJECTIVE
+    if cli.selection_metric == "mae" and not cli.multi_objective:
+        print(f"  Optuna objective: {opt_obj} (train checkpoint still dev MAE)")
     print(f"  Tier:    {cli.search_tier}")
     print(f"  Trials:  {cli.n_trials} (existing: {existing_trials})")
     ep_range = DATASET_EPOCH_RANGE[cli.dataset]
@@ -1393,17 +1428,20 @@ def print_study_summary(study, cli):
             return
         bt = study.best_trial
         print(f"  Best trial: #{bt.number}")
-        print(f"  Best {cli.selection_metric} (Optuna objective): {bt.value:.6f}")
-        if cli.selection_metric == "mae" and bt.user_attrs.get("test_mae") is not None:
-            print(
-                "  Best-trial Best Results (test) MAE (diagnostic; not the objective): "
-                f"{float(bt.user_attrs['test_mae']):.6f}"
-            )
+        opt_obj = getattr(cli, "optuna_objective", DEFAULT_OPTUNA_OBJECTIVE) or DEFAULT_OPTUNA_OBJECTIVE
+        if cli.selection_metric == "mae" and opt_obj in OPTUNA_OBJECTIVE_CHOICES:
+            obj_label = "dev MAE" if opt_obj == "dev_mae" else "test MAE (Best Results)"
+            print(f"  Best Optuna objective ({obj_label}): {bt.value:.6f}")
             if bt.user_attrs.get("dev_mae") is not None:
+                print(f"  Same trial min dev MAE: {float(bt.user_attrs['dev_mae']):.6f}")
+            if bt.user_attrs.get("test_mae") is not None:
+                diag = "objective" if opt_obj == "test_mae" else "diagnostic"
                 print(
-                    "  Same trial min dev MAE (stage-2, matches objective): "
-                    f"{float(bt.user_attrs['dev_mae']):.6f}"
+                    f"  Same trial Best Results test MAE ({diag}): "
+                    f"{float(bt.user_attrs['test_mae']):.6f}"
                 )
+        else:
+            print(f"  Best {cli.selection_metric} (Optuna objective): {bt.value:.6f}")
         if bt.user_attrs.get("train_log_path"):
             print(f"  Train log: {bt.user_attrs['train_log_path']}")
         print("  Params:")
@@ -1642,15 +1680,18 @@ def objective(trial, cli):
         if dev_mae is None:
             print(f"  Trial {trial.number}: no dev MAE parsed for objective")
             raise optuna.TrialPruned()
+        opt_obj = getattr(cli, "optuna_objective", DEFAULT_OPTUNA_OBJECTIVE) or DEFAULT_OPTUNA_OBJECTIVE
         trial.set_user_attr("dev_mae", float(dev_mae))
         trial.set_user_attr("test_mae", float(test_mae))
+        trial.set_user_attr("optuna_objective", opt_obj)
         trial.set_user_attr("train_log_path", os.path.abspath(log_path))
+        obj_val = float(test_mae) if opt_obj == "test_mae" else float(dev_mae)
         print(
-            f"  Trial {trial.number} DONE: dev_MAE={dev_mae:.4f} "
-            f"test_MAE={test_mae:.4f} composite={composite:.4f} "
+            f"  Trial {trial.number} DONE: optuna={opt_obj} value={obj_val:.4f} "
+            f"dev_MAE={dev_mae:.4f} test_MAE={test_mae:.4f} composite={composite:.4f} "
             f"Acc2={acc2*100:.2f}% Corr={corr:.4f}"
         )
-        return float(dev_mae)
+        return obj_val
 
     print(f"  Trial {trial.number} DONE: composite={composite:.4f} "
           f"Acc2={acc2*100:.2f}% MAE={test_mae:.4f} Corr={corr:.4f}")
@@ -1704,6 +1745,15 @@ def main():
     pa.add_argument("--selection_metric", type=str,
                     default=DEFAULT_SELECTION_METRIC,
                     choices=SELECTION_METRIC_CHOICES)
+    pa.add_argument(
+        "--optuna_objective",
+        type=str,
+        default=DEFAULT_OPTUNA_OBJECTIVE,
+        choices=OPTUNA_OBJECTIVE_CHOICES,
+        help="When --selection_metric mae: Optuna minimizes dev_mae (default) or "
+             "test_mae (Best Results at dev-selected checkpoint). Training still "
+             "selects checkpoints by dev MAE.",
+    )
     pa.add_argument("--multi_objective", action="store_true",
                     help="Multi-obj BoTorch instead of single-obj TPE")
     pa.add_argument("--n_startup_trials", type=int, default=55,
@@ -1774,7 +1824,8 @@ def main():
         default="none",
         choices=list(MICRO_REFINE_MODES),
         help="phase7-style narrow refinement: merge MICRO_REFINE_* local bounds, "
-             "fix stable categoricals (MOSI or SIMSv2), SIMSv2 adds tight/escape bands.",
+             "fix stable categoricals for legacy modes; simsv2_final keeps categorical "
+             "choices unchanged for same-study continuation.",
     )
     pa.add_argument(
         "--enqueue_trials_storage",
@@ -1806,6 +1857,25 @@ def main():
              "(BERT-base-uncased local dir or HF id).",
     )
     cli = pa.parse_args()
+    if cli.optuna_objective not in OPTUNA_OBJECTIVE_CHOICES:
+        print(
+            f"ERROR: --optuna_objective must be one of {OPTUNA_OBJECTIVE_CHOICES}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if cli.optuna_objective == "test_mae" and cli.selection_metric != "mae":
+        print(
+            "ERROR: --optuna_objective test_mae requires --selection_metric mae.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if cli.multi_objective and cli.optuna_objective != DEFAULT_OPTUNA_OBJECTIVE:
+        print(
+            "ERROR: --optuna_objective is only used for single-objective "
+            f"--selection_metric mae (not --multi_objective).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     mr = (getattr(cli, "micro_refine", "none") or "none").lower()
     if mr not in MICRO_REFINE_MODES:
         mr = "none"
@@ -1828,9 +1898,9 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
-    if cli.micro_refine == "simsv2" and ds != "simsv2":
+    if cli.micro_refine in ("simsv2", "simsv2_final") and ds != "simsv2":
         print(
-            "ERROR: --micro_refine simsv2 requires --dataset simsv2.",
+            f"ERROR: --micro_refine {cli.micro_refine} requires --dataset simsv2.",
             file=sys.stderr,
         )
         sys.exit(1)
