@@ -42,12 +42,14 @@ from types import SimpleNamespace
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from transformers import AlbertTokenizer, DebertaV2Tokenizer
+from transformers import AlbertTokenizer, BertTokenizer, DebertaV2Tokenizer
 
 _QE_DIR = os.path.dirname(os.path.abspath(__file__))
 _MY = os.path.dirname(_QE_DIR)
 if _MY not in sys.path:
     sys.path.insert(0, _MY)
+if _QE_DIR not in sys.path:
+    sys.path.insert(0, _QE_DIR)
 
 import global_configs  # noqa: E402
 from global_configs import DEVICE  # noqa: E402
@@ -55,6 +57,15 @@ from global_configs import DEVICE  # noqa: E402
 from ib_conf_utils import (  # noqa: E402
     install_infogate_ib_trace,
     per_token_ib_conf_mean_over_bottleneck,
+)
+from simsv2_qual_utils import (  # noqa: E402
+    apply_ckpt_arch_simsv2,
+    default_simsv2_cli,
+    forward_simsv2,
+    load_simsv2_model,
+    load_single_simsv2_batch,
+    simsv2_infogate,
+    unpack_simsv2_batch,
 )
 
 
@@ -350,9 +361,74 @@ def run_albert(cli: SimpleNamespace, ckpt_path: str, split: str, sample_index: i
     return 0
 
 
+def run_simsv2(cli: SimpleNamespace, ckpt_path: str, split: str, sample_index: int, output: str) -> int:
+    global_configs.set_dataset_config("simsv2")
+    random.seed(128)
+    np.random.seed(128)
+    torch.manual_seed(128)
+
+    try:
+        batch, inner = load_single_simsv2_batch(cli, split, sample_index, batch_size=1)
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: could not load SIMSv2 sample: {exc}", file=sys.stderr)
+        return 1
+
+    model = load_simsv2_model(cli, ckpt_path)
+    ig = simsv2_infogate(model)
+    cleanup_ib, ib_store = install_infogate_ib_trace(ig)
+
+    try:
+        with torch.no_grad():
+            batch = tuple(t.to(DEVICE) for t in batch)
+            input_ids, visual, acoustic, labels, input_mask, segment_ids = unpack_simsv2_batch(batch)
+            attn = input_mask.float()
+            ib_store.clear()
+            forward_simsv2(
+                model, input_ids, visual, acoustic,
+                labels=None, input_mask=input_mask, segment_ids=segment_ids,
+            )
+            need = {"t", "a", "v", "conf_p"}
+            if not need.issubset(ib_store.keys()):
+                print("ERROR: IB trace missing", sorted(ib_store.keys()), file=sys.stderr)
+                return 1
+            ct = per_token_ib_conf_mean_over_bottleneck(ib_store["t"], attn)[inner].detach().cpu().numpy()
+            ca = per_token_ib_conf_mean_over_bottleneck(ib_store["a"], attn)[inner].detach().cpu().numpy()
+            cv = per_token_ib_conf_mean_over_bottleneck(ib_store["v"], attn)[inner].detach().cpu().numpy()
+            cf = per_token_ib_conf_mean_over_bottleneck(ib_store["conf_p"], attn)[inner].detach().cpu().numpy()
+    finally:
+        cleanup_ib()
+
+    ids = input_ids[inner].detach().cpu().tolist()
+    toks = BertTokenizer.from_pretrained(cli.model).convert_ids_to_tokens(ids)
+    mask = attn[inner].detach().cpu().numpy()
+    T = len(ids)
+    out_dir = os.path.dirname(os.path.abspath(output)) or "."
+    os.makedirs(out_dir, exist_ok=True)
+    fieldnames = ["pos", "input_id", "subword", "is_valid", "conf_t", "conf_a", "conf_v", "conf_fused"]
+    with open(output, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=fieldnames)
+        w.writeheader()
+        for pos in range(T):
+            valid = int(mask[pos] >= 0.5)
+            w.writerow(
+                {
+                    "pos": pos,
+                    "input_id": ids[pos],
+                    "subword": toks[pos] if pos < len(toks) else "",
+                    "is_valid": valid,
+                    "conf_t": float(ct[pos]) if valid else 0.0,
+                    "conf_a": float(ca[pos]) if valid else 0.0,
+                    "conf_v": float(cv[pos]) if valid else 0.0,
+                    "conf_fused": float(cf[pos]) if valid else 0.0,
+                }
+            )
+    print(f"Wrote {T} token rows to {output}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--backend", choices=("deberta", "albert"), required=True)
+    ap.add_argument("--backend", choices=("deberta", "albert", "bert"), required=True)
     ap.add_argument("--checkpoint", type=str, required=True)
     ap.add_argument("--split", type=str, choices=("dev", "test"), default="test")
     ap.add_argument("--sample_index", type=int, required=True)
@@ -367,8 +443,8 @@ def main() -> int:
         "--dataset",
         type=str,
         required=True,
-        choices=("mosi", "mosei", "mustard", "ur_funny"),
-        help="With --backend deberta: mosi|mosei. With albert: mustard|ur_funny.",
+        choices=("mosi", "mosei", "mustard", "ur_funny", "simsv2"),
+        help="With deberta: mosi|mosei. With albert: mustard|ur_funny. With bert: simsv2.",
     )
     args = ap.parse_args()
 
@@ -409,6 +485,16 @@ def main() -> int:
         if not getattr(cli, "ablation", None):
             cli.ablation = "none"
         return run_deberta(cli, ckpt_path, args.split, args.sample_index, args.output)
+
+    if args.backend == "bert":
+        if args.dataset != "simsv2":
+            print("ERROR: bert backend requires --dataset simsv2", file=sys.stderr)
+            return 1
+        model_dir = args.model or os.path.join(_MY, "bert-base-chinese")
+        cli = default_simsv2_cli()
+        cli.model = model_dir
+        apply_ckpt_arch_simsv2(cli, ckpt_path)
+        return run_simsv2(cli, ckpt_path, args.split, args.sample_index, args.output)
 
     if args.dataset not in ("mustard", "ur_funny"):
         print("ERROR: albert backend requires --dataset mustard or ur_funny", file=sys.stderr)

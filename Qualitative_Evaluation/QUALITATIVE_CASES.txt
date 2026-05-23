@@ -9,6 +9,7 @@ Regenerate full per-sample tables with:
 
 **Latest regenerated CSVs (relative to `My_creation/`)**  
 - MOSEI trial 70 / test: `Qualitative_Evaluation/results/mosei_trial70_dpr_test.csv` (4643 rows)  
+- SIMSv2 trial 53 / test: `Qualitative_Evaluation/results/simsv2_trial53_dpr_test.csv` (generate with the command below)  
 - MUStARD trial 113 / test: `Qualitative_Evaluation/results/mustard_trial113_dpr_test.csv` (68 rows)  
 
 Run with `conda run -n ITHP5090 python …` from `My_creation/` if system Python has no torch.
@@ -41,6 +42,51 @@ At threshold 0.5 the checkpoint gives **`pred_bin=0`**, **`prob≈0.069`** → *
 
 **Optional alternate (sarcasm + correct + A-primary)**  
 `global_index=0`, `hid='1_2614'`, **`label=1`**, **`pred_correct=1`**, also **acoustic-primary** — use if you want a **positive** detection example without FN.
+
+--------------------------------------------------------------------------------
+## Case C — SIMSv2 (regression, BERT + MMSA)
+
+- **Study / ckpt (relative to My_creation/)**  
+  `fixed_experiment/runs/simsv2_tier3_fresh_trial53/checkpoints/infogate_simsv2_best.pt`
+- **Split**: `test`
+- **Row**: **`global_index = 673`** (`split_index = 673`)
+
+**Generate the SIMSv2 DPR table**
+
+```bash
+python Qualitative_Evaluation/dump_dpr_primary_on_split.py \
+  --checkpoint fixed_experiment/runs/simsv2_tier3_fresh_trial53/checkpoints/infogate_simsv2_best.pt \
+  --dataset simsv2 --split test \
+  --output Qualitative_Evaluation/results/simsv2_trial53_dpr_test.csv
+```
+
+**Why this row**  
+Rare **visual-primary** DPR on SIMSv2 trial-53 test (`primary_idx=2`; only 3/1034
+test samples are non-language-primary). The route is a close **V/L near-tie**
+(`w_v≈0.443`, `w_l≈0.436`, `w_a≈0.121`) with moderate
+`route_entropy≈0.978`, while the prediction is nearly exact
+(`label≈0.800`, `logit≈0.799`, `abs_err≈0.0008`). VTB is also strongest on the
+visual slot (`ib_conf_v≈0.741` vs `ib_conf_t≈0.610`, `ib_conf_a≈0.525`), making
+it a clean SIMSv2 counterpart to the MOSEI acoustic-primary case.
+
+**Re-selecting a row**  
+If this checkpoint/data split is regenerated, prefer a sample with non-language
+DPR primary (`primary_idx != 1`), moderate routing entropy, and low-to-moderate
+`abs_err`. A convenient candidate filter is:
+
+```bash
+python - <<'PY'
+import csv
+rows = []
+with open("Qualitative_Evaluation/results/simsv2_trial53_dpr_test.csv", newline="") as f:
+    for r in csv.DictReader(f):
+        if int(r["primary_idx"]) != 1:
+            rows.append(r)
+rows.sort(key=lambda r: (float(r["abs_err"]), -float(r["route_entropy"])))
+for r in rows[:10]:
+    print(r["global_index"], r["primary_name"], r["abs_err"], r["route_entropy"], r["w_a"], r["w_l"], r["w_v"])
+PY
+```
 
 --------------------------------------------------------------------------------
 ## 任意 MOSEI / MUStARD sample：索引怎么对齐 raw？

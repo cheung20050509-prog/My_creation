@@ -8,6 +8,9 @@ logs/optuna/4090D_restart/phase4_mosi/checkpoints/optuna_mosi_phase4_mosi_space3
 # MOSEI — study infogate_mosei_phase1_4090d, trial 70 (gold repro)
 logs/optuna/4090D_restart/phase1/checkpoints/optuna_mosei_phase1/trial_70/infogate_mosei_best.pt
 #
+# SIMSv2 — fixed_experiment tier3_fresh trial 53 (paper PRISM row)
+fixed_experiment/runs/simsv2_tier3_fresh_trial53/checkpoints/infogate_simsv2_best.pt
+#
 # MUStARD (ALBERT+HCF classify) — example trial 113 (b3 study)
 logs/optuna/4090D_restart/classification/optuna_classify_mustard_albert_hcf_b3_20260427_235533/checkpoints/optuna_mustard/trial_113/infogate_mustard_best.pt
 #

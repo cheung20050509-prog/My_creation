@@ -1,0 +1,15 @@
+mode: peak_centered_equalized_token_waveform
+tokens: 吕子乔还有铁杆粉丝呢
+token_count: 10
+slot_width: 360
+mapping: each token segment is warped so its max absolute amplitude maps to the slot center
+吕	center=179.5	peak_x=179.5	peak_time=2.148500	peak_value=0.324036
+子	center=539.5	peak_x=539.5	peak_time=2.312813	peak_value=0.267395
+乔	center=899.5	peak_x=899.5	peak_time=2.689188	peak_value=0.475311
+还	center=1259.5	peak_x=1259.5	peak_time=2.824813	peak_value=0.297150
+有	center=1619.5	peak_x=1619.5	peak_time=2.930188	peak_value=0.305298
+铁	center=1979.5	peak_x=1979.5	peak_time=3.167812	peak_value=-0.331970
+杆	center=2339.5	peak_x=2339.5	peak_time=3.366563	peak_value=0.332123
+粉	center=2699.5	peak_x=2699.5	peak_time=3.370062	peak_value=0.326904
+丝	center=3059.5	peak_x=3059.5	peak_time=3.753812	peak_value=0.147736
+呢	center=3419.5	peak_x=3419.5	peak_time=3.898375	peak_value=0.292358

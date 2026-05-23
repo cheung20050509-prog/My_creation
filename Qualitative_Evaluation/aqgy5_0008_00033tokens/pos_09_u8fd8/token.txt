@@ -1,0 +1,11 @@
+token: 还
+model_pos: 9
+pkl_token_index: 8
+full_text: 没想到啊，吕子乔还有铁杆粉丝呢。
+utterance_id: aqgy5_0008_00033
+global_index: 673
+time_start: 2.73
+time_end: 2.85
+time_alignment: funasr
+funasr_char: 还
+funasr_match: funasr_timestamp

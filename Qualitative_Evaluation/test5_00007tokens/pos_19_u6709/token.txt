@@ -1,0 +1,11 @@
+token: 有
+model_pos: 19
+pkl_token_index: 18
+full_text: 其实我是觉得我很想被安慰一下，可是没有人说话，也没有人安慰我。
+utterance_id: test5_00007
+global_index: 890
+time_start: 4.61
+time_end: 4.69
+time_alignment: funasr
+funasr_char: 有
+funasr_match: funasr_timestamp

@@ -1,0 +1,11 @@
+token: 走
+model_pos: 4
+pkl_token_index: 3
+full_text: 你带她走，俺要是有命回去，俺当牛做马报答你
+utterance_id: video_0051_0032
+global_index: 342
+time_start: 1.12
+time_end: 1.445
+time_alignment: funasr
+funasr_char: 走
+funasr_match: funasr_timestamp

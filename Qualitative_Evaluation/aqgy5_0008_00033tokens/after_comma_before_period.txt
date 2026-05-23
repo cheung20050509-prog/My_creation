@@ -1,0 +1,8 @@
+segment: after_comma_before_period
+included_text: 吕子乔还有铁杆粉丝呢
+excluded_left_token: ，
+excluded_right_token: 。
+time_start: 1.99
+time_end: 3.975
+duration: 1.985
+source_audio: /root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/Qualitative_Evaluation/aqgy5_0008_00033tokens/source.wav

@@ -1,0 +1,373 @@
+{
+  "alignment": "funasr",
+  "cache": "Qualitative_Evaluation/video_0051_0032tokens/funasr_cache.json",
+  "content_tokens": [
+    "你",
+    "带",
+    "她",
+    "走",
+    "，",
+    "俺",
+    "要",
+    "是",
+    "有",
+    "命",
+    "回",
+    "去",
+    "，",
+    "俺",
+    "当",
+    "牛",
+    "做",
+    "马",
+    "报",
+    "答",
+    "你"
+  ],
+  "funasr_items": [
+    {
+      "char": "你",
+      "start": 0.72,
+      "end": 0.88,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "带",
+      "start": 0.88,
+      "end": 1.02,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "他",
+      "start": 1.02,
+      "end": 1.12,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "走",
+      "start": 1.12,
+      "end": 1.445,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "，",
+      "start": null,
+      "end": null,
+      "match": "funasr_text"
+    },
+    {
+      "char": "俺",
+      "start": 2.18,
+      "end": 2.36,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "要",
+      "start": 2.36,
+      "end": 2.46,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "是",
+      "start": 2.46,
+      "end": 2.58,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "有",
+      "start": 2.58,
+      "end": 2.74,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "命",
+      "start": 2.74,
+      "end": 2.94,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "回",
+      "start": 2.94,
+      "end": 3.14,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "去",
+      "start": 3.14,
+      "end": 3.435,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "，",
+      "start": null,
+      "end": null,
+      "match": "funasr_text"
+    },
+    {
+      "char": "俺",
+      "start": 4.41,
+      "end": 4.65,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "当",
+      "start": 4.65,
+      "end": 4.85,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "牛",
+      "start": 4.85,
+      "end": 4.99,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "做",
+      "start": 4.99,
+      "end": 5.13,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "马",
+      "start": 5.13,
+      "end": 5.33,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "报",
+      "start": 5.33,
+      "end": 5.47,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "答",
+      "start": 5.47,
+      "end": 5.65,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "你",
+      "start": 5.65,
+      "end": 5.795,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "。",
+      "start": null,
+      "end": null,
+      "match": "funasr_text"
+    }
+  ],
+  "timings": [
+    {
+      "pkl_index": 0,
+      "token_word": "你",
+      "start": 0.72,
+      "end": 0.88,
+      "mid": 0.8,
+      "whisper_word": "你",
+      "funasr_char": "你",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 1,
+      "token_word": "带",
+      "start": 0.88,
+      "end": 1.02,
+      "mid": 0.95,
+      "whisper_word": "带",
+      "funasr_char": "带",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 2,
+      "token_word": "她",
+      "start": 1.02,
+      "end": 1.12,
+      "mid": 1.07,
+      "whisper_word": "他",
+      "funasr_char": "他",
+      "match": "replace_timed_substitution"
+    },
+    {
+      "pkl_index": 3,
+      "token_word": "走",
+      "start": 1.12,
+      "end": 1.445,
+      "mid": 1.2825000000000002,
+      "whisper_word": "走",
+      "funasr_char": "走",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 4,
+      "token_word": "，",
+      "start": 1.445,
+      "end": 2.18,
+      "mid": 1.8125,
+      "whisper_word": null,
+      "funasr_char": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 5,
+      "token_word": "俺",
+      "start": 2.18,
+      "end": 2.36,
+      "mid": 2.27,
+      "whisper_word": "俺",
+      "funasr_char": "俺",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 6,
+      "token_word": "要",
+      "start": 2.36,
+      "end": 2.46,
+      "mid": 2.41,
+      "whisper_word": "要",
+      "funasr_char": "要",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 7,
+      "token_word": "是",
+      "start": 2.46,
+      "end": 2.58,
+      "mid": 2.52,
+      "whisper_word": "是",
+      "funasr_char": "是",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 8,
+      "token_word": "有",
+      "start": 2.58,
+      "end": 2.74,
+      "mid": 2.66,
+      "whisper_word": "有",
+      "funasr_char": "有",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 9,
+      "token_word": "命",
+      "start": 2.74,
+      "end": 2.94,
+      "mid": 2.84,
+      "whisper_word": "命",
+      "funasr_char": "命",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 10,
+      "token_word": "回",
+      "start": 2.94,
+      "end": 3.14,
+      "mid": 3.04,
+      "whisper_word": "回",
+      "funasr_char": "回",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 11,
+      "token_word": "去",
+      "start": 3.14,
+      "end": 3.435,
+      "mid": 3.2875,
+      "whisper_word": "去",
+      "funasr_char": "去",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 12,
+      "token_word": "，",
+      "start": 3.435,
+      "end": 4.41,
+      "mid": 3.9225000000000003,
+      "whisper_word": null,
+      "funasr_char": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 13,
+      "token_word": "俺",
+      "start": 4.41,
+      "end": 4.65,
+      "mid": 4.53,
+      "whisper_word": "俺",
+      "funasr_char": "俺",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 14,
+      "token_word": "当",
+      "start": 4.65,
+      "end": 4.85,
+      "mid": 4.75,
+      "whisper_word": "当",
+      "funasr_char": "当",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 15,
+      "token_word": "牛",
+      "start": 4.85,
+      "end": 4.99,
+      "mid": 4.92,
+      "whisper_word": "牛",
+      "funasr_char": "牛",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 16,
+      "token_word": "做",
+      "start": 4.99,
+      "end": 5.13,
+      "mid": 5.0600000000000005,
+      "whisper_word": "做",
+      "funasr_char": "做",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 17,
+      "token_word": "马",
+      "start": 5.13,
+      "end": 5.33,
+      "mid": 5.23,
+      "whisper_word": "马",
+      "funasr_char": "马",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 18,
+      "token_word": "报",
+      "start": 5.33,
+      "end": 5.47,
+      "mid": 5.4,
+      "whisper_word": "报",
+      "funasr_char": "报",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 19,
+      "token_word": "答",
+      "start": 5.47,
+      "end": 5.65,
+      "mid": 5.5600000000000005,
+      "whisper_word": "答",
+      "funasr_char": "答",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 20,
+      "token_word": "你",
+      "start": 5.65,
+      "end": 5.795,
+      "mid": 5.7225,
+      "whisper_word": "你",
+      "funasr_char": "你",
+      "match": "funasr_timestamp"
+    }
+  ]
+}

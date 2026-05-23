@@ -1,0 +1,8 @@
+mode: continuous_raw_waveform
+segment: 也没有人安慰我
+time_start_abs: 5.250000
+time_end_abs: 6.135000
+duration_s: 0.885000
+peak_abs: 0.2065
+ylim: auto from peak (not fixed ±1)
+note: no caption; no time-warp / token equalization

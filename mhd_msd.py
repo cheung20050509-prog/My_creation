@@ -8,7 +8,7 @@ methods = {
 }
 
 data = {
-    "2": [70.55,70.61, 72.13,  72.13, 70.92, 71.30, 73.97, 74.75],
+    "2": [70.55,70.61, 72.13,  72.13, 70.92, 71.30, 73.97, 75.15],
     "3": [74.72, 71.42, 76.82, 76.30, 77.94, 77.94, 78.50, 79.41]
 }
 
@@ -26,8 +26,8 @@ colors = [
 ]
 
 y_config = {
-    "2": {"ylim": (63, 78), "ylabel": "Accuracy  (%)"},
-    "3": {"ylim": (69, 84), "ylabel": "Accuracy  (%)"}
+    "2": {"ylim": (66, 78), "ylabel": "Accuracy  (%)"},
+    "3": {"ylim": (70, 82), "ylabel": "Accuracy  (%)"}
 }
 
 xlabel_config = {
@@ -44,7 +44,7 @@ for idx, dataset in enumerate(datasets):
     labels = methods[dataset]
     x = np.arange(len(values))
 
-    ax.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
+    ax.yaxis.set_major_formatter(FormatStrFormatter("%d"))
 
     ax.bar(
         x,
@@ -56,14 +56,14 @@ for idx, dataset in enumerate(datasets):
     )
 
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=11, rotation=30, ha="right")
+    ax.set_xticklabels(labels, fontsize=13, rotation=30, ha="right")
 
-    ax.set_xlabel(xlabel_config[dataset], fontsize=12, fontweight="bold", labelpad=10)
+    ax.set_xlabel(xlabel_config[dataset], fontsize=14, fontweight="bold", labelpad=10)
     ax.xaxis.set_label_coords(0.5, -0.24)
-    ax.set_ylabel(y_config[dataset]["ylabel"], fontsize=11, fontweight="bold")
+    ax.set_ylabel(y_config[dataset]["ylabel"], fontsize=13, fontweight="bold")
 
     ax.set_ylim(y_config[dataset]["ylim"])
-    ax.tick_params(axis="y", labelsize=11)
+    ax.tick_params(axis="y", labelsize=13)
 
     ax.spines["top"].set_visible(True)
     ax.spines["right"].set_visible(True)

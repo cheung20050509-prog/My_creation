@@ -1,0 +1,543 @@
+{
+  "alignment": "funasr",
+  "cache": "Qualitative_Evaluation/test5_00007tokens/funasr_cache.json",
+  "content_tokens": [
+    "其",
+    "实",
+    "我",
+    "是",
+    "觉",
+    "得",
+    "我",
+    "很",
+    "想",
+    "被",
+    "安",
+    "慰",
+    "一",
+    "下",
+    "，",
+    "可",
+    "是",
+    "没",
+    "有",
+    "人",
+    "说",
+    "话",
+    "，",
+    "也",
+    "没",
+    "有",
+    "人",
+    "安",
+    "慰",
+    "我",
+    "。"
+  ],
+  "funasr_items": [
+    {
+      "char": "其",
+      "start": 0.05,
+      "end": 0.15,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "实",
+      "start": 0.15,
+      "end": 0.33,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "其",
+      "start": 0.33,
+      "end": 0.43,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "实",
+      "start": 0.43,
+      "end": 0.55,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "我",
+      "start": 0.55,
+      "end": 0.71,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "是",
+      "start": 0.71,
+      "end": 0.83,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "觉",
+      "start": 0.83,
+      "end": 0.99,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "得",
+      "start": 0.99,
+      "end": 1.315,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "我",
+      "start": 2.1,
+      "end": 2.2,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "很",
+      "start": 2.2,
+      "end": 2.3,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "想",
+      "start": 2.3,
+      "end": 2.48,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "被",
+      "start": 2.48,
+      "end": 2.6,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "安",
+      "start": 2.6,
+      "end": 2.7,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "慰",
+      "start": 2.7,
+      "end": 2.88,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "一",
+      "start": 2.88,
+      "end": 2.98,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "下",
+      "start": 2.98,
+      "end": 3.215,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "，",
+      "start": null,
+      "end": null,
+      "match": "funasr_text"
+    },
+    {
+      "char": "是",
+      "start": 4.33,
+      "end": 4.49,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "没",
+      "start": 4.49,
+      "end": 4.61,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "有",
+      "start": 4.61,
+      "end": 4.69,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "人",
+      "start": 4.69,
+      "end": 4.85,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "说",
+      "start": 4.85,
+      "end": 5.01,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "话",
+      "start": 5.01,
+      "end": 5.25,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "，",
+      "start": null,
+      "end": null,
+      "match": "funasr_text"
+    },
+    {
+      "char": "也",
+      "start": 5.25,
+      "end": 5.37,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "没",
+      "start": 5.37,
+      "end": 5.47,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "有",
+      "start": 5.47,
+      "end": 5.59,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "人",
+      "start": 5.59,
+      "end": 5.69,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "安",
+      "start": 5.69,
+      "end": 5.81,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "慰",
+      "start": 5.81,
+      "end": 5.99,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "我",
+      "start": 5.99,
+      "end": 6.135,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "。",
+      "start": null,
+      "end": null,
+      "match": "funasr_text"
+    }
+  ],
+  "timings": [
+    {
+      "pkl_index": 0,
+      "token_word": "其",
+      "start": 0.33,
+      "end": 0.43,
+      "mid": 0.38,
+      "whisper_word": "其",
+      "funasr_char": "其",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 1,
+      "token_word": "实",
+      "start": 0.43,
+      "end": 0.55,
+      "mid": 0.49,
+      "whisper_word": "实",
+      "funasr_char": "实",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 2,
+      "token_word": "我",
+      "start": 0.55,
+      "end": 0.71,
+      "mid": 0.63,
+      "whisper_word": "我",
+      "funasr_char": "我",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 3,
+      "token_word": "是",
+      "start": 0.71,
+      "end": 0.83,
+      "mid": 0.77,
+      "whisper_word": "是",
+      "funasr_char": "是",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 4,
+      "token_word": "觉",
+      "start": 0.83,
+      "end": 0.99,
+      "mid": 0.9099999999999999,
+      "whisper_word": "觉",
+      "funasr_char": "觉",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 5,
+      "token_word": "得",
+      "start": 0.99,
+      "end": 1.315,
+      "mid": 1.1524999999999999,
+      "whisper_word": "得",
+      "funasr_char": "得",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 6,
+      "token_word": "我",
+      "start": 2.1,
+      "end": 2.2,
+      "mid": 2.1500000000000004,
+      "whisper_word": "我",
+      "funasr_char": "我",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 7,
+      "token_word": "很",
+      "start": 2.2,
+      "end": 2.3,
+      "mid": 2.25,
+      "whisper_word": "很",
+      "funasr_char": "很",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 8,
+      "token_word": "想",
+      "start": 2.3,
+      "end": 2.48,
+      "mid": 2.3899999999999997,
+      "whisper_word": "想",
+      "funasr_char": "想",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 9,
+      "token_word": "被",
+      "start": 2.48,
+      "end": 2.6,
+      "mid": 2.54,
+      "whisper_word": "被",
+      "funasr_char": "被",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 10,
+      "token_word": "安",
+      "start": 2.6,
+      "end": 2.7,
+      "mid": 2.6500000000000004,
+      "whisper_word": "安",
+      "funasr_char": "安",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 11,
+      "token_word": "慰",
+      "start": 2.7,
+      "end": 2.88,
+      "mid": 2.79,
+      "whisper_word": "慰",
+      "funasr_char": "慰",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 12,
+      "token_word": "一",
+      "start": 2.88,
+      "end": 2.98,
+      "mid": 2.9299999999999997,
+      "whisper_word": "一",
+      "funasr_char": "一",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 13,
+      "token_word": "下",
+      "start": 2.98,
+      "end": 3.215,
+      "mid": 3.0975,
+      "whisper_word": "下",
+      "funasr_char": "下",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 14,
+      "token_word": "，",
+      "start": 3.215,
+      "end": 3.7725,
+      "mid": 3.49375,
+      "whisper_word": null,
+      "funasr_char": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 15,
+      "token_word": "可",
+      "start": 3.7725,
+      "end": 4.33,
+      "mid": 4.05125,
+      "whisper_word": null,
+      "funasr_char": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 16,
+      "token_word": "是",
+      "start": 4.33,
+      "end": 4.49,
+      "mid": 4.41,
+      "whisper_word": "是",
+      "funasr_char": "是",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 17,
+      "token_word": "没",
+      "start": 4.49,
+      "end": 4.61,
+      "mid": 4.550000000000001,
+      "whisper_word": "没",
+      "funasr_char": "没",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 18,
+      "token_word": "有",
+      "start": 4.61,
+      "end": 4.69,
+      "mid": 4.65,
+      "whisper_word": "有",
+      "funasr_char": "有",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 19,
+      "token_word": "人",
+      "start": 4.69,
+      "end": 4.85,
+      "mid": 4.77,
+      "whisper_word": "人",
+      "funasr_char": "人",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 20,
+      "token_word": "说",
+      "start": 4.85,
+      "end": 5.01,
+      "mid": 4.93,
+      "whisper_word": "说",
+      "funasr_char": "说",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 21,
+      "token_word": "话",
+      "start": 5.01,
+      "end": 5.25,
+      "mid": 5.13,
+      "whisper_word": "话",
+      "funasr_char": "话",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 22,
+      "token_word": "，",
+      "start": 5.25,
+      "end": 5.3,
+      "mid": 5.275,
+      "whisper_word": null,
+      "funasr_char": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 23,
+      "token_word": "也",
+      "start": 5.25,
+      "end": 5.37,
+      "mid": 5.3100000000000005,
+      "whisper_word": "也",
+      "funasr_char": "也",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 24,
+      "token_word": "没",
+      "start": 5.37,
+      "end": 5.47,
+      "mid": 5.42,
+      "whisper_word": "没",
+      "funasr_char": "没",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 25,
+      "token_word": "有",
+      "start": 5.47,
+      "end": 5.59,
+      "mid": 5.529999999999999,
+      "whisper_word": "有",
+      "funasr_char": "有",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 26,
+      "token_word": "人",
+      "start": 5.59,
+      "end": 5.69,
+      "mid": 5.640000000000001,
+      "whisper_word": "人",
+      "funasr_char": "人",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 27,
+      "token_word": "安",
+      "start": 5.69,
+      "end": 5.81,
+      "mid": 5.75,
+      "whisper_word": "安",
+      "funasr_char": "安",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 28,
+      "token_word": "慰",
+      "start": 5.81,
+      "end": 5.99,
+      "mid": 5.9,
+      "whisper_word": "慰",
+      "funasr_char": "慰",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 29,
+      "token_word": "我",
+      "start": 5.99,
+      "end": 6.135,
+      "mid": 6.0625,
+      "whisper_word": "我",
+      "funasr_char": "我",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 30,
+      "token_word": "。",
+      "start": 6.135,
+      "end": 6.2,
+      "mid": 6.1675,
+      "whisper_word": null,
+      "funasr_char": null,
+      "match": "interpolated"
+    }
+  ]
+}

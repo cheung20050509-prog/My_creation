@@ -1,0 +1,282 @@
+{
+  "alignment": "funasr",
+  "cache": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/Qualitative_Evaluation/aqgy5_0008_00033tokens/funasr_cache.json",
+  "content_tokens": [
+    "没",
+    "想",
+    "到",
+    "啊",
+    "，",
+    "吕",
+    "子",
+    "乔",
+    "还",
+    "有",
+    "铁",
+    "杆",
+    "粉",
+    "丝",
+    "呢",
+    "。"
+  ],
+  "funasr_items": [
+    {
+      "char": "没",
+      "start": 0.03,
+      "end": 0.15,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "想",
+      "start": 0.15,
+      "end": 0.35,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "到",
+      "start": 0.35,
+      "end": 0.59,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "啊",
+      "start": 0.81,
+      "end": 1.075,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "，",
+      "start": null,
+      "end": null,
+      "match": "funasr_text"
+    },
+    {
+      "char": "吕",
+      "start": 1.99,
+      "end": 2.21,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "子",
+      "start": 2.21,
+      "end": 2.45,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "乔",
+      "start": 2.45,
+      "end": 2.69,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "还",
+      "start": 2.73,
+      "end": 2.85,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "有",
+      "start": 2.85,
+      "end": 3.03,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "铁",
+      "start": 3.03,
+      "end": 3.19,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "杆",
+      "start": 3.19,
+      "end": 3.37,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "粉",
+      "start": 3.37,
+      "end": 3.53,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "丝",
+      "start": 3.53,
+      "end": 3.77,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "啦",
+      "start": 3.77,
+      "end": 3.975,
+      "match": "funasr_timestamp"
+    },
+    {
+      "char": "。",
+      "start": null,
+      "end": null,
+      "match": "funasr_text"
+    }
+  ],
+  "timings": [
+    {
+      "pkl_index": 0,
+      "token_word": "没",
+      "start": 0.03,
+      "end": 0.15,
+      "mid": 0.09,
+      "whisper_word": "没",
+      "funasr_char": "没",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 1,
+      "token_word": "想",
+      "start": 0.15,
+      "end": 0.35,
+      "mid": 0.25,
+      "whisper_word": "想",
+      "funasr_char": "想",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 2,
+      "token_word": "到",
+      "start": 0.35,
+      "end": 0.59,
+      "mid": 0.47,
+      "whisper_word": "到",
+      "funasr_char": "到",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 3,
+      "token_word": "啊",
+      "start": 0.81,
+      "end": 1.075,
+      "mid": 0.9425,
+      "whisper_word": "啊",
+      "funasr_char": "啊",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 4,
+      "token_word": "，",
+      "start": 1.075,
+      "end": 1.99,
+      "mid": 1.5325,
+      "whisper_word": null,
+      "funasr_char": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 5,
+      "token_word": "吕",
+      "start": 1.99,
+      "end": 2.21,
+      "mid": 2.1,
+      "whisper_word": "吕",
+      "funasr_char": "吕",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 6,
+      "token_word": "子",
+      "start": 2.21,
+      "end": 2.45,
+      "mid": 2.33,
+      "whisper_word": "子",
+      "funasr_char": "子",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 7,
+      "token_word": "乔",
+      "start": 2.45,
+      "end": 2.69,
+      "mid": 2.5700000000000003,
+      "whisper_word": "乔",
+      "funasr_char": "乔",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 8,
+      "token_word": "还",
+      "start": 2.73,
+      "end": 2.85,
+      "mid": 2.79,
+      "whisper_word": "还",
+      "funasr_char": "还",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 9,
+      "token_word": "有",
+      "start": 2.85,
+      "end": 3.03,
+      "mid": 2.94,
+      "whisper_word": "有",
+      "funasr_char": "有",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 10,
+      "token_word": "铁",
+      "start": 3.03,
+      "end": 3.19,
+      "mid": 3.11,
+      "whisper_word": "铁",
+      "funasr_char": "铁",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 11,
+      "token_word": "杆",
+      "start": 3.19,
+      "end": 3.37,
+      "mid": 3.2800000000000002,
+      "whisper_word": "杆",
+      "funasr_char": "杆",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 12,
+      "token_word": "粉",
+      "start": 3.37,
+      "end": 3.53,
+      "mid": 3.45,
+      "whisper_word": "粉",
+      "funasr_char": "粉",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 13,
+      "token_word": "丝",
+      "start": 3.53,
+      "end": 3.77,
+      "mid": 3.65,
+      "whisper_word": "丝",
+      "funasr_char": "丝",
+      "match": "funasr_timestamp"
+    },
+    {
+      "pkl_index": 14,
+      "token_word": "呢",
+      "start": 3.77,
+      "end": 3.975,
+      "mid": 3.8725,
+      "whisper_word": "啦",
+      "funasr_char": "啦",
+      "match": "replace_timed_substitution"
+    },
+    {
+      "pkl_index": 15,
+      "token_word": "。",
+      "start": 3.975,
+      "end": 4.08675,
+      "mid": 4.030875,
+      "whisper_word": null,
+      "funasr_char": null,
+      "match": "interpolated"
+    }
+  ]
+}

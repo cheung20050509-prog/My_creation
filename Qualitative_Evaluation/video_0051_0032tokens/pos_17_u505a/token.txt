@@ -1,0 +1,11 @@
+token: 做
+model_pos: 17
+pkl_token_index: 16
+full_text: 你带她走，俺要是有命回去，俺当牛做马报答你
+utterance_id: video_0051_0032
+global_index: 342
+time_start: 4.99
+time_end: 5.13
+time_alignment: funasr
+funasr_char: 做
+funasr_match: funasr_timestamp

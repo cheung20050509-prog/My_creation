@@ -57,6 +57,8 @@ _QE_DIR = os.path.dirname(os.path.abspath(__file__))
 _MY = os.path.dirname(_QE_DIR)
 if _MY not in sys.path:
     sys.path.insert(0, _MY)
+if _QE_DIR not in sys.path:
+    sys.path.insert(0, _QE_DIR)
 
 import global_configs  # noqa: E402
 from deberta_infogate import InfoGate_DeBertaForSequenceClassification  # noqa: E402
@@ -66,6 +68,15 @@ from ib_conf_utils import (  # noqa: E402
     install_infogate_ib_trace,
     per_sample_dpr_entropy,
     per_sample_ib_conf_mean,
+)
+from simsv2_qual_utils import (  # noqa: E402
+    apply_ckpt_arch_simsv2,
+    build_simsv2_loader,
+    default_simsv2_cli,
+    forward_simsv2,
+    load_simsv2_model,
+    simsv2_infogate,
+    unpack_simsv2_batch,
 )
 
 
@@ -190,10 +201,140 @@ def _weights_and_primary_from_mselector_output(out) -> tuple[torch.Tensor | None
     return None, out[-1]
 
 
+def _write_rows_and_summary(rows: list[dict], output: str) -> None:
+    out_dir = os.path.dirname(os.path.abspath(output)) or "."
+    os.makedirs(out_dir, exist_ok=True)
+    fieldnames = [
+        "global_index", "split_index", "label", "logit", "abs_err",
+        "route_entropy", "h_p_l2norm",
+        "primary_idx", "primary_name",
+        "w_a", "w_l", "w_v", "w_max",
+        "ib_conf_t", "ib_conf_a", "ib_conf_v", "ib_conf_fused",
+    ]
+    with open(output, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        w.writerows(rows)
+
+    n = len(rows)
+    na = sum(1 for r in rows if r["primary_idx"] == 0)
+    nl = sum(1 for r in rows if r["primary_idx"] == 1)
+    nv = sum(1 for r in rows if r["primary_idx"] == 2)
+    nnl = na + nv
+    non_l = [r for r in rows if r["primary_idx"] != 1]
+    wmax_non_l = [float(r["w_max"]) for r in non_l]
+    mean_wmax_nl = sum(wmax_non_l) / len(wmax_non_l) if wmax_non_l else 0.0
+    mean_abs = sum(float(r["abs_err"]) for r in rows) / max(n, 1)
+
+    print(f"Wrote {n} rows to {output}")
+    print(f"Counts: acoustic={na}  language={nl}  visual={nv}  non_language={nnl} ({100.0 * nnl / max(n,1):.2f}%)")
+    print(f"Non-L DPR w_max mean: {mean_wmax_nl:.6f}  (n={len(non_l)})")
+    print(f"Mean |logit-label| (subset MAE proxy): {mean_abs:.6f}")
+
+
+def _run_simsv2(ckpt_path: str, split: str, output: str, batch_size: int) -> int:
+    cli = default_simsv2_cli()
+    apply_ckpt_arch_simsv2(cli, ckpt_path)
+    try:
+        dl, _split_key, _data_path = build_simsv2_loader(cli, split, batch_size)
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR: could not load SIMSv2 split: {exc}", file=sys.stderr)
+        return 1
+
+    model = load_simsv2_model(cli, ckpt_path)
+
+    captured: list[tuple[torch.Tensor | None, torch.Tensor]] = []
+
+    def _hook(_mod, _inp, out):
+        w, p = _weights_and_primary_from_mselector_output(out)
+        captured.append((w.detach().cpu() if w is not None else None, p.detach().cpu()))
+
+    ig = simsv2_infogate(model)
+    h = ig.mselector.register_forward_hook(_hook)
+    cleanup_ib, ib_store = install_infogate_ib_trace(ig)
+
+    names = {0: "acoustic", 1: "language", 2: "visual"}
+    rows = []
+    offset = 0
+    try:
+        with torch.no_grad():
+            for batch in tqdm(dl, desc=f"DPR {split}"):
+                batch = tuple(t.to(DEVICE) for t in batch)
+                input_ids, visual, acoustic, labels, input_mask, segment_ids = unpack_simsv2_batch(batch)
+                attn = input_mask.float()
+                ib_store.clear()
+                captured.clear()
+                logits, _, _, h_p = forward_simsv2(
+                    model, input_ids, visual, acoustic,
+                    labels=None, input_mask=input_mask, segment_ids=segment_ids,
+                )
+                if not captured:
+                    print("ERROR: mselector hook did not fire", file=sys.stderr)
+                    return 1
+                wcpu, pidx = captured[-1]
+                if wcpu is None:
+                    print("ERROR: could not parse DPR weights from mselector output", file=sys.stderr)
+                    return 1
+                if wcpu.size(-1) != 3:
+                    print(f"ERROR: expected 3 DPR modalities for simsv2, got {wcpu.size(-1)}", file=sys.stderr)
+                    return 1
+                if not {"t", "a", "v", "conf_p"}.issubset(ib_store.keys()):
+                    print(
+                        "ERROR: IB conf hooks missing keys "
+                        f"(have {sorted(ib_store.keys())})",
+                        file=sys.stderr,
+                    )
+                    return 1
+                ib_t = per_sample_ib_conf_mean(ib_store["t"], attn).cpu()
+                ib_a = per_sample_ib_conf_mean(ib_store["a"], attn).cpu()
+                ib_v = per_sample_ib_conf_mean(ib_store["v"], attn).cpu()
+                ib_f = per_sample_ib_conf_mean(ib_store["conf_p"], attn).cpu()
+                logit_b = logits.squeeze(-1).detach().cpu()
+                y_b = labels.squeeze(-1).detach().cpu()
+                hp_norm = h_p.squeeze(-1).norm(dim=-1).detach().cpu()
+                ent_b = per_sample_dpr_entropy(wcpu).cpu()
+                for j in range(pidx.size(0)):
+                    pi = int(pidx[j].item())
+                    wa = float(wcpu[j, 0].item())
+                    wl = float(wcpu[j, 1].item())
+                    wv = float(wcpu[j, 2].item())
+                    wmax = max(wa, wl, wv)
+                    yj = float(y_b[j].item())
+                    lj = float(logit_b[j].item())
+                    rows.append(
+                        {
+                            "global_index": offset + j,
+                            "split_index": offset + j,
+                            "label": yj,
+                            "logit": lj,
+                            "abs_err": abs(lj - yj),
+                            "route_entropy": float(ent_b[j].item()),
+                            "h_p_l2norm": float(hp_norm[j].item()),
+                            "primary_idx": pi,
+                            "primary_name": names.get(pi, str(pi)),
+                            "w_a": wa,
+                            "w_l": wl,
+                            "w_v": wv,
+                            "w_max": wmax,
+                            "ib_conf_t": float(ib_t[j].item()),
+                            "ib_conf_a": float(ib_a[j].item()),
+                            "ib_conf_v": float(ib_v[j].item()),
+                            "ib_conf_fused": float(ib_f[j].item()),
+                        }
+                    )
+                offset += pidx.size(0)
+    finally:
+        h.remove()
+        cleanup_ib()
+
+    _write_rows_and_summary(rows, output)
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--checkpoint", type=str, required=True)
-    ap.add_argument("--dataset", type=str, choices=("mosi", "mosei"), required=True)
+    ap.add_argument("--dataset", type=str, choices=("mosi", "mosei", "simsv2"), required=True)
     ap.add_argument("--split", type=str, choices=("dev", "test"), default="test")
     ap.add_argument("--output", type=str, required=True)
     ap.add_argument("--batch_size", type=int, default=64)
@@ -204,6 +345,12 @@ def main() -> int:
     if not os.path.isfile(ckpt_path):
         print(f"ERROR: checkpoint not found: {ckpt_path}", file=sys.stderr)
         return 1
+
+    if args.dataset == "simsv2":
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        return _run_simsv2(ckpt_path, args.split, args.output, args.batch_size)
 
     cli = SimpleNamespace(
         model=os.path.join(_MY, "deberta-v3-base"),
@@ -352,35 +499,7 @@ def main() -> int:
         h.remove()
         cleanup_ib()
 
-    out_dir = os.path.dirname(os.path.abspath(args.output)) or "."
-    os.makedirs(out_dir, exist_ok=True)
-    fieldnames = [
-        "global_index", "split_index", "label", "logit", "abs_err",
-        "route_entropy", "h_p_l2norm",
-        "primary_idx", "primary_name",
-        "w_a", "w_l", "w_v", "w_max",
-        "ib_conf_t", "ib_conf_a", "ib_conf_v", "ib_conf_fused",
-    ]
-    with open(args.output, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        w.writerows(rows)
-
-    n = len(rows)
-    na = sum(1 for r in rows if r["primary_idx"] == 0)
-    nl = sum(1 for r in rows if r["primary_idx"] == 1)
-    nv = sum(1 for r in rows if r["primary_idx"] == 2)
-    nnl = na + nv
-    non_l = [r for r in rows if r["primary_idx"] != 1]
-    wmax_non_l = [float(r["w_max"]) for r in non_l]
-    mean_wmax_nl = sum(wmax_non_l) / len(wmax_non_l) if wmax_non_l else 0.0
-
-    mean_abs = sum(float(r["abs_err"]) for r in rows) / max(n, 1)
-
-    print(f"Wrote {n} rows to {args.output}")
-    print(f"Counts: acoustic={na}  language={nl}  visual={nv}  non_language={nnl} ({100.0 * nnl / max(n,1):.2f}%)")
-    print(f"Non-L DPR w_max mean: {mean_wmax_nl:.6f}  (n={len(non_l)})")
-    print(f"Mean |logit-label| (subset MAE proxy): {mean_abs:.6f}")
+    _write_rows_and_summary(rows, args.output)
     return 0
 
 

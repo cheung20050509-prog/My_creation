@@ -1,0 +1,11 @@
+{
+  "primary_name": "visual",
+  "conf_t": 0.6039952,
+  "conf_a": 0.50221372,
+  "conf_v": 0.82325196,
+  "conf_fused": 0.82325196,
+  "conf_language": 0.603995144367218,
+  "conf_acoustic": 0.502213716506958,
+  "conf_visual": 0.8232520222663879,
+  "aux_conf_mean": 0.553104430437088
+}

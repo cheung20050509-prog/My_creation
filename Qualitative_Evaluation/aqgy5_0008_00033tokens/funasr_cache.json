@@ -1,0 +1,75 @@
+{
+  "device": "cuda:0",
+  "model_kwargs": {
+    "model": "paraformer-zh",
+    "vad_model": "fsmn-vad",
+    "punc_model": "ct-punc",
+    "device": "cuda:0",
+    "timestamp_model": "fa-zh"
+  },
+  "audio": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/Qualitative_Evaluation/aqgy5_0008_00033tokens/source.wav",
+  "result": [
+    {
+      "key": "source",
+      "text": "没想到啊，吕子乔还有铁杆粉丝啦。",
+      "timestamp": [
+        [
+          30,
+          150
+        ],
+        [
+          150,
+          350
+        ],
+        [
+          350,
+          590
+        ],
+        [
+          810,
+          1075
+        ],
+        [
+          1990,
+          2210
+        ],
+        [
+          2210,
+          2450
+        ],
+        [
+          2450,
+          2690
+        ],
+        [
+          2730,
+          2850
+        ],
+        [
+          2850,
+          3030
+        ],
+        [
+          3030,
+          3190
+        ],
+        [
+          3190,
+          3370
+        ],
+        [
+          3370,
+          3530
+        ],
+        [
+          3530,
+          3770
+        ],
+        [
+          3770,
+          3975
+        ]
+      ]
+    }
+  ]
+}

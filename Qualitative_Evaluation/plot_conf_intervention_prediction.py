@@ -37,6 +37,15 @@ import global_configs  # noqa: E402
 from deberta_infogate import InfoGate_DeBertaForSequenceClassification  # noqa: E402
 from global_configs import DEVICE  # noqa: E402
 from ib_conf_utils import install_infogate_ib_trace, per_sample_ib_conf_mean  # noqa: E402
+from simsv2_qual_utils import (  # noqa: E402
+    apply_ckpt_arch_simsv2,
+    default_simsv2_cli,
+    forward_simsv2,
+    load_simsv2_model,
+    load_single_simsv2_batch,
+    simsv2_infogate,
+    unpack_simsv2_batch,
+)
 
 
 def _load_deberta_dump_helpers():
@@ -49,6 +58,8 @@ def _load_deberta_dump_helpers():
 
 
 def _default_cli(dataset: str) -> SimpleNamespace:
+    if dataset == "simsv2":
+        return default_simsv2_cli()
     return SimpleNamespace(
         model=os.path.join(_MY, "deberta-v3-base"),
         dataset=dataset,
@@ -141,7 +152,12 @@ def _install_conf_intervention(ig_module, mode: str, seed: int) -> Callable[[], 
 
 def _load_single_sample(cli: SimpleNamespace, split: str, global_index: int):
     from torch.utils.data import DataLoader
-    from transformers import DebertaV2Tokenizer
+    from transformers import BertTokenizer, DebertaV2Tokenizer
+
+    if cli.dataset == "simsv2":
+        batch, _inner = load_single_simsv2_batch(cli, split, global_index, batch_size=1)
+        tokenizer = BertTokenizer.from_pretrained(cli.model)
+        return batch, tokenizer
 
     convert_to_features, build_tensor_dataset, _, _ = _load_deberta_dump_helpers()
     data_path = os.path.join(_MY, "datasets", f"{cli.dataset}.pkl")
@@ -163,7 +179,8 @@ def _load_single_sample(cli: SimpleNamespace, split: str, global_index: int):
 
 
 def _run_one_mode(model, batch, mode: str, seed: int, parse_mselector) -> dict[str, float | str]:
-    ig = model.dberta.infogate
+    is_simsv2 = len(batch) >= 6
+    ig = simsv2_infogate(model) if is_simsv2 else model.dberta.infogate
     pad_id = model.config.pad_token_id if model.config.pad_token_id is not None else 0
 
     captured = []
@@ -177,14 +194,24 @@ def _run_one_mode(model, batch, mode: str, seed: int, parse_mselector) -> dict[s
     cleanup_intervention = _install_conf_intervention(ig.infogate, mode, seed)
 
     try:
-        input_ids, visual, acoustic, labels = batch
-        visual = visual.squeeze(1)
-        acoustic = acoustic.squeeze(1)
-        attention_mask = input_ids.ne(pad_id).float()
+        if is_simsv2:
+            input_ids, visual, acoustic, labels, input_mask, segment_ids = unpack_simsv2_batch(batch)
+            attention_mask = input_mask.float()
+        else:
+            input_ids, visual, acoustic, labels = batch
+            visual = visual.squeeze(1)
+            acoustic = acoustic.squeeze(1)
+            attention_mask = input_ids.ne(pad_id).float()
         ib_store.clear()
         captured.clear()
         with torch.no_grad():
-            logits, _, _, _ = model(input_ids, visual, acoustic, labels=None, stage=2)
+            if is_simsv2:
+                logits, _, _, _ = forward_simsv2(
+                    model, input_ids, visual, acoustic,
+                    labels=None, input_mask=input_mask, segment_ids=segment_ids,
+                )
+            else:
+                logits, _, _, _ = model(input_ids, visual, acoustic, labels=None, stage=2)
         if not captured:
             raise RuntimeError("mselector hook did not fire")
         weights, primary = captured[-1]
@@ -265,7 +292,7 @@ def _plot(path_prefix: str, rows: list[dict[str, float | str]]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--dataset", type=str, choices=("mosi", "mosei"), default="mosei")
+    parser.add_argument("--dataset", type=str, choices=("mosi", "mosei", "simsv2"), default="mosei")
     parser.add_argument("--split", type=str, choices=("dev", "test"), default="test")
     parser.add_argument("--global-index", type=int, default=750)
     parser.add_argument("--output-prefix", type=str, required=True)
@@ -288,18 +315,24 @@ def main() -> int:
 
     cli = _default_cli(args.dataset)
     _, _, apply_ckpt_arch, parse_mselector = _load_deberta_dump_helpers()
-    apply_ckpt_arch(cli, ckpt_path)
+    if args.dataset == "simsv2":
+        apply_ckpt_arch_simsv2(cli, ckpt_path)
+    else:
+        apply_ckpt_arch(cli, ckpt_path)
     if not getattr(cli, "ablation", None):
         cli.ablation = "none"
     global_configs.set_dataset_config(cli.dataset)
 
-    model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
-        cli.model, multimodal_config=cli, num_labels=1
-    )
-    ckpt = torch.load(ckpt_path, map_location=DEVICE, weights_only=False)
-    model.load_state_dict(ckpt["model_state_dict"], strict=True)
-    model.to(DEVICE)
-    model.eval()
+    if args.dataset == "simsv2":
+        model = load_simsv2_model(cli, ckpt_path)
+    else:
+        model = InfoGate_DeBertaForSequenceClassification.from_pretrained(
+            cli.model, multimodal_config=cli, num_labels=1
+        )
+        ckpt = torch.load(ckpt_path, map_location=DEVICE, weights_only=False)
+        model.load_state_dict(ckpt["model_state_dict"], strict=True)
+        model.to(DEVICE)
+        model.eval()
 
     batch, _ = _load_single_sample(cli, args.split, args.global_index)
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
