@@ -1,0 +1,347 @@
+{
+  "transcript": {
+    "text": " Hi, I'm here reviewing in the name of the king. It's a film.",
+    "segments": [
+      {
+        "id": 0,
+        "seek": 0,
+        "start": 0.7200000000000002,
+        "end": 3.98,
+        "text": " Hi, I'm here reviewing in the name of the king. It's a film.",
+        "tokens": [
+          50364,
+          2421,
+          11,
+          286,
+          478,
+          510,
+          19576,
+          294,
+          264,
+          1315,
+          295,
+          264,
+          4867,
+          13,
+          467,
+          311,
+          257,
+          2007,
+          13,
+          50564
+        ],
+        "temperature": 0.0,
+        "avg_logprob": -0.4218990235101609,
+        "compression_ratio": 0.9523809523809523,
+        "no_speech_prob": 0.25623834133148193,
+        "words": [
+          {
+            "word": " Hi,",
+            "start": 0.7200000000000002,
+            "end": 1.1,
+            "probability": 0.7141841053962708
+          },
+          {
+            "word": " I'm",
+            "start": 1.16,
+            "end": 1.34,
+            "probability": 0.9496850073337555
+          },
+          {
+            "word": " here",
+            "start": 1.34,
+            "end": 1.46,
+            "probability": 0.8703535199165344
+          },
+          {
+            "word": " reviewing",
+            "start": 1.46,
+            "end": 1.88,
+            "probability": 0.9791128635406494
+          },
+          {
+            "word": " in",
+            "start": 1.88,
+            "end": 2.2,
+            "probability": 0.9314058423042297
+          },
+          {
+            "word": " the",
+            "start": 2.2,
+            "end": 2.34,
+            "probability": 0.9810953736305237
+          },
+          {
+            "word": " name",
+            "start": 2.34,
+            "end": 2.56,
+            "probability": 0.9750101566314697
+          },
+          {
+            "word": " of",
+            "start": 2.56,
+            "end": 2.76,
+            "probability": 0.9962120056152344
+          },
+          {
+            "word": " the",
+            "start": 2.76,
+            "end": 2.92,
+            "probability": 0.9831640124320984
+          },
+          {
+            "word": " king.",
+            "start": 2.92,
+            "end": 3.28,
+            "probability": 0.6071833372116089
+          },
+          {
+            "word": " It's",
+            "start": 3.56,
+            "end": 3.78,
+            "probability": 0.9359849393367767
+          },
+          {
+            "word": " a",
+            "start": 3.78,
+            "end": 3.9,
+            "probability": 0.45473888516426086
+          },
+          {
+            "word": " film.",
+            "start": 3.9,
+            "end": 3.98,
+            "probability": 0.4416050314903259
+          }
+        ]
+      }
+    ],
+    "language": "en"
+  },
+  "whisper_words": [
+    {
+      "word": "Hi,",
+      "norm": "hi",
+      "start": 0.7200000000000002,
+      "end": 1.1
+    },
+    {
+      "word": "I'm",
+      "norm": "i'm",
+      "start": 1.16,
+      "end": 1.34
+    },
+    {
+      "word": "here",
+      "norm": "here",
+      "start": 1.34,
+      "end": 1.46
+    },
+    {
+      "word": "reviewing",
+      "norm": "review",
+      "start": 1.46,
+      "end": 1.88
+    },
+    {
+      "word": "in",
+      "norm": "in",
+      "start": 1.88,
+      "end": 2.2
+    },
+    {
+      "word": "the",
+      "norm": "the",
+      "start": 2.2,
+      "end": 2.34
+    },
+    {
+      "word": "name",
+      "norm": "name",
+      "start": 2.34,
+      "end": 2.56
+    },
+    {
+      "word": "of",
+      "norm": "of",
+      "start": 2.56,
+      "end": 2.76
+    },
+    {
+      "word": "the",
+      "norm": "the",
+      "start": 2.76,
+      "end": 2.92
+    },
+    {
+      "word": "king.",
+      "norm": "king",
+      "start": 2.92,
+      "end": 3.28
+    },
+    {
+      "word": "It's",
+      "norm": "it's",
+      "start": 3.56,
+      "end": 3.78
+    },
+    {
+      "word": "a",
+      "norm": "a",
+      "start": 3.78,
+      "end": 3.9
+    },
+    {
+      "word": "film.",
+      "norm": "film",
+      "start": 3.9,
+      "end": 3.98
+    }
+  ],
+  "timings": [
+    {
+      "pkl_index": 0,
+      "token_word": "hi",
+      "start": 0.7200000000000002,
+      "end": 1.1,
+      "mid": 0.9100000000000001,
+      "whisper_word": "Hi,",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 1,
+      "token_word": ".",
+      "start": 1.16,
+      "end": 1.25,
+      "mid": 1.205,
+      "whisper_word": "I'm",
+      "match": "replace"
+    },
+    {
+      "pkl_index": 2,
+      "token_word": "am",
+      "start": 1.25,
+      "end": 1.34,
+      "mid": 1.295,
+      "whisper_word": "I'm",
+      "match": "replace"
+    },
+    {
+      "pkl_index": 3,
+      "token_word": "here",
+      "start": 1.34,
+      "end": 1.46,
+      "mid": 1.4,
+      "whisper_word": "here",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 4,
+      "token_word": "to",
+      "start": 1.46,
+      "end": 1.51,
+      "mid": 1.4849999999999999,
+      "whisper_word": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 5,
+      "token_word": "review",
+      "start": 1.46,
+      "end": 1.88,
+      "mid": 1.67,
+      "whisper_word": "reviewing",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 6,
+      "token_word": "in",
+      "start": 1.88,
+      "end": 2.2,
+      "mid": 2.04,
+      "whisper_word": "in",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 7,
+      "token_word": "the",
+      "start": 2.2,
+      "end": 2.34,
+      "mid": 2.27,
+      "whisper_word": "the",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 8,
+      "token_word": "name",
+      "start": 2.34,
+      "end": 2.56,
+      "mid": 2.45,
+      "whisper_word": "name",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 9,
+      "token_word": "of",
+      "start": 2.56,
+      "end": 2.76,
+      "mid": 2.66,
+      "whisper_word": "of",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 10,
+      "token_word": "the",
+      "start": 2.76,
+      "end": 2.92,
+      "mid": 2.84,
+      "whisper_word": "the",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 11,
+      "token_word": ".",
+      "start": 2.92,
+      "end": 2.9699999999999998,
+      "mid": 2.945,
+      "whisper_word": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 12,
+      "token_word": "king",
+      "start": 2.92,
+      "end": 3.28,
+      "mid": 3.0999999999999996,
+      "whisper_word": "king.",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 13,
+      "token_word": "it",
+      "start": 3.56,
+      "end": 3.78,
+      "mid": 3.67,
+      "whisper_word": "It's",
+      "match": "replace"
+    },
+    {
+      "pkl_index": 14,
+      "token_word": "a",
+      "start": 3.78,
+      "end": 3.9,
+      "mid": 3.84,
+      "whisper_word": "a",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 15,
+      "token_word": "film",
+      "start": 3.9,
+      "end": 3.98,
+      "mid": 3.94,
+      "whisper_word": "film.",
+      "match": "equal"
+    }
+  ]
+}

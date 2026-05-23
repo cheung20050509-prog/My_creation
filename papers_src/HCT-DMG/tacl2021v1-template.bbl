@@ -1,0 +1,289 @@
+\begin{thebibliography}{57}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+
+\bibitem[{Baltru{\v{s}}aitis et~al.(2018)Baltru{\v{s}}aitis, Ahuja, and Morency}]{baltruvsaitis2018multimodal}
+Tadas Baltru{\v{s}}aitis, Chaitanya Ahuja, and Louis-Philippe Morency. 2018.
+\newblock Multimodal machine learning: A survey and taxonomy.
+\newblock \emph{IEEE transactions on pattern analysis and machine intelligence}, 41(2):423--443.
+
+\bibitem[{Busso et~al.(2008)Busso, Bulut, Lee, Kazemzadeh, Mower, Kim, Chang, Lee, and Narayanan}]{Busso2008}
+Carlos Busso, Murtaza Bulut, Chi-Chun Lee, Abe Kazemzadeh, Emily Mower, Samuel Kim, Jeannette~N Chang, Sungbok Lee, and Shrikanth~S Narayanan. 2008.
+\newblock Iemocap: Interactive emotional dyadic motion capture database.
+\newblock \emph{Language resources and evaluation}, 42(4):335--359.
+
+\bibitem[{Castro et~al.(2019)Castro, Hazarika, P{\'e}rez-Rosas, Zimmermann, Mihalcea, and Poria}]{castro2019towards}
+Santiago Castro, Devamanyu Hazarika, Ver{\'o}nica P{\'e}rez-Rosas, Roger Zimmermann, Rada Mihalcea, and Soujanya Poria. 2019.
+\newblock Towards multimodal sarcasm detection (an \_obviously\_ perfect paper).
+\newblock In \emph{Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics}, pages 4619--4629.
+
+\bibitem[{Caucci and Kreuz(2012)}]{caucci2012social}
+Gina~M Caucci and Roger~J Kreuz. 2012.
+\newblock Social and paralinguistic cues to sarcasm.
+\newblock \emph{Humor}, 25(1):1--22.
+
+\bibitem[{Chauhan et~al.(2019)Chauhan, Akhtar, Ekbal, and Bhattacharyya}]{chauhan2019context}
+Dushyant~Singh Chauhan, Md~Shad Akhtar, Asif Ekbal, and Pushpak Bhattacharyya. 2019.
+\newblock Context-aware interactive attention for multi-modal sentiment and emotion analysis.
+\newblock In \emph{Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)}, pages 5647--5657.
+
+\bibitem[{Chen et~al.(2022)Chen, Wang, Chen, Wu, Liu, Chen, Li, Kanda, Yoshioka, Xiao et~al.}]{chen2022wavlm}
+Sanyuan Chen, Chengyi Wang, Zhengyang Chen, Yu~Wu, Shujie Liu, Zhuo Chen, Jinyu Li, Naoyuki Kanda, Takuya Yoshioka, Xiong Xiao, et~al. 2022.
+\newblock Wavlm: Large-scale self-supervised pre-training for full stack speech processing.
+\newblock \emph{IEEE Journal of Selected Topics in Signal Processing}, 16(6):1505--1518.
+
+\bibitem[{Chuang and Wu(2004)}]{chuang2004multi}
+Ze-Jing Chuang and Chung-Hsien Wu. 2004.
+\newblock Multi-modal emotion recognition from speech and text.
+\newblock In \emph{International Journal of Computational Linguistics \& Chinese Language Processing, Volume 9, Number 2, August 2004: Special Issue on New Trends of Speech and Language Processing}, pages 45--62.
+
+\bibitem[{Degottex et~al.(2014)Degottex, Kane, Drugman, Raitio, and Scherer}]{p56}
+Gilles Degottex, John Kane, Thomas Drugman, Tuomo Raitio, and Stefan Scherer. 2014.
+\newblock Covarep—a collaborative voice analysis repository for speech technologies.
+\newblock In \emph{2014 ieee international conference on acoustics, speech and signal processing (icassp)}, pages 960--964. IEEE.
+
+\bibitem[{Delbrouck et~al.(2020)Delbrouck, Tits, Brousmiche, and Dupont}]{delbrouck2020transformer}
+Jean-Benoit Delbrouck, No{\'e} Tits, Mathilde Brousmiche, and St{\'e}phane Dupont. 2020.
+\newblock A transformer-based joint-encoding for emotion recognition and sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:2006.15955}.
+
+\bibitem[{Desai et~al.(2022)Desai, Chakraborty, and Akhtar}]{Desai2022}
+Poorav Desai, Tanmoy Chakraborty, and Md~Shad Akhtar. 2022.
+\newblock Nice perfume. how long did you marinate in it? multimodal sarcasm explanation.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, volume~36, pages 10563--10571.
+
+\bibitem[{Devlin et~al.(2018)Devlin, Chang, Lee, and Toutanova}]{devlin2018bert}
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2018.
+\newblock Bert: Pre-training of deep bidirectional transformers for language understanding.
+\newblock \emph{arXiv preprint arXiv:1810.04805}.
+
+\bibitem[{Grant and Greenberg(2001)}]{grant2001speech}
+Ken~W Grant and Steven Greenberg. 2001.
+\newblock Speech intelligibility derived from asynchronous processing of auditory-visual information.
+\newblock In \emph{AVSP 2001-International Conference on Auditory-Visual Speech Processing}.
+
+\bibitem[{Hasan et~al.(2021)Hasan, Lee, Rahman, Zadeh, Mihalcea, Morency, and Hoque}]{hasan2021humor}
+Md~Kamrul Hasan, Sangwu Lee, Wasifur Rahman, Amir Zadeh, Rada Mihalcea, Louis-Philippe Morency, and Ehsan Hoque. 2021.
+\newblock Humor knowledge enriched transformer for understanding multimodal humor.
+\newblock In \emph{Proceedings of the AAAI conference on artificial intelligence}, volume 35-14, pages 12972--12980.
+
+\bibitem[{Hasan et~al.(2019)Hasan, Rahman, Zadeh, Zhong, Tanveer, Morency et~al.}]{hasan2019ur}
+Md~Kamrul Hasan, Wasifur Rahman, Amir Zadeh, Jianyuan Zhong, Md~Iftekhar Tanveer, Louis-Philippe Morency, et~al. 2019.
+\newblock Ur-funny: A multimodal language dataset for understanding humor.
+\newblock \emph{arXiv preprint arXiv:1904.06618}.
+
+\bibitem[{Hazarika et~al.(2020)Hazarika, Zimmermann, and Poria}]{hazarika2020misa}
+Devamanyu Hazarika, Roger Zimmermann, and Soujanya Poria. 2020.
+\newblock Misa: Modality-invariant and-specific representations for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the 28th ACM International Conference on Multimedia}, pages 1122--1131.
+
+\bibitem[{Huang et~al.(2021)Huang, Du, Xue, Chen, Zhao, and Huang}]{huang2021makes}
+Yu~Huang, Chenzhuang Du, Zihui Xue, Xuanyao Chen, Hang Zhao, and Longbo Huang. 2021.
+\newblock What makes multi-modal learning better than single (provably).
+\newblock \emph{Advances in Neural Information Processing Systems}, 34:10944--10956.
+
+\bibitem[{Lan et~al.(2019)Lan, Chen, Goodman, Gimpel, Sharma, and Soricut}]{lan2019albert}
+Zhenzhong Lan, Mingda Chen, Sebastian Goodman, Kevin Gimpel, Piyush Sharma, and Radu Soricut. 2019.
+\newblock Albert: A lite bert for self-supervised learning of language representations.
+\newblock \emph{arXiv preprint arXiv:1909.11942}.
+
+\bibitem[{Laplante and Ambady(2003)}]{laplante2003things}
+Debi Laplante and Nalini Ambady. 2003.
+\newblock On how things are said: Voice tone, voice intensity, verbal content, and perceptions of politeness.
+\newblock \emph{Journal of language and social psychology}, 22(4):434--441.
+
+\bibitem[{Li et~al.(2022)Li, Bell, and Lai}]{Li2022}
+Yuanchao Li, Peter Bell, and Catherine Lai. 2022.
+\newblock Fusing {ASR} outputs in joint training for speech emotion recognition.
+\newblock In \emph{ICASSP 2022-2022 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)}, pages 7362--7366. IEEE.
+
+\bibitem[{Li et~al.(2019)Li, Ishi, Inoue, Nakamura, and Kawahara}]{li2019}
+Yuanchao Li, Carlos~Toshinori Ishi, Koji Inoue, Shizuka Nakamura, and Tatsuya Kawahara. 2019.
+\newblock Expressing reactive emotion based on multimodal emotion recognition for natural conversation in human--robot interaction.
+\newblock \emph{Advanced Robotics}, 33(20):1030--1041.
+
+\bibitem[{Li et~al.(2020)Li, Zhao, and Shen}]{Li2020}
+Yuanchao Li, Tianyu Zhao, and Xun Shen. 2020.
+\newblock Attention-based multimodal fusion for estimating human emotion in real-world {HRI}.
+\newblock In \emph{Companion of the 2020 ACM/IEEE International Conference on Human-Robot Interaction}, pages 340--342.
+
+\bibitem[{Lian et~al.(2022)Lian, Liu, and Tao}]{lian2022smin}
+Zheng Lian, Bin Liu, and Jianhua Tao. 2022.
+\newblock Smin: Semi-supervised multi-modal interaction network for conversational emotion recognition.
+\newblock \emph{IEEE Transactions on Affective Computing}.
+
+\bibitem[{Liang et~al.(2018)Liang, Liu, Zadeh, and Morency}]{liang2018multimodal}
+Paul~Pu Liang, Ziyin Liu, Amir Zadeh, and Louis-Philippe Morency. 2018.
+\newblock Multimodal language analysis with recurrent multistage fusion.
+\newblock In \emph{Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing}, pages 150--161.
+
+\bibitem[{Lindquist et~al.(2015)Lindquist, MacCormack, and Shablack}]{Lindquist2015}
+Kristen~A Lindquist, Jennifer~K MacCormack, and Holly Shablack. 2015.
+\newblock The role of language in emotion: Predictions from psychological constructionism.
+\newblock \emph{Frontiers in psychology}, 6:444.
+
+\bibitem[{Liu et~al.(2018)Liu, Shen, Lakshminarasimhan, Liang, Zadeh, and Morency}]{Liu2018}
+Zhun Liu, Ying Shen, Varun~Bharadhwaj Lakshminarasimhan, Paul~Pu Liang, Amir Zadeh, and Louis-Philippe Morency. 2018.
+\newblock Efficient low-rank multimodal fusion with modality-specific factors.
+\newblock \emph{arXiv preprint arXiv:1806.00064}.
+
+\bibitem[{Livingstone and Russo(2018)}]{livingstone2018ryerson}
+Steven~R Livingstone and Frank~A Russo. 2018.
+\newblock The ryerson audio-visual database of emotional speech and song (ravdess): A dynamic, multimodal set of facial and vocal expressions in north american english.
+\newblock \emph{PloS one}, 13(5):e0196391.
+
+\bibitem[{Lu et~al.(2019)Lu, Batra, Parikh, and Lee}]{lu2019vilbert}
+Jiasen Lu, Dhruv Batra, Devi Parikh, and Stefan Lee. 2019.
+\newblock Vilbert: Pretraining task-agnostic visiolinguistic representations for vision-and-language tasks.
+\newblock \emph{Advances in neural information processing systems}, 32.
+
+\bibitem[{Ma et~al.(2023)Ma, Zhang, and Sun}]{ma2023multimodal}
+Feipeng Ma, Yueyi Zhang, and Xiaoyan Sun. 2023.
+\newblock Multimodal sentiment analysis with preferential fusion and distance-aware contrastive learning.
+\newblock In \emph{2023 IEEE International Conference on Multimedia and Expo (ICME)}, pages 1367--1372. IEEE.
+
+\bibitem[{Peelle et~al.(2010)Peelle, Johnsrude, and Davis}]{peelle2010hierarchical}
+Jonathan~E Peelle, Ingrid Johnsrude, and Matthew~H Davis. 2010.
+\newblock Hierarchical processing for speech in human auditory cortex and beyond.
+\newblock \emph{Frontiers in human neuroscience}, page~51.
+
+\bibitem[{Pennington et~al.(2014)Pennington, Socher, and Manning}]{pennington2014glove}
+Jeffrey Pennington, Richard Socher, and Christopher~D Manning. 2014.
+\newblock Glove: Global vectors for word representation.
+\newblock In \emph{Proceedings of the 2014 conference on empirical methods in natural language processing (EMNLP)}, pages 1532--1543.
+
+\bibitem[{Pham et~al.(2019)Pham, Liang, Manzini, Morency, and P{\'o}czos}]{pham2019found}
+Hai Pham, Paul~Pu Liang, Thomas Manzini, Louis-Philippe Morency, and Barnab{\'a}s P{\'o}czos. 2019.
+\newblock Found in translation: Learning robust joint representations by cyclic translations between modalities.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, volume~33, pages 6892--6899.
+
+\bibitem[{Radford et~al.(2021)Radford, Kim, Hallacy, Ramesh, Goh, Agarwal, Sastry, Askell, Mishkin, Clark et~al.}]{radford2021learning}
+Alec Radford, Jong~Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, et~al. 2021.
+\newblock Learning transferable visual models from natural language supervision.
+\newblock In \emph{International conference on machine learning}, pages 8748--8763. PMLR.
+
+\bibitem[{Rahman et~al.(2020)Rahman, Hasan, Lee, Zadeh, Mao, Morency, and Hoque}]{rahman2020integrating}
+Wasifur Rahman, Md~Kamrul Hasan, Sangwu Lee, Amir Zadeh, Chengfeng Mao, Louis-Philippe Morency, and Ehsan Hoque. 2020.
+\newblock Integrating multimodal information in large pretrained transformers.
+\newblock In \emph{Proceedings of the conference. Association for Computational Linguistics. Meeting}, volume 2020, page 2359. NIH Public Access.
+
+\bibitem[{Rajan et~al.(2022)Rajan, Brutti, and Cavallaro}]{rajan2022cross}
+Vandana Rajan, Alessio Brutti, and Andrea Cavallaro. 2022.
+\newblock Is cross-attention preferable to self-attention for multi-modal emotion recognition?
+\newblock In \emph{ICASSP 2022-2022 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)}, pages 4693--4697. IEEE.
+
+\bibitem[{Rashed et~al.(2022)Rashed, Elsayed, and Schmidt-Thieme}]{rashed2022context}
+Ahmed Rashed, Shereen Elsayed, and Lars Schmidt-Thieme. 2022.
+\newblock Context and attribute-aware sequential recommendation via cross-attention.
+\newblock In \emph{Proceedings of the 16th ACM Conference on Recommender Systems}, pages 71--80.
+
+\bibitem[{Sahay et~al.(2020)Sahay, Okur, Kumar, and Nachman}]{sahay2020low}
+Saurav Sahay, Eda Okur, Shachi~H Kumar, and Lama Nachman. 2020.
+\newblock Low rank fusion based transformers for multimodal sequences.
+\newblock \emph{arXiv preprint arXiv:2007.02038}.
+
+\bibitem[{Shao et~al.(2023)Shao, Ziser, and Cohen}]{shao2023erasure}
+Shun Shao, Yftah Ziser, and Shay~B Cohen. 2023.
+\newblock Erasure of unaligned attributes from neural representations.
+\newblock \emph{Transactions of the Association for Computational Linguistics}, 11:488--510.
+
+\bibitem[{Smith et~al.(2017)Smith, Kindermans, Ying, and Le}]{smith2017don}
+Samuel~L Smith, Pieter-Jan Kindermans, Chris Ying, and Quoc~V Le. 2017.
+\newblock Don't decay the learning rate, increase the batch size.
+\newblock \emph{arXiv preprint arXiv:1711.00489}.
+
+\bibitem[{Stock and Strapparava(2003)}]{stock2003getting}
+Oliviero Stock and Carlo Strapparava. 2003.
+\newblock Getting serious about the development of computational humor.
+\newblock In \emph{IJCAI}, volume~3, pages 59--64. Citeseer.
+
+\bibitem[{Tian et~al.(2016)Tian, Moore, and Lai}]{tian2016recognizing}
+Leimin Tian, Johanna Moore, and Catherine Lai. 2016.
+\newblock Recognizing emotions in spoken dialogue with hierarchically fused acoustic and lexical features.
+\newblock In \emph{2016 IEEE Spoken Language Technology Workshop (SLT)}, pages 565--572. IEEE.
+
+\bibitem[{Tokuhisa et~al.(2008)Tokuhisa, Inui, and Matsumoto}]{tokuhisa2008emotion}
+Ryoko Tokuhisa, Kentaro Inui, and Yuji Matsumoto. 2008.
+\newblock Emotion classification using massive examples extracted from the web.
+\newblock In \emph{Proceedings of the 22nd International Conference on Computational Linguistics (Coling 2008)}, pages 881--888.
+
+\bibitem[{Tsai et~al.(2019)Tsai, Bai, Liang, Kolter, Morency, and Salakhutdinov}]{Tsai2019}
+Yao-Hung~Hubert Tsai, Shaojie Bai, Paul~Pu Liang, J~Zico Kolter, Louis-Philippe Morency, and Ruslan Salakhutdinov. 2019.
+\newblock Multimodal transformer for unaligned multimodal language sequences.
+\newblock In \emph{Proceedings of the conference. Association for Computational Linguistics. Meeting}, volume 2019, page 6558. NIH Public Access.
+
+\bibitem[{Tsai et~al.(2018)Tsai, Liang, Zadeh, Morency, and Salakhutdinov}]{Tsai2018Learning}
+Yao-Hung~Hubert Tsai, Paul~Pu Liang, Amir Zadeh, Louis-Philippe Morency, and Ruslan Salakhutdinov. 2018.
+\newblock Learning factorized multimodal representations.
+\newblock \emph{arXiv preprint arXiv:1806.06176}.
+
+\bibitem[{Vaswani et~al.(2017)Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, and Polosukhin}]{Vaswani2017}
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan~N Gomez, {\L}ukasz Kaiser, and Illia Polosukhin. 2017.
+\newblock Attention is all you need.
+\newblock \emph{Advances in neural information processing systems}, 30.
+
+\bibitem[{Wang et~al.(2019)Wang, Shen, Liu, Liang, Zadeh, and Morency}]{Wang2019}
+Yansen Wang, Ying Shen, Zhun Liu, Paul~Pu Liang, Amir Zadeh, and Louis-Philippe Morency. 2019.
+\newblock Words can shift: Dynamically adjusting word representations using nonverbal behaviors.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial Intelligence}, volume~33, pages 7216--7223.
+
+\bibitem[{Wu et~al.(2021)Wu, Zhao, Lu, Qin, Wu, Sheng, and Li}]{Wu2021}
+Yang Wu, Yanyan Zhao, Xin Lu, Bing Qin, Yin Wu, Jian Sheng, and Jinlong Li. 2021.
+\newblock Modeling incongruity between modalities for multimodal sarcasm detection.
+\newblock \emph{IEEE MultiMedia}, 28(2):86--95.
+
+\bibitem[{Xu et~al.(2018)Xu, Mao, and Chen}]{Xu2018}
+Nan Xu, Wenji Mao, and Guandan Chen. 2018.
+\newblock A co-memory network for multimodal sentiment analysis.
+\newblock In \emph{The 41st international ACM SIGIR conference on research \& development in information retrieval}, pages 929--932.
+
+\bibitem[{Yacoub et~al.(2003)Yacoub, Simske, Lin, and Burns}]{yacoub2003recognition}
+Sherif~M Yacoub, Steven~J Simske, Xiaofan Lin, and John Burns. 2003.
+\newblock Recognition of emotions in interactive voice response systems.
+\newblock In \emph{Interspeech}.
+
+\bibitem[{Yang et~al.(2020)Yang, Xu, and Gao}]{yang2020cm}
+Kaicheng Yang, Hua Xu, and Kai Gao. 2020.
+\newblock Cm-bert: Cross-modal bert for text-audio sentiment analysis.
+\newblock In \emph{Proceedings of the 28th ACM international conference on multimedia}, pages 521--528.
+
+\bibitem[{Yu et~al.(2021)Yu, Xu, Yuan, and Wu}]{yu2021learning}
+Wenmeng Yu, Hua Xu, Ziqi Yuan, and Jiele Wu. 2021.
+\newblock Learning modality-specific representations with self-supervised multi-task learning for multimodal sentiment analysis.
+\newblock In \emph{Proceedings of the AAAI conference on artificial intelligence}, volume 35-12, pages 10790--10797.
+
+\bibitem[{Zadeh et~al.(2017)Zadeh, Chen, Poria, Cambria, and Morency}]{zadeh2017}
+Amir Zadeh, Minghai Chen, Soujanya Poria, Erik Cambria, and Louis-Philippe Morency. 2017.
+\newblock Tensor fusion network for multimodal sentiment analysis.
+\newblock \emph{arXiv preprint arXiv:1707.07250}.
+
+\bibitem[{Zadeh et~al.(2018{\natexlab{a}})Zadeh, Liang, Mazumder, Poria, Cambria, and Morency}]{zadeh2018memory}
+Amir Zadeh, Paul~Pu Liang, Navonil Mazumder, Soujanya Poria, Erik Cambria, and Louis-Philippe Morency. 2018{\natexlab{a}}.
+\newblock Memory fusion network for multi-view sequential learning.
+\newblock In \emph{Proceedings of the AAAI conference on artificial intelligence}, volume 32-1.
+
+\bibitem[{Zadeh et~al.(2018{\natexlab{b}})Zadeh, Liang, Poria, Cambria, and Morency}]{Zadeh2018}
+Amir Zadeh, Paul~Pu Liang, Soujanya Poria, Erik Cambria, and Louis-Philippe Morency. 2018{\natexlab{b}}.
+\newblock Multimodal language analysis in the wild: Cmu-mosei dataset and interpretable dynamic fusion graph.
+\newblock In \emph{Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pages 2236--2246.
+
+\bibitem[{Zadeh et~al.(2018{\natexlab{c}})Zadeh, Liang, Poria, Vij, Cambria, and Morency}]{zadeh2018multi}
+Amir Zadeh, Paul~Pu Liang, Soujanya Poria, Prateek Vij, Erik Cambria, and Louis-Philippe Morency. 2018{\natexlab{c}}.
+\newblock Multi-attention recurrent network for human communication comprehension.
+\newblock In \emph{Thirty-Second AAAI Conference on Artificial Intelligence}.
+
+\bibitem[{Zadeh et~al.(2019)Zadeh, Mao, Shi, Zhang, Liang, Poria, and Morency}]{Zadeh2019}
+Amir Zadeh, Chengfeng Mao, Kelly Shi, Yiwei Zhang, Paul~Pu Liang, Soujanya Poria, and Louis-Philippe Morency. 2019.
+\newblock Factorized multimodal transformer for multimodal sequential learning.
+\newblock \emph{arXiv preprint arXiv:1911.09826}.
+
+\bibitem[{Zadeh et~al.(2016)Zadeh, Zellers, Pincus, and Morency}]{Zadeh2016}
+Amir Zadeh, Rowan Zellers, Eli Pincus, and Louis-Philippe Morency. 2016.
+\newblock Multimodal sentiment intensity analysis in videos: Facial gestures and verbal messages.
+\newblock \emph{IEEE Intelligent Systems}, 31(6):82--88.
+
+\bibitem[{Zhang et~al.(2022)Zhang, Chadwick, Ramos, and Bhattacharya}]{zhang2022cross}
+Shucong Zhang, Malcolm Chadwick, Alberto Gil~CP Ramos, and Sourav Bhattacharya. 2022.
+\newblock Cross-attention is all you need: Real-time streaming transformers for personalised speech enhancement.
+\newblock \emph{arXiv preprint arXiv:2211.04346}.
+
+\end{thebibliography}

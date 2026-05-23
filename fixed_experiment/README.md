@@ -89,9 +89,38 @@ cd My_creation && python scripts/verify_mosei_phase1_trial70_optuna_train_argv.p
 
 ---
 
+## CH-SIMS v2 — tier3_fresh trial 53 (paper PRISM table row)
+
+- **Study:** `infogate_simsv2_tier3_fresh_mmsa`
+- **DB / log:** `logs/optuna/4090D_restart/simsv2_tier3_fresh/db/simsv2.db`, `train_logs/simsv2_tier3_fresh_trial_53.log`
+- **Test (Best Results, dev MAE selection):** Acc5 **55.61%**, Acc3 **73.40%**, Acc2 **80.08%**, F1 **80.13%**, MAE **0.2907**, Corr **0.7050** — matches `acl_latex.tex` PRISM row (55.6 / 73.4 / 80.1 / 80.1 / 0.291 / 0.705)
+- **Files:** [`simsv2_tier3_fresh_trial53_hparams.py`](simsv2_tier3_fresh_trial53_hparams.py), [`train_fixed_simsv2_tier3_fresh_trial53.py`](train_fixed_simsv2_tier3_fresh_trial53.py), [`run_simsv2_tier3_fresh_trial53.sh`](run_simsv2_tier3_fresh_trial53.sh)
+- **Outputs:** `fixed_experiment/runs/simsv2_tier3_fresh_trial53/`
+
+Uses MMSA pkl features (`--simsv2_feature_mode mmsa`), batch 8 × grad accum 4, `--early_stop_patience 15`, `--selection_metric mae`.
+
+```bash
+bash /path/to/My_creation/fixed_experiment/run_simsv2_tier3_fresh_trial53.sh
+```
+
+**nohup** (SSH 断开后继续跑):
+
+```bash
+cd My_creation && bash fixed_experiment/run_simsv2_tier3_fresh_trial53_nohup.sh
+# tail -f fixed_experiment/runs/simsv2_tier3_fresh_trial53/train.log
+```
+
+Dry-run:
+
+```bash
+cd My_creation && python fixed_experiment/train_fixed_simsv2_tier3_fresh_trial53.py --dry-run
+```
+
+---
+
 ## CH-SIMS v2 — phase4 trial 52
 
-- **Study:** `infogate_simsv2_phase4_4090d` (paper main row: use final **trial 52** in `phase4/run/simsv2.log`, second `Trial 52 finished` block; Best MAE **0.3113** in `simsv2_phase4_trial_52.log`)
+- **Study:** `infogate_simsv2_phase4_4090d` (older phase4 best; **not** the paper PRISM SIMSv2 row — use **tier3_fresh trial 53** above)
 - **Files:** [`simsv2_phase4_trial52_hparams.py`](simsv2_phase4_trial52_hparams.py), [`train_fixed_simsv2_phase4_trial52.py`](train_fixed_simsv2_phase4_trial52.py), [`run_simsv2_phase4_trial52.sh`](run_simsv2_phase4_trial52.sh)
 - **Outputs:** `fixed_experiment/runs/simsv2_phase4_trial52/`
 
