@@ -1,0 +1,21 @@
+{
+  "dataset": "mosi",
+  "split": "test",
+  "global_index": 116,
+  "segment_id": "d3_k5Xpfmik[14]",
+  "label": 2.5999999046325684,
+  "prediction": null,
+  "model_pos": 22,
+  "pkl_token_index": 21,
+  "token": "apocalipse",
+  "token_word": "apocalipse",
+  "has_media": true,
+  "time_start": 7.0,
+  "time_end": 7.52,
+  "time_mid": 7.26,
+  "time_alignment": "whisper",
+  "whisper_word": "apocalypse",
+  "whisper_match": "replace",
+  "source_video": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/Qualitative_Evaluation/raw/d3_k5Xpfmik/d3_k5Xpfmik_15.mp4",
+  "source_audio": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/Qualitative_Evaluation/raw/d3_k5Xpfmik/d3_k5Xpfmik_15.wav"
+}

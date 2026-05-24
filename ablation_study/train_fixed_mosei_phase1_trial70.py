@@ -38,6 +38,7 @@ def main() -> int:
             "no_mselector",
             "no_ib",
             "no_ib_no_mselector_no_infogate",
+            "no_conf",
             "no_conf_gating",
             "no_adaptive_gate",
         ),

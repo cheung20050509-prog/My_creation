@@ -95,6 +95,7 @@ ABLATION_CHOICES = (
     "no_mselector",
     "no_ib",
     "no_ib_no_mselector_no_infogate",
+    "no_conf",
     "no_conf_gating",
     "no_adaptive_gate",
 )
@@ -105,6 +106,7 @@ parser.add_argument(
     choices=ABLATION_CHOICES,
     help=(
         "PRISM ablation: ``no_mselector``=w/o DPR, ``no_ib``=w/o VTB, ``no_infogate``=w/o InfoGate; "
+        "``no_conf`` aliases ``no_conf_gating``; "
         "``no_ib_no_mselector_no_infogate``=w/o all three (frozen recipe otherwise)."
     ),
 )

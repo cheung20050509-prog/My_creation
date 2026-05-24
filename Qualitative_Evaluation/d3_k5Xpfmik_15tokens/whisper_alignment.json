@@ -1,0 +1,269 @@
+{
+  "alignment": "whisper",
+  "model": "base",
+  "audio": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/Qualitative_Evaluation/raw/d3_k5Xpfmik/d3_k5Xpfmik_15.wav",
+  "words": [
+    "the",
+    "sequences",
+    "of",
+    "the",
+    "beginning",
+    "of",
+    "the",
+    "film",
+    "which",
+    "features",
+    "columbus",
+    "exzplaining",
+    "some",
+    "of",
+    "his",
+    "rules",
+    "um",
+    "to",
+    "surviving",
+    "a",
+    "zombie",
+    "apocalipse",
+    "are",
+    "really",
+    "well",
+    "done"
+  ],
+  "timings": [
+    {
+      "pkl_index": 0,
+      "token_word": "the",
+      "start": 0.0,
+      "end": 0.16,
+      "mid": 0.08,
+      "whisper_word": "The",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 1,
+      "token_word": "sequences",
+      "start": 0.16,
+      "end": 0.54,
+      "mid": 0.35000000000000003,
+      "whisper_word": "sequences",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 2,
+      "token_word": "of",
+      "start": 0.54,
+      "end": 0.86,
+      "mid": 0.7,
+      "whisper_word": "at",
+      "match": "replace"
+    },
+    {
+      "pkl_index": 3,
+      "token_word": "the",
+      "start": 0.86,
+      "end": 0.92,
+      "mid": 0.89,
+      "whisper_word": "the",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 4,
+      "token_word": "beginning",
+      "start": 0.92,
+      "end": 1.14,
+      "mid": 1.03,
+      "whisper_word": "beginning",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 5,
+      "token_word": "of",
+      "start": 1.14,
+      "end": 1.34,
+      "mid": 1.24,
+      "whisper_word": "of",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 6,
+      "token_word": "the",
+      "start": 1.34,
+      "end": 1.44,
+      "mid": 1.3900000000000001,
+      "whisper_word": "the",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 7,
+      "token_word": "film",
+      "start": 1.44,
+      "end": 1.68,
+      "mid": 1.56,
+      "whisper_word": "film",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 8,
+      "token_word": "which",
+      "start": 1.68,
+      "end": 1.92,
+      "mid": 1.7999999999999998,
+      "whisper_word": "which",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 9,
+      "token_word": "features",
+      "start": 1.92,
+      "end": 2.3,
+      "mid": 2.11,
+      "whisper_word": "feature",
+      "match": "replace"
+    },
+    {
+      "pkl_index": 10,
+      "token_word": "columbus",
+      "start": 2.3,
+      "end": 2.82,
+      "mid": 2.5599999999999996,
+      "whisper_word": "Columbus",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 11,
+      "token_word": "exzplaining",
+      "start": 2.82,
+      "end": 3.5,
+      "mid": 3.16,
+      "whisper_word": "explaining",
+      "match": "replace"
+    },
+    {
+      "pkl_index": 12,
+      "token_word": "some",
+      "start": 3.5,
+      "end": 3.82,
+      "mid": 3.66,
+      "whisper_word": "some",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 13,
+      "token_word": "of",
+      "start": 3.82,
+      "end": 3.96,
+      "mid": 3.8899999999999997,
+      "whisper_word": "of",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 14,
+      "token_word": "his",
+      "start": 3.96,
+      "end": 4.12,
+      "mid": 4.04,
+      "whisper_word": "his",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 15,
+      "token_word": "rules",
+      "start": 4.12,
+      "end": 4.72,
+      "mid": 4.42,
+      "whisper_word": "rules",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 16,
+      "token_word": "um",
+      "start": 4.72,
+      "end": 4.77,
+      "mid": 4.744999999999999,
+      "whisper_word": null,
+      "match": "interpolated"
+    },
+    {
+      "pkl_index": 17,
+      "token_word": "to",
+      "start": 4.72,
+      "end": 5.04,
+      "mid": 4.88,
+      "whisper_word": "to",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 18,
+      "token_word": "surviving",
+      "start": 5.04,
+      "end": 5.8,
+      "mid": 5.42,
+      "whisper_word": "surviving",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 19,
+      "token_word": "a",
+      "start": 5.8,
+      "end": 6.32,
+      "mid": 6.0600000000000005,
+      "whisper_word": "a",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 20,
+      "token_word": "zombie",
+      "start": 6.32,
+      "end": 7.0,
+      "mid": 6.66,
+      "whisper_word": "zombie",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 21,
+      "token_word": "apocalipse",
+      "start": 7.0,
+      "end": 7.52,
+      "mid": 7.26,
+      "whisper_word": "apocalypse",
+      "match": "replace"
+    },
+    {
+      "pkl_index": 22,
+      "token_word": "are",
+      "start": 7.52,
+      "end": 7.88,
+      "mid": 7.699999999999999,
+      "whisper_word": "are",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 23,
+      "token_word": "really",
+      "start": 7.88,
+      "end": 8.24,
+      "mid": 8.06,
+      "whisper_word": "really",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 24,
+      "token_word": "well",
+      "start": 8.24,
+      "end": 8.48,
+      "mid": 8.36,
+      "whisper_word": "well",
+      "match": "equal"
+    },
+    {
+      "pkl_index": 25,
+      "token_word": "done",
+      "start": 8.48,
+      "end": 8.72,
+      "mid": 8.600000000000001,
+      "whisper_word": "done.",
+      "match": "equal"
+    }
+  ]
+}

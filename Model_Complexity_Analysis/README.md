@@ -1,11 +1,11 @@
-# Model complexity analysis (fixed_experiment)
+# Model complexity analysis (paper configs)
 
-Case study for the three frozen Optuna configurations documented in [`../fixed_experiment/README.md`](../fixed_experiment/README.md):
+Case study for the frozen Optuna configurations used by the current paper tables:
 
 | Case | Hyperparameters module | Backbone |
 |------|------------------------|----------|
-| MOSI trial 234 | [`../fixed_experiment/mosi_trial234_hparams.py`](../fixed_experiment/mosi_trial234_hparams.py) | DeBERTa-v3 |
-| MOSEI phase1 trial 70 | [`../fixed_experiment/mosei_phase1_trial70_hparams.py`](../fixed_experiment/mosei_phase1_trial70_hparams.py) | DeBERTa-v3 |
+| MOSI more/mosi trial 39 | [`../ablation_study/mosi_more_trial39_hparams.py`](../ablation_study/mosi_more_trial39_hparams.py) | DeBERTa-v3 |
+| MOSEI phase1 trial 70 | [`../ablation_study/mosei_phase1_trial70_hparams.py`](../ablation_study/mosei_phase1_trial70_hparams.py) | DeBERTa-v3 |
 | SIMSv2 phase4 trial 52 | [`../fixed_experiment/simsv2_phase4_trial52_hparams.py`](../fixed_experiment/simsv2_phase4_trial52_hparams.py) | BERT-base-Chinese |
 
 ## Python environment
@@ -35,6 +35,17 @@ chmod +x Model_Complexity_Analysis/run_measure.sh
 ./Model_Complexity_Analysis/run_measure.sh --cases mosi,mosei,simsv2 --output Model_Complexity_Analysis/results.md
 ```
 
+**Full training time (serial, nohup)** — MOSI then MOSEI on one GPU:
+
+```bash
+cd /path/to/My_creation
+nohup bash Model_Complexity_Analysis/run_fulltrain_serial_nohup.sh \
+  > Model_Complexity_Analysis/nohup_fulltrain_serial_20260525.log 2>&1 &
+tail -f Model_Complexity_Analysis/nohup_fulltrain_serial_20260525.log
+```
+
+Outputs: `results_mosi_fulltrain_paper_20260525.md`, `results_mosei_fulltrain_paper_20260525.md`.
+
 Equivalent explicit call:
 
 ```bash
@@ -48,14 +59,18 @@ Optional:
 - `--output PATH` — write a Markdown table (e.g. `Model_Complexity_Analysis/results.md`).
 - `--memory-full-accum` — report peak GPU memory after `gradient_accumulation_step` micro-batch backward passes **without** `optimizer.step()` (closer to worst-case peak within an accumulation window).
 - `--skip-epoch-time` — skip full `train_epoch` timing (faster smoke test).
+- `--full-training-time` — run the complete training loop once and report total wall-clock time, completed epochs, and average complete-epoch time. Run large datasets one case at a time to avoid GPU interference.
 
 ## Metric definitions
 
-- **Parameters / trainable** — `numel()` over `model.parameters()` and over parameters with `requires_grad` (same spirit as [`fixed_experiment/train.py`](../fixed_experiment/train.py) startup logs).
+- **Parameters / trainable** — `numel()` over `model.parameters()` and over parameters with `requires_grad` (same spirit as the training startup logs).
 - **FLOPs** — approximate count for **one training forward** at micro-batch shape: `train_batch_size × max_seq_length` (frozen argv does not override `max_seq_length`; default is **50** in `train.py`), `stage=1`, with real-valued labels matching logits shape. Custom heads, gating, and some Transformer ops are only partially supported by generic counters; treat numbers as **comparable estimates**, not audit-grade totals.
 - **Peak GPU memory (default)** — `torch.cuda.max_memory_allocated()` after **one** forward+backward at micro-batch size `train_batch_size`, with the same loss as training (`L1 + mse_weight * MSE` on predictions + IB term), including loss scaling by `gradient_accumulation_step` as in `train_epoch`. Does not include optimizer state unless you extend the script; it reflects activations + gradients for that step.
-- **Per-epoch training time** — wall time for **one full** `train_epoch` over the real training `DataLoader`, `stage=1`, including optimizer steps, with `torch.cuda.synchronize()` before/after timing when CUDA is used. First epoch in real training may use EMA only after `ema_start_epoch`; here EMA is disabled (`ema=None`) for a stable complexity readout.
+- **One-epoch training time** — wall time for **one full** `train_epoch` over the real training `DataLoader`, `stage=1`, including optimizer steps, with `torch.cuda.synchronize()` before/after timing when CUDA is used. First epoch in real training may use EMA only after `ema_start_epoch`; here EMA is disabled (`ema=None`) for a stable single-epoch readout. This column is skipped automatically when `--full-training-time` is used.
+- **Average complete-epoch time** — enabled by `--full-training-time`; wall time averaged across all completed epochs of a full training run. Each epoch includes training, development/test evaluation, EMA apply/restore when active, best-checkpoint saving, and early-stopping bookkeeping.
+- **Total training time** — enabled by `--full-training-time`; wall time from the start of the full epoch loop until completion or early stopping. It excludes one-time data/model construction before the loop and excludes the static parameter/FLOP/memory probes.
+- **Completed epochs** — actual number of epochs used for the total/average timing. MOSI paper trial 39 uses early stopping; MOSEI phase1 trial 70 does not, so it runs the configured 50 epochs unless interrupted.
 
 ## Outputs
 
-The driver prints a Markdown table to stdout and, with `--output`, writes the same table to a file. Each dataset runs in a **separate subprocess** so `fixed_experiment/train.py` parses the correct CLI once per case.
+The driver prints a Markdown table to stdout and, with `--output`, writes the same table to a file. Each dataset runs in a **separate subprocess** so the selected `train.py` parses the correct CLI once per case.

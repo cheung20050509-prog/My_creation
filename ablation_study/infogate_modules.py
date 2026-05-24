@@ -515,6 +515,7 @@ class InfoGate(nn.Module):
             'no_infogate',
             'no_mselector',
             'no_ib',
+            'no_conf',
             'no_conf_gating',
             'no_adaptive_gate',
             'no_ib_no_mselector_no_infogate',
@@ -583,7 +584,7 @@ class InfoGate(nn.Module):
         else:
             self.infogate = InfoGateModule(
                 bn_dim, num_layers, num_heads, dropout, num_aux=num_aux,
-                no_conf_gating=(self.ablation == 'no_conf_gating'),
+                no_conf_gating=(self.ablation in {'no_conf', 'no_conf_gating'}),
                 no_adaptive_gate=(self.ablation == 'no_adaptive_gate'),
             )
 

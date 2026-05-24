@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MOSEI phase1 trial70: six PRISM --ablation modes, separate runs/*/ dirs.
+# MOSEI phase1 trial70: PRISM --ablation modes, separate runs/*/ dirs.
 # Multi-GPU: **default = one training process per GPU** (parallel within a wave); after the
 # wave finishes, the next wave starts (serial across waves). Override with JOBS_PER_GPU if
 # you want multiple jobs on one card (not recommended for baseline none vs gold).
@@ -17,6 +17,7 @@
 #                  e.g. "2,1" → two processes on GPU0, one on GPU1 (legacy throughput layout).
 #                  Unset: defaults to **1 job per listed GPU** (1,1,…); two GPUs 0,1 → three waves of two.
 #   EXCLUDE_GPUS   used only when auto-selecting GPUs on machines with != 2 GPUs (unset → default 1)
+#   MODES          optional whitespace-separated ablation list, e.g. MODES="no_conf"
 set -euo pipefail
 MY_CREATION="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$MY_CREATION"
@@ -123,7 +124,8 @@ PARALLEL=${#SLOT_GPUS[@]}
 echo "======== $(date -Is) MOSEI trial70 PRISM ablation batch: GPUs=[${GPU_IDS[*]}] JOBS_PER_GPU=[${JOBS_ARR[*]}] PARALLEL=${PARALLEL} (EXCLUDE_GPUS auto-only: ${EXCLUDE_GPUS:-∅}) ========"
 echo "NOTE: Baseline none vs frozen — run none as the sole CUDA job on that GPU (no second training on the same card)."
 
-MODES=(none no_infogate no_mselector no_ib no_ib_no_mselector_no_infogate no_conf_gating no_adaptive_gate)
+# shellcheck disable=SC2206
+MODES=( ${MODES:-none no_infogate no_mselector no_ib no_ib_no_mselector_no_infogate no_conf no_conf_gating no_adaptive_gate} )
 n_modes=${#MODES[@]}
 
 for ((start = 0; start < n_modes; start += PARALLEL)); do

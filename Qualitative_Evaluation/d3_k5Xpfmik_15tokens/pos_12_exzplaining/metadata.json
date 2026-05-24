@@ -1,0 +1,21 @@
+{
+  "dataset": "mosi",
+  "split": "test",
+  "global_index": 116,
+  "segment_id": "d3_k5Xpfmik[14]",
+  "label": 2.5999999046325684,
+  "prediction": null,
+  "model_pos": 12,
+  "pkl_token_index": 11,
+  "token": "exzplaining",
+  "token_word": "exzplaining",
+  "has_media": true,
+  "time_start": 2.82,
+  "time_end": 3.5,
+  "time_mid": 3.16,
+  "time_alignment": "whisper",
+  "whisper_word": "explaining",
+  "whisper_match": "replace",
+  "source_video": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/Qualitative_Evaluation/raw/d3_k5Xpfmik/d3_k5Xpfmik_15.mp4",
+  "source_audio": "/root/autodl-tmp/ITHP_MODS_CyIN_Ect/My_creation/Qualitative_Evaluation/raw/d3_k5Xpfmik/d3_k5Xpfmik_15.wav"
+}
