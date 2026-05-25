@@ -1,4 +1,4 @@
-# Ablation study: CMU-MOSI (more trial 39 / trial 234 / 220), CMU-MOSEI trial 70 & CH-SIMS v2 phase4 trial 52
+# Ablation study: CMU-MOSI, CMU-MOSEI, CH-SIMS v2, UR-FUNNY v2 & MUStARD
 
 Prepared by mirroring [`fixed_experiment/`](../fixed_experiment/) into this directory; launcher paths use `ablation_study/` so runs stay isolated under `ablation_study/runs/`. CLI float formatting matches `optuna_search_v2.objective()` so parsed learning rates match the gold Optuna train log headers.
 
@@ -173,6 +173,35 @@ Run only `no_conf`:
 MODES="no_conf" GPU_LIST=0 JOBS_PER_GPU=1 bash ablation_study/run_prism_ablations_simsv2_tier3_fresh_trial53.sh
 ```
 
+## UR-FUNNY v2 trial 162 / MUStARD s2_local trial 134 (classification)
+
+Frozen ALBERT+HCF classification recipes from [`fixed_experiment/`](../fixed_experiment/) (`ur_funny_trial162_hparams.py`, `mustard_s2_local_trial134_hparams.py`). Paper targets (test Acc): **UR-FUNNY 75.15%** (table **75.2%**), **MUStARD 79.41%** (table **79.4%**). Training entry: [`train_classify.py`](train_classify.py) + [`albert_infogate.py`](albert_infogate.py) with `--ablation` wired to [`infogate_modules.py`](infogate_modules.py). Data loaders still load from parent `My_creation/data_humor.py`.
+
+| Paper / description | CLI `--ablation` |
+|-------------------|------------------|
+| w/o VTB | `no_ib` |
+| w/o conf | `no_conf` |
+| w/o DPR | `no_mselector` |
+| w/o InfoGate | `no_infogate` |
+
+| Dataset | Hparams | Launcher | Serial ablations (default four modes, no `none`) |
+|---------|---------|----------|--------------------------------------------------|
+| UR-FUNNY v2 trial 162 | [`ur_funny_trial162_hparams.py`](ur_funny_trial162_hparams.py) | [`train_fixed_ur_funny_trial162.py`](train_fixed_ur_funny_trial162.py) | [`run_prism_ablations_ur_funny_trial162_serial.sh`](run_prism_ablations_ur_funny_trial162_serial.sh) |
+| MUStARD s2_local trial 134 | [`mustard_s2_local_trial134_hparams.py`](mustard_s2_local_trial134_hparams.py) | [`train_fixed_mustard_s2_local_trial134.py`](train_fixed_mustard_s2_local_trial134.py) | [`run_prism_ablations_mustard_trial134_serial.sh`](run_prism_ablations_mustard_trial134_serial.sh) |
+
+Outputs per mode: `ablation_study/runs/ur_funny_trial162_<mode>/` and `ablation_study/runs/mustard_s2_local_trial134_<mode>/` (`train.log`, `checkpoints/`). Master logs: `runs/ur_funny_trial162_ablation_serial.log`, `runs/mustard_s2_local_trial134_ablation_serial.log`.
+
+```bash
+cd My_creation
+python ablation_study/train_fixed_ur_funny_trial162.py --ablation no_ib --dry-run
+python ablation_study/train_fixed_mustard_s2_local_trial134.py --ablation no_mselector --dry-run
+
+CUDA_VISIBLE_DEVICES=0 bash ablation_study/run_prism_ablations_ur_funny_trial162_serial.sh
+CUDA_VISIBLE_DEVICES=0 bash ablation_study/run_prism_ablations_mustard_trial134_serial.sh
+```
+
+Override modes: `MODES="no_conf no_ib" bash ablation_study/run_prism_ablations_ur_funny_trial162_serial.sh`.
+
 ## PRISM ablations
 
 Batch scripts run `none`, `no_infogate`, `no_mselector`, `no_ib`, `no_conf_gating`, `no_adaptive_gate` into separate `runs/*` directories. MOSEI trial70 also includes `no_conf` as an alias of `no_conf_gating` with its own run directory. For strict baseline certification vs [`fixed_experiment/`](../fixed_experiment/), do not stack **`none`** with another training job on the same GPU in the same wave (`JOBS_PER_GPU=1` on that card or run `none` alone).
@@ -185,6 +214,8 @@ Batch scripts run `none`, `no_infogate`, `no_mselector`, `no_ib`, `no_conf_gatin
 | MOSEI trial 70 | [`run_prism_ablations_mosei_phase1_trial70.sh`](run_prism_ablations_mosei_phase1_trial70.sh) |
 | SIMSv2 phase4 trial 52 | [`run_prism_ablations_simsv2_phase4_trial52.sh`](run_prism_ablations_simsv2_phase4_trial52.sh) |
 | SIMSv2 tier3_fresh trial 53 | [`run_prism_ablations_simsv2_tier3_fresh_trial53.sh`](run_prism_ablations_simsv2_tier3_fresh_trial53.sh) |
+| UR-FUNNY v2 trial 162 (classify) | [`run_prism_ablations_ur_funny_trial162_serial.sh`](run_prism_ablations_ur_funny_trial162_serial.sh) |
+| MUStARD s2_local trial 134 (classify) | [`run_prism_ablations_mustard_trial134_serial.sh`](run_prism_ablations_mustard_trial134_serial.sh) |
 
 **Queue MOSI trial220 after MOSEI:** [`run_prism_ablations_mosei_phase1_trial70.sh`](run_prism_ablations_mosei_phase1_trial70.sh) writes its bash PID to [`runs/mosei_phase1_trial70_prism_master.pid`](runs/mosei_phase1_trial70_prism_master.pid) on startup. Start [`queue_mosi_trial220_after_mosei_prism.sh`](queue_mosi_trial220_after_mosei_prism.sh) (e.g. with `nohup`). It **blocks until that PID exits** — i.e. **MOSEI’s six PRISM ablations have finished all waves** — then runs [**`run_prism_ablations_mosi_trial220.sh`**](run_prism_ablations_mosi_trial220.sh) for **MOSI’s six PRISM modes** (`none`, `no_infogate`, …). **`JOBS_PER_GPU=1,1` by default** for MOSI unless you export another value. Override wait target with `MOSEI_MASTER_PID`, or `SKIP_MOSEI_WAIT=1` to run MOSI immediately (debug).
 
@@ -196,7 +227,9 @@ These files are **copies** of the corresponding modules under [`My_creation/`](.
 
 | File | Role |
 |------|------|
-| [`train.py`](train.py) | Entry training script (path patches for snapshot layout) |
+| [`train.py`](train.py) | Regression training (path patches for snapshot layout) |
+| [`train_classify.py`](train_classify.py) | UR-FUNNY / MUStARD binary classification + `--ablation` |
+| [`albert_infogate.py`](albert_infogate.py) | ALBERT + InfoGate (classification ablations) |
 | [`deberta_infogate.py`](deberta_infogate.py) | DeBERTa + InfoGate |
 | [`bert_infogate.py`](bert_infogate.py) | BERT path (e.g. SIMSv2) |
 | [`infogate_modules.py`](infogate_modules.py) | Shared InfoGate blocks |
@@ -242,6 +275,8 @@ cd My_creation && python ablation_study/train_fixed_mosi_trial234.py --dry-run
 cd My_creation && python ablation_study/train_fixed_mosi_trial220.py --dry-run
 cd My_creation && python ablation_study/train_fixed_mosei_phase1_trial70.py --dry-run
 cd My_creation && python ablation_study/train_fixed_simsv2_phase4_trial52.py --dry-run
+cd My_creation && python ablation_study/train_fixed_ur_funny_trial162.py --ablation no_ib --dry-run
+cd My_creation && python ablation_study/train_fixed_mustard_s2_local_trial134.py --ablation no_mselector --dry-run
 ```
 
 ## Optional check (argv vs gold logs)

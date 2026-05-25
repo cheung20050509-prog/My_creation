@@ -1,4 +1,4 @@
-# Fixed experiment: frozen Optuna trials (MOSI, MOSEI, SIMSv2)
+# Fixed experiment: frozen Optuna trials (MOSI, MOSEI, SIMSv2, UR-FUNNY, MUStARD)
 
 Reproducible single runs with hyperparameters copied from **`My_creation/logs/optuna/4090D_restart`**. CLI float formatting matches `optuna_search_v2.objective()` so parsed learning rates match the gold Optuna train log headers.
 
@@ -135,6 +135,62 @@ Dry-run / verify:
 ```bash
 cd My_creation && python fixed_experiment/train_fixed_simsv2_phase4_trial52.py --dry-run
 cd My_creation && python scripts/verify_simsv2_phase4_trial52_optuna_train_argv.py
+```
+
+---
+
+## UR-FUNNY v2 — trial 162 (paper classification row)
+
+- **Study:** `infogate_ur_funny_optuna_classify_albert_hcf_20260426_192758` (tier-2 TPE)
+- **Train log:** `logs/optuna/4090D_restart/classification/optuna_classify_albert_hcf_20260426_192758/train_logs/ur_funny_trial_162.log`
+- **Test (Best Results, dev `binary_acc`, epoch ≥ 10):** Acc **75.15%**, F1 **75.01%** — paper **75.2%** (`mhd_msd.py` uses 75.15)
+- **Files:** [`ur_funny_trial162_hparams.py`](ur_funny_trial162_hparams.py), [`train_fixed_ur_funny_trial162.py`](train_fixed_ur_funny_trial162.py), [`run_ur_funny_trial162.sh`](run_ur_funny_trial162.sh)
+- **Outputs:** `fixed_experiment/runs/ur_funny_trial162/`
+- **Entry:** `My_creation/train_classify.py` (ALBERT + HCF, cwd = `My_creation`)
+
+```bash
+bash /path/to/My_creation/fixed_experiment/run_ur_funny_trial162.sh
+```
+
+Dry-run:
+
+```bash
+cd My_creation && python fixed_experiment/train_fixed_ur_funny_trial162.py --dry-run
+```
+
+---
+
+## MUStARD — s2_local trial 134 (paper classification row)
+
+- **Study:** `infogate_mustard_optuna_classify_albert_hcf_20260426_192758_s2_local`
+- **Train log:** `.../train_logs/mustard_s2_local_trial_134.log`
+- **Test (Best Results, dev `binary_acc`, epoch ≥ 13):** Acc **79.41%**, F1 **79.34%** — paper **79.4%**
+- **Files:** [`mustard_s2_local_trial134_hparams.py`](mustard_s2_local_trial134_hparams.py), [`train_fixed_mustard_s2_local_trial134.py`](train_fixed_mustard_s2_local_trial134.py), [`run_mustard_s2_local_trial134.sh`](run_mustard_s2_local_trial134.sh)
+- **Outputs:** `fixed_experiment/runs/mustard_s2_local_trial134/`
+
+```bash
+bash /path/to/My_creation/fixed_experiment/run_mustard_s2_local_trial134.sh
+```
+
+**Parallel nohup** (one GPU each; on single-GPU hosts use `UR_FUNNY_GPU=0 MUSTARD_GPU=0`):
+
+```bash
+cd My_creation && bash fixed_experiment/run_classify_paper_trials_parallel_nohup.sh
+# single GPU example:
+UR_FUNNY_GPU=0 MUSTARD_GPU=0 bash fixed_experiment/run_classify_paper_trials_parallel_nohup.sh
+```
+
+**Serial / nohup** (UR-FUNNY then MUStARD on one GPU):
+
+```bash
+cd My_creation && bash fixed_experiment/run_classify_paper_trials_serial.sh
+cd My_creation && bash fixed_experiment/run_classify_paper_trials_nohup.sh
+```
+
+Dry-run:
+
+```bash
+cd My_creation && python fixed_experiment/train_fixed_mustard_s2_local_trial134.py --dry-run
 ```
 
 ---

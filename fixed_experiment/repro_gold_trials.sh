@@ -76,3 +76,19 @@ if [[ "${1:-}" == "mosei" || "${1:-}" == "all" ]]; then
     --ema_start_epoch 5 \
     2>&1 | tee "${LOGDIR}/mosei_trial70_fixedexp.log"
 fi
+
+# UR-FUNNY v2 trial 162 (paper classification Acc 75.15%)
+if [[ "${1:-}" == "ur_funny" || "${1:-}" == "classify" || "${1:-}" == "all" ]]; then
+  echo "[ur_funny] logging to ${LOGDIR}/ur_funny_trial162_fixedexp.log"
+  CUDA_VISIBLE_DEVICES="${UR_FUNNY_GPU:-0}" "$PYTHON" -u fixed_experiment/train_fixed_ur_funny_trial162.py \
+    --checkpoint-dir "${LOGDIR}/ckpt_ur_funny162" \
+    2>&1 | tee "${LOGDIR}/ur_funny_trial162_fixedexp.log"
+fi
+
+# MUStARD s2_local trial 134 (paper classification Acc 79.41%)
+if [[ "${1:-}" == "mustard" || "${1:-}" == "classify" || "${1:-}" == "all" ]]; then
+  echo "[mustard] logging to ${LOGDIR}/mustard_trial134_fixedexp.log"
+  CUDA_VISIBLE_DEVICES="${MUSTARD_GPU:-0}" "$PYTHON" -u fixed_experiment/train_fixed_mustard_s2_local_trial134.py \
+    --checkpoint-dir "${LOGDIR}/ckpt_mustard134" \
+    2>&1 | tee "${LOGDIR}/mustard_trial134_fixedexp.log"
+fi

@@ -46,15 +46,14 @@ for idx, dataset in enumerate(datasets):
 
     ax.yaxis.set_major_formatter(FormatStrFormatter("%d"))
 
-    ax.bar(
+    bars = ax.bar(
         x,
         values,
         width=0.6,
         color=colors,
         edgecolor="black",
-        linewidth=1
+        linewidth=1,
     )
-
     ax.set_xticks(x)
     ax.set_xticklabels(labels, fontsize=13, rotation=30, ha="right")
 
@@ -63,6 +62,18 @@ for idx, dataset in enumerate(datasets):
     ax.set_ylabel(y_config[dataset]["ylabel"], fontsize=13, fontweight="bold")
 
     ax.set_ylim(y_config[dataset]["ylim"])
+    for bar, value in zip(bars, values):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + 0.25,
+            f"{value:.1f}",
+            ha="center",
+            va="bottom",
+            fontsize=11,
+            fontweight="bold",
+            clip_on=False,
+            zorder=5,
+        )
     ax.tick_params(axis="y", labelsize=13)
 
     ax.spines["top"].set_visible(True)
